@@ -18,7 +18,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import { useFeedbackToast } from '../context/ToastContext';
+import { useFeedbackToast } from '../../../context/ToastContext';
 
 interface GMDecision {
   id: string;

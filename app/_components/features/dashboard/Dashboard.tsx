@@ -1,11 +1,11 @@
 'use client';
 
-import { useRole } from '../context/RoleContext';
-import { GMDashboard } from '../_components/features/dashboard/GMDashboard';
-import { MarketingDashboard } from '../_components/features/dashboard/MarketingDashboard';
-import { HRDashboard } from '../_components/features/dashboard/HRDashboard';
-import { EmployeeDashboardView } from '../_components/features/dashboard/EmployeeDashboardView';
-import { PMTimelineDashboard } from './PMTimelineDashboard';
+import { useRole } from '../../../context/RoleContext';
+import { GMDashboard } from './GMDashboard';
+import { MarketingDashboard } from './MarketingDashboard';
+import { HRDashboard } from './HRDashboard';
+import { EmployeeDashboardView } from './EmployeeDashboardView';
+import { PMDashboard } from './PMDashboard';
 
 export function Dashboard() {
   const { currentUser } = useRole();
@@ -22,7 +22,7 @@ export function Dashboard() {
 
   // PM Dashboard - Use new timeline dashboard
   if (currentUser.role === 'pm') {
-    return <PMTimelineDashboard />;
+    return <PMDashboard />;
   }
 
   // HR Dashboard

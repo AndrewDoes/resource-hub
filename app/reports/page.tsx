@@ -1,4 +1,5 @@
-import { Reports } from "../components/Reports";
+import { Reports } from "../_components/features/reports/Reports";
+
 
 export default function ReportsPage() {
   return <Reports />;

@@ -19,7 +19,7 @@ import {
   Award,
   ChevronRight,
 } from 'lucide-react';
-import { useFeedbackToast } from '../context/ToastContext';
+import { useFeedbackToast } from '../../../context/ToastContext';
 
 interface Employee {
   id: string;
@@ -247,7 +247,7 @@ export function UnifiedEmployeeManagement() {
   };
 
   return (
-    <div className="max-w-[1800px] mx-auto space-y-6">
+    <div className="max-w-450 mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -289,7 +289,7 @@ export function UnifiedEmployeeManagement() {
           <p className="text-2xl font-semibold text-gray-900">{stats.active}</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-green-200 bg-green-50 shadow-sm">
+        <div className="rounded-xl p-5 border border-green-200 bg-green-50 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-green-700">Available</h3>
             <UserCircle className="w-5 h-5 text-green-600" />
@@ -307,8 +307,8 @@ export function UnifiedEmployeeManagement() {
 
         <div
           className={`rounded-xl p-5 border shadow-sm ${stats.overloaded > 0
-              ? 'bg-red-50 border-red-200'
-              : 'bg-white border-gray-200'
+            ? 'bg-red-50 border-red-200'
+            : 'bg-white border-gray-200'
             }`}
         >
           <div className="flex items-center justify-between mb-2">
@@ -336,7 +336,7 @@ export function UnifiedEmployeeManagement() {
       {stats.overloaded > 0 && (
         <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="text-sm font-semibold text-red-900 mb-1">
                 Resource Overload Warning
@@ -365,15 +365,15 @@ export function UnifiedEmployeeManagement() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as TabType)}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.key
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 {tab.label}
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === tab.key
-                      ? 'bg-blue-100 text-blue-600'
-                      : 'bg-gray-100 text-gray-600'
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-gray-100 text-gray-600'
                     }`}
                 >
                   {tab.count}
@@ -471,7 +471,7 @@ export function UnifiedEmployeeManagement() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 bg-linear-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
                           <span className="text-white font-medium text-sm">
                             {employee.avatar}
                           </span>
@@ -516,10 +516,10 @@ export function UnifiedEmployeeManagement() {
                         <div className="flex-1 w-20 bg-gray-200 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full ${employee.workload <= 80
-                                ? 'bg-green-500'
-                                : employee.workload <= 100
-                                  ? 'bg-yellow-500'
-                                  : 'bg-red-500'
+                              ? 'bg-green-500'
+                              : employee.workload <= 100
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
                               }`}
                             style={{ width: `${Math.min(employee.workload, 100)}%` }}
                           ></div>
@@ -548,22 +548,22 @@ export function UnifiedEmployeeManagement() {
                       <div className="space-y-1">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${availStatus.color === 'green'
-                              ? 'bg-green-100 text-green-700'
-                              : availStatus.color === 'yellow'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : availStatus.color === 'orange'
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : 'bg-red-100 text-red-700'
+                            ? 'bg-green-100 text-green-700'
+                            : availStatus.color === 'yellow'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : availStatus.color === 'orange'
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-red-100 text-red-700'
                             }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${availStatus.color === 'green'
-                                ? 'bg-green-500'
-                                : availStatus.color === 'yellow'
-                                  ? 'bg-yellow-500'
-                                  : availStatus.color === 'orange'
-                                    ? 'bg-orange-500'
-                                    : 'bg-red-500'
+                              ? 'bg-green-500'
+                              : availStatus.color === 'yellow'
+                                ? 'bg-yellow-500'
+                                : availStatus.color === 'orange'
+                                  ? 'bg-orange-500'
+                                  : 'bg-red-500'
                               }`}
                           ></span>
                           {availStatus.label}
@@ -641,7 +641,7 @@ export function UnifiedEmployeeManagement() {
             className="fixed inset-0 bg-black/30 z-40"
             onClick={() => setSelectedEmployee(null)}
           />
-          <div className="fixed right-0 top-0 bottom-0 w-[500px] bg-white shadow-2xl z-50 overflow-y-auto">
+          <div className="fixed right-0 top-0 bottom-0 w-125 bg-white shadow-2xl z-50 overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Employee Details</h2>
               <button
@@ -655,7 +655,7 @@ export function UnifiedEmployeeManagement() {
             <div className="p-6 space-y-6">
               {/* Profile Section */}
               <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-20 h-20 bg-linear-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-white font-semibold text-2xl">
                     {selectedEmployee.avatar}
                   </span>

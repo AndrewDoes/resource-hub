@@ -78,7 +78,7 @@ export function MyProjects() {
       </div>
 
       {/* Summary Card */}
-      <div className="bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl p-6 text-white shadow-lg">
+      <div className="bg-linear-to-br from-orange-500 to-yellow-500 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-white/20 rounded-lg backdrop-blur">
             <Briefcase className="w-6 h-6" />

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { GanttTimeline, TimelineProject } from './GanttTimeline';
-import { SmartFilters, FilterOptions } from './SmartFilters';
+import { SmartFilters, FilterOptions } from '../../common/SmartFilters';
 import {
   ResourcePlanningSystem,
   ResourceConflict,
@@ -9,8 +9,8 @@ import {
   SystemAlert,
   Project as IntelligenceProject,
   Employee,
-} from './SystemIntelligence';
-import { useFeedbackToast } from '../context/ToastContext';
+} from '../system/SystemIntelligence';
+import { useFeedbackToast } from '../../../context/ToastContext';
 import Link from 'next/link';
 import {
   BarChart3,
@@ -207,7 +207,7 @@ const statsData = [
   },
 ];
 
-export function PMTimelineDashboard() {
+export function PMDashboard() {
   const { addToast } = useFeedbackToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [filters, setFilters] = useState<FilterOptions>({

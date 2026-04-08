@@ -134,7 +134,7 @@ export function WorkflowVisualizer({ currentStatus, compact = false }: WorkflowV
               <div className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${isActive
-                    ? `bg-gradient-to-br ${step.color} text-white shadow-md`
+                    ? `bg-linear-to-br ${step.color} text-white shadow-md`
                     : isCompleted
                       ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-400'
@@ -189,7 +189,7 @@ export function WorkflowVisualizer({ currentStatus, compact = false }: WorkflowV
       {currentStatus === 'rejected' && (
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-red-900">Project Rejected</p>
               <p className="text-sm text-red-700 mt-1">

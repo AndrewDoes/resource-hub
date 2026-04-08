@@ -1,7 +1,8 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useRole, UserRole, roleConfig } from '../context/RoleContext';
 import { Check, ChevronDown } from 'lucide-react';
+import { roleConfig, useRole } from '@/app/context/RoleContext';
+import { UserRole } from '@/app/types';
 
 interface ProfileDropdownProps {
   isOpen: boolean;
@@ -108,15 +109,15 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
                   key={role}
                   onClick={() => handleRoleSwitch(role)}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${isActive
-                      ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${isActive
-                          ? 'bg-white/20 backdrop-blur'
-                          : `bg-linear-to-br ${roleConfig[role].color}`
+                        ? 'bg-white/20 backdrop-blur'
+                        : `bg-linear-to-br ${roleConfig[role].color}`
                         }`}
                     >
                       <span className={`text-xs font-medium ${isActive ? 'text-white' : 'text-white'}`}>

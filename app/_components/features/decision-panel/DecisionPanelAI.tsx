@@ -14,7 +14,7 @@ import {
   HelpCircle,
   DollarSign,
 } from 'lucide-react';
-import { useFeedbackToast } from '../context/ToastContext';
+import { useFeedbackToast } from '../../../context/ToastContext';
 
 export interface ProjectData {
   id: string;

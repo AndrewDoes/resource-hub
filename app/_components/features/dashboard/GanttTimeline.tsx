@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { Calendar, Users, AlertTriangle, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { StatusBadge, ProjectStatus } from './WorkflowSystem';
+import { StatusBadge, ProjectStatus } from '../system/WorkflowSystem';
 
 export interface TimelineProject {
   id: string;

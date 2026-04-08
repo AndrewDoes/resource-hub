@@ -20,10 +20,11 @@ import {
   Gavel,
   ChevronDown,
 } from 'lucide-react';
-import { NotificationPanel, Notification } from './NotificationPanel';
-import { ProfileDropdown } from './ProfileDropdown';
-import { useRole, UserRole, roleConfig } from '../context/RoleContext';
-import { ToastProvider } from '../context/ToastContext';
+import { Notification, UserRole } from '@/app/types';
+import { roleConfig, useRole } from '@/app/context/RoleContext';
+import { ToastProvider } from '@/app/context/ToastContext';
+import { NotificationPanel } from '../common/NotificationPanel';
+import { ProfileDropdown } from '../common/ProfileDropdown';
 
 interface MenuItem {
   path: string;
@@ -181,8 +182,8 @@ export function Root({ children }: { children: ReactNode }) {
                   key={item.path}
                   href={item.path}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${active
-                      ? 'bg-gradient-to-r from-blue-50 to-green-50 text-blue-700 font-semibold shadow-sm'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-linear-to-r from-blue-50 to-green-50 text-blue-700 font-semibold shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -194,7 +195,7 @@ export function Root({ children }: { children: ReactNode }) {
 
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className={`w-8 h-8 bg-gradient-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
+              <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
                 <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -225,8 +226,8 @@ export function Root({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => setNotificationOpen(!notificationOpen)}
                   className={`relative p-2 rounded-lg transition-all ${notificationOpen
-                      ? 'bg-blue-100 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
                   <Bell className="w-5 h-5" />
@@ -241,7 +242,7 @@ export function Root({ children }: { children: ReactNode }) {
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
                 >
-                  <div className={`w-8 h-8 bg-gradient-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
+                  <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
                     <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
                   </div>
                   <div className="text-left hidden md:block">

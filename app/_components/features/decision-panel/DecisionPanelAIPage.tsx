@@ -15,7 +15,7 @@ import {
   DollarSign,
   ChevronRight,
 } from 'lucide-react';
-import { useFeedbackToast } from '../context/ToastContext';
+import { useFeedbackToast } from '../../../context/ToastContext';
 
 interface ProjectData {
   id: string;

@@ -10,8 +10,8 @@ import {
   ZoomOut,
   X,
 } from 'lucide-react';
-import { DecisionPanelAI } from './DecisionPanelAI';
-import type { ProjectData } from './DecisionPanelAI';
+import { DecisionPanelAI } from '../decision-panel/DecisionPanelAI';
+import type { ProjectData } from '../decision-panel/DecisionPanelAI';
 
 interface GanttProject {
   id: string;
