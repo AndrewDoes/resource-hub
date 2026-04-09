@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Settings, MessageSquare, RefreshCw, GitBranch } from 'lucide-react';
+import { Settings, MessageSquare, RefreshCw, GitBranch, BarChart3, Users, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 
@@ -14,10 +14,92 @@ import { ProjectGrid } from './ProjectGrid';
 
 
 // Types, Data, Utils
-import { TimelineProject } from '@/app/_components/features/common/dashboard/types';
-import { mockProjects, mockEmployees, statsData } from '@/app/_components/features/common/dashboard/data';
+import { TimelineProject, DashboardStat } from '@/app/_components/features/common/dashboard/types';
+import { mockProjects, mockEmployees } from '@/app/_components/features/common/dashboard/data';
 import { convertToIntelligenceProjects } from '@/app/_components/features/common/dashboard/utils';
-import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert } from '@/app/_components/system/SystemIntelligence';
+import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert, Employee } from '@/app/_components/system/SystemIntelligence';
+import {
+  fetchProjectManagerProjectTeam,
+  fetchProjectManagerProjects,
+  projectManagerFallbackProjects,
+  type ProjectManagerProjectSummary,
+  type ProjectManagerProjectTeamMember,
+} from '@/functions/api/projectManager';
+
+const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+
+const getProjectStatus = (project: ProjectManagerProjectSummary): TimelineProject['status'] => {
+  const progress = Number.isFinite(project.progress) ? project.progress : 0;
+  const today = new Date();
+  const startDate = new Date(project.startDate);
+
+  if (progress >= 100) {
+    return 'completed';
+  }
+
+  if (startDate > today) {
+    return 'assigned';
+  }
+
+  return 'in-progress';
+};
+
+const getProjectPhase = (project: ProjectManagerProjectSummary): TimelineProject['phase'] => {
+  const status = getProjectStatus(project);
+
+  if (status === 'assigned') {
+    return 'planning';
+  }
+
+  if (status === 'completed') {
+    return 'delivery';
+  }
+
+  return 'execution';
+};
+
+const computeStats = (projects: TimelineProject[], conflictCount: number): DashboardStat[] => {
+  const activeProjects = projects.filter((project) => project.status !== 'completed').length;
+  const uniqueTeamMembers = new Set(projects.flatMap((project) => project.teamMembers));
+  const averageProgress = projects.length === 0
+    ? 0
+    : Math.round(projects.reduce((total, project) => total + project.progress, 0) / projects.length);
+
+  return [
+    {
+      label: 'Active Projects',
+      value: String(activeProjects),
+      change: `${projects.length} total projects`,
+      icon: BarChart3,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+    },
+    {
+      label: 'Total Team Members',
+      value: String(uniqueTeamMembers.size),
+      change: 'Across current projects',
+      icon: Users,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+    },
+    {
+      label: 'Conflicts Detected',
+      value: String(conflictCount),
+      change: conflictCount > 0 ? 'Needs attention' : 'All clear',
+      icon: AlertTriangle,
+      color: conflictCount > 0 ? 'text-red-600' : 'text-emerald-600',
+      bgColor: conflictCount > 0 ? 'bg-red-50' : 'bg-emerald-50',
+    },
+    {
+      label: 'Avg Progress',
+      value: `${averageProgress}%`,
+      change: 'Across all projects',
+      icon: TrendingUp,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+    },
+  ];
+};
 
 
 export function PMDashboard() {
@@ -31,31 +113,152 @@ export function PMDashboard() {
     sortOrder: 'asc',
   });
 
+  const [allProjects, setAllProjects] = useState<TimelineProject[]>(mockProjects);
   const [filteredProjects, setFilteredProjects] = useState<TimelineProject[]>(mockProjects);
+  const [stats, setStats] = useState<DashboardStat[]>(computeStats(mockProjects, 0));
   const [detectedConflicts, setDetectedConflicts] = useState<ResourceConflict[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Run conflict detection on mount and when projects change
   useEffect(() => {
-    const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
-    const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
+    let isMounted = true;
 
-    // Generate recommendations for each conflict
-    const conflictsWithSuggestions = conflicts.map((conflict) => ({
-      ...conflict,
-      suggestions: ResourcePlanningSystem.generateRecommendations(
-        conflict,
-        mockEmployees,
-        intelligenceProjects
-      ),
-    }));
+    const loadDashboard = async () => {
+      try {
+        const summaries = await fetchProjectManagerProjects(defaultPmUserId);
+        const sourceSummaries = summaries.length > 0 ? summaries : projectManagerFallbackProjects;
 
-    setDetectedConflicts(conflictsWithSuggestions);
+        const teamResponses = await Promise.all(
+          sourceSummaries.map(async (project) => {
+            try {
+              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
+              return { projectId: project.id, team };
+            } catch {
+              return { projectId: project.id, team: [] as ProjectManagerProjectTeamMember[] };
+            }
+          })
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        const projectTeamMap = new Map(teamResponses.map((item) => [item.projectId, item.team]));
+
+        const liveProjects: TimelineProject[] = sourceSummaries.map((project) => {
+          const team = projectTeamMap.get(project.id) ?? [];
+          return {
+            id: project.id,
+            name: project.name,
+            description: project.description,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            progress: Math.max(0, Math.min(100, Math.round(project.progress))),
+            status: getProjectStatus(project),
+            teamMembers: team.map((member) => member.fullName),
+            phase: getProjectPhase(project),
+          };
+        });
+
+        const employeeMap = new Map<string, Employee>();
+        projectTeamMap.forEach((teamMembers, projectId) => {
+          teamMembers.forEach((member) => {
+            const key = member.employeeId;
+            const existing = employeeMap.get(key);
+
+            if (existing) {
+              if (!existing.currentProjects.includes(projectId)) {
+                existing.currentProjects.push(projectId);
+              }
+              existing.availability = Math.max(0, existing.availability - Math.round(member.allocationPercent / 2));
+              return;
+            }
+
+            employeeMap.set(key, {
+              id: key,
+              name: member.fullName,
+              skills: [member.jobTitle],
+              availability: Math.max(0, 100 - Math.round(member.allocationPercent)),
+              currentProjects: [projectId],
+              status: 'active',
+            });
+          });
+        });
+
+        const inferredEmployees = employeeMap.size > 0 ? Array.from(employeeMap.values()) : mockEmployees;
+
+        const intelligenceProjects = convertToIntelligenceProjects(liveProjects, inferredEmployees);
+        const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, inferredEmployees);
+        const conflictsWithSuggestions = conflicts.map((conflict) => ({
+          ...conflict,
+          suggestions: ResourcePlanningSystem.generateRecommendations(
+            conflict,
+            inferredEmployees,
+            intelligenceProjects
+          ),
+        }));
+
+        const conflictProjectIds = new Set(conflictsWithSuggestions.flatMap((conflict) => conflict.projectIds));
+        const projectsWithConflicts = liveProjects.map((project) => {
+          if (!conflictProjectIds.has(project.id)) {
+            return project;
+          }
+
+          const relatedConflicts = conflictsWithSuggestions.filter((conflict) => conflict.projectIds.includes(project.id));
+          return {
+            ...project,
+            hasConflict: true,
+            conflictMessage: relatedConflicts[0]?.details,
+          };
+        });
+
+        setEmployees(inferredEmployees);
+        setAllProjects(projectsWithConflicts);
+        setFilteredProjects(projectsWithConflicts);
+        setDetectedConflicts(conflictsWithSuggestions);
+        setStats(computeStats(projectsWithConflicts, conflictsWithSuggestions.length));
+        setError(null);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
+        const fallbackConflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
+        const fallbackConflictsWithSuggestions = fallbackConflicts.map((conflict) => ({
+          ...conflict,
+          suggestions: ResourcePlanningSystem.generateRecommendations(
+            conflict,
+            mockEmployees,
+            intelligenceProjects
+          ),
+        }));
+
+        setEmployees(mockEmployees);
+        setAllProjects(mockProjects);
+        setFilteredProjects(mockProjects);
+        setDetectedConflicts(fallbackConflictsWithSuggestions);
+        setStats(computeStats(mockProjects, fallbackConflictsWithSuggestions.length));
+        setError(loadError instanceof Error ? loadError.message : 'Failed to load PM dashboard');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
 
-    let filtered = [...mockProjects];
+    let filtered = [...allProjects];
 
     // Search filter
     if (newFilters.search) {
@@ -147,19 +350,20 @@ export function PMDashboard() {
   };
 
   const handleRefreshConflicts = () => {
-    const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
-    const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
+    const intelligenceProjects = convertToIntelligenceProjects(allProjects, employees);
+    const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, employees);
 
     const conflictsWithSuggestions = conflicts.map((conflict) => ({
       ...conflict,
       suggestions: ResourcePlanningSystem.generateRecommendations(
         conflict,
-        mockEmployees,
+        employees,
         intelligenceProjects
       ),
     }));
 
     setDetectedConflicts(conflictsWithSuggestions);
+    setStats(computeStats(allProjects, conflictsWithSuggestions.length));
     addToast({
       type: 'success',
       title: 'Conflicts Refreshed',
@@ -209,8 +413,20 @@ export function PMDashboard() {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Showing local fallback data because PM dashboard backend requests failed: {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
+          Loading PM dashboard from backend...
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <DashboardStats stats={statsData} />
+      <DashboardStats stats={stats} />
 
       {/* System Intelligence Alerts */}
       {detectedConflicts.length > 0 && (
