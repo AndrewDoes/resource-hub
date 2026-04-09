@@ -14,6 +14,8 @@ import { ContractExecutionPanel } from './components/ContractExecutionPanel';
 import { AssignmentValidation } from './components/AssignmentValidation';
 import { HiringActionPanel } from './components/HiringActionPanel';
 import { EmployeeStatusControl } from './components/EmployeeStatusControl';
+import { WorkloadStatusIndicator } from './components/WorkloadStatusIndicator';
+import { WorkloadKPIs } from './components/WorkloadKPIs';
 
 export function HRValidation() {
   const [gmDecisions, setGmDecisions] = useState<GMDecision[]>(mockGMDecisions);
@@ -105,6 +107,11 @@ export function HRValidation() {
             <span>Validation Mode Active</span>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <WorkloadStatusIndicator />
+        <WorkloadKPIs employeeStatus={employeeStatus} />
       </div>
 
       <div className="grid grid-cols-1 gap-6">
