@@ -66,6 +66,7 @@ export interface Employee {
   status: 'active' | 'inactive' | 'resigned';
   availability: number;
   workload: number;
+  assignedHours: number;
   currentProjects: string[];
   projectHistory: string[];
   joinedDate: string;

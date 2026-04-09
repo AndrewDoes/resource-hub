@@ -14,6 +14,7 @@ export const BackendApiUrl = {
   generalManagerProjectPrediction: (projectId: string) => `${baseUrl}/api/general-manager/predictions/projects/${projectId}`,
   generalManagerContractDecisions: `${baseUrl}/api/general-manager/contract-decisions`,
   employees: `${baseUrl}/api/employees`,
+  employeesList: `${baseUrl}/api/employees/list`,
   assignments: `${baseUrl}/api/assignments`,
   lookups: `${baseUrl}/api/lookups`,
 } as const;

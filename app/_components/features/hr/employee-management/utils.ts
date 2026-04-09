@@ -55,6 +55,7 @@ export const calculateWorkloadFromHours = (assignedHours: number): number => {
  */
 export const calculateStatus = (assignedHours: number): 'available' | 'moderate' | 'busy' | 'overloaded' => {
   const workloadPercent = calculateWorkloadFromHours(assignedHours);
+  console.log(`Assigned Hours: ${assignedHours}, Workload Percent: ${workloadPercent}`);
   if (workloadPercent <= 40) return 'available';
   if (workloadPercent <= 70) return 'moderate';
   if (workloadPercent <= 100) return 'busy';
@@ -64,9 +65,18 @@ export const calculateStatus = (assignedHours: number): 'available' | 'moderate'
 /**
  * Helper for UnifiedEmployeeManagement availability status
  */
-export const getAvailabilityStatus = (availability: number, workload: number) => {
-  if (workload > 100) return { label: 'Overloaded', color: 'red' };
-  if (availability >= 80) return { label: 'Available', color: 'green' };
-  if (availability >= 50) return { label: 'Moderate', color: 'yellow' };
-  return { label: 'Busy', color: 'orange' };
+export const getAvailabilityStatus = (assignedHours: number) => {
+  const status = calculateStatus(assignedHours);
+  switch (status) {
+    case 'available':
+      return { label: 'Available', color: 'green' };
+    case 'moderate':
+      return { label: 'Moderate', color: 'yellow' };
+    case 'busy':
+      return { label: 'Busy', color: 'orange' };
+    case 'overloaded':
+      return { label: 'Overloaded', color: 'red' };
+    default:
+      return { label: 'Unknown', color: 'gray' };
+  }
 };
