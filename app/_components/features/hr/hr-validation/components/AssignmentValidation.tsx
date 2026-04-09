@@ -5,14 +5,16 @@ import { AssignmentRequest } from '../types';
 
 interface AssignmentValidationProps {
   assignmentRequests: AssignmentRequest[];
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  onApprove: (id: string) => void | Promise<void>;
+  onReject: (id: string) => void | Promise<void>;
+  isLoading?: boolean;
 }
 
 export function AssignmentValidation({
   assignmentRequests,
   onApprove,
   onReject,
+  isLoading = false,
 }: AssignmentValidationProps) {
   const pendingAssignments = assignmentRequests.filter((a) => a.status === 'pending');
 
@@ -27,7 +29,13 @@ export function AssignmentValidation({
       </div>
 
       <div className="p-6 space-y-4">
-        {pendingAssignments.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-40 bg-gray-50 border border-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : pendingAssignments.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p className="text-sm">No pending assignment validations</p>

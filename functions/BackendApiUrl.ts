@@ -17,5 +17,8 @@ export const BackendApiUrl = {
   employees: `${baseUrl}/api/employees`,
   employeesList: `${baseUrl}/api/employees/list`,
   assignments: `${baseUrl}/api/assignments`,
+  assignmentsList: `${baseUrl}/api/Assignments/list`,
+  updateAssignmentStatus: `${baseUrl}/api/Assignments/update-status`,
+  hrDashboardSummary: `${baseUrl}/api/human-resource/dashboard-summary`,
   lookups: `${baseUrl}/api/lookups`,
 } as const;
