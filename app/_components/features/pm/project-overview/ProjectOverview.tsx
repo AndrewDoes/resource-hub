@@ -1,51 +1,66 @@
-'use client';
-import { Folder, Calendar, Users, TrendingUp, Clock } from 'lucide-react';
+"use client";
 
-interface Project {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: 'on-track' | 'at-risk' | 'delayed';
-  progress: number;
-  teamSize: number;
-  description: string;
-}
+import { useEffect, useMemo, useState } from "react";
+import { Calendar, Clock, Folder, TrendingUp, Users } from "lucide-react";
 
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    startDate: '2026-04-15',
-    endDate: '2026-07-15',
-    status: 'on-track',
-    progress: 45,
-    teamSize: 8,
-    description: 'Complete redesign of company website with modern UI/UX',
-  },
-  {
-    id: '2',
-    name: 'Mobile App Development',
-    startDate: '2026-05-01',
-    endDate: '2026-08-30',
-    status: 'at-risk',
-    progress: 30,
-    teamSize: 6,
-    description: 'Native mobile application for iOS and Android platforms',
-  },
-  {
-    id: '3',
-    name: 'Marketing Campaign Q3',
-    startDate: '2026-06-01',
-    endDate: '2026-09-15',
-    status: 'on-track',
-    progress: 20,
-    teamSize: 5,
-    description: 'Comprehensive marketing campaign for Q3 product launch',
-  },
-];
+import {
+  fetchProjectManagerProjects,
+  projectManagerFallbackProjects,
+  type ProjectManagerProjectSummary,
+} from "@/functions/api/projectManager";
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
 export function ProjectOverview() {
+  const [projects, setProjects] = useState<ProjectManagerProjectSummary[]>(projectManagerFallbackProjects);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProjects = async () => {
+      try {
+        const response = await fetchProjectManagerProjects();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setProjects(response.length > 0 ? response : projectManagerFallbackProjects);
+        setError(null);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+
+        setProjects(projectManagerFallbackProjects);
+        setError(loadError instanceof Error ? loadError.message : "Failed to load projects");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'on-track':
@@ -72,6 +87,15 @@ export function ProjectOverview() {
     }
   };
 
+  const stats = useMemo(() => {
+    return {
+      total: projects.length,
+      onTrack: projects.filter((project) => project.status === 'on-track').length,
+      atRisk: projects.filter((project) => project.status === 'at-risk').length,
+      delayed: projects.filter((project) => project.status === 'delayed').length,
+    };
+  }, [projects]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div>
@@ -79,6 +103,11 @@ export function ProjectOverview() {
         <p className="text-sm text-gray-500 mt-1">
           Monitor all projects and track their progress
         </p>
+        {error && (
+          <p className="mt-2 text-sm text-amber-700">
+            Showing local fallback data because the backend request failed: {error}
+          </p>
+        )}
       </div>
 
       {/* Summary Card */}
@@ -90,7 +119,7 @@ export function ProjectOverview() {
           <div>
             <h2 className="text-xl font-semibold mb-1">Active Projects</h2>
             <p className="text-blue-50 text-sm">
-              {mockProjects.length} projects in progress • {mockProjects.filter(p => p.status === 'on-track').length} on track
+              {stats.total} projects in progress • {stats.onTrack} on track
             </p>
           </div>
         </div>
@@ -98,22 +127,28 @@ export function ProjectOverview() {
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="bg-white/10 backdrop-blur rounded-lg p-4">
             <p className="text-sm mb-1">On Track</p>
-            <p className="text-2xl font-semibold">{mockProjects.filter(p => p.status === 'on-track').length}</p>
+            <p className="text-2xl font-semibold">{stats.onTrack}</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-lg p-4">
             <p className="text-sm mb-1">At Risk</p>
-            <p className="text-2xl font-semibold">{mockProjects.filter(p => p.status === 'at-risk').length}</p>
+            <p className="text-2xl font-semibold">{stats.atRisk}</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-lg p-4">
             <p className="text-sm mb-1">Delayed</p>
-            <p className="text-2xl font-semibold">{mockProjects.filter(p => p.status === 'delayed').length}</p>
+            <p className="text-2xl font-semibold">{stats.delayed}</p>
           </div>
         </div>
       </div>
 
       {/* Projects List */}
       <div className="space-y-4">
-        {mockProjects.map((project) => (
+        {isLoading && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-sm text-gray-500">
+            Loading projects from the backend...
+          </div>
+        )}
+
+        {!isLoading && projects.map((project) => (
           <div
             key={project.id}
             className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow"
@@ -136,14 +171,14 @@ export function ProjectOverview() {
                   <Calendar className="w-4 h-4" />
                   Start Date
                 </div>
-                <p className="text-sm font-medium text-gray-900">{project.startDate}</p>
+                <p className="text-sm font-medium text-gray-900">{formatDate(project.startDate)}</p>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                   <Clock className="w-4 h-4" />
                   End Date
                 </div>
-                <p className="text-sm font-medium text-gray-900">{project.endDate}</p>
+                <p className="text-sm font-medium text-gray-900">{formatDate(project.endDate)}</p>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
