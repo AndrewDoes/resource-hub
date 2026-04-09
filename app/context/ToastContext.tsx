@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { ToastContainer, Toast } from '../components/FeedbackToast';
+import { Toast, ToastContainer } from '../_components/common/FeedbackToast';
 
 interface ToastContextType {
   addToast: (toast: Omit<Toast, 'id'>) => void;

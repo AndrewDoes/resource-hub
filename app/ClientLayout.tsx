@@ -1,8 +1,8 @@
 'use client';
 
+import { Root } from './_components/layout/MainLayout';
 import { RoleProvider } from './context/RoleContext';
 import { ToastProvider } from './context/ToastContext';
-import { Root } from './components/Root';
 import { ReactNode } from 'react';
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
