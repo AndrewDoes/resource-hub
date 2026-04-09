@@ -65,7 +65,8 @@ export interface Employee {
   location: string;
   department: string;
   skills: string[];
-  status: 'active' | 'inactive' | 'resigned';
+  status: 'active' | 'inactive' | 'resigned' | 'on-leave';
+
   availability: number;
   workload: number;
   currentProjects: string[];
