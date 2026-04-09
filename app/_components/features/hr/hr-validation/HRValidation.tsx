@@ -109,12 +109,10 @@ export function HRValidation() {
         </div>
       </div>
 
+
       <div className="grid grid-cols-1 gap-6">
         <WorkloadStatusIndicator />
         <WorkloadKPIs employeeStatus={employeeStatus} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
         <div className="space-y-6">
           <DecisionInbox
             gmDecisions={gmDecisions}
@@ -137,8 +135,6 @@ export function HRValidation() {
           <EmployeeStatusControl
             employeeStatus={employeeStatus}
           />
-        </div>
-        <div className="grid grid-cols-1 gap-6">
           <AssignmentValidation
             assignmentRequests={assignmentRequests}
             onApprove={handleApproveAssignment}
