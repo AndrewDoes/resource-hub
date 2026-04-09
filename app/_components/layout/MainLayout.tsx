@@ -34,17 +34,29 @@ interface MenuItem {
 }
 
 const allMenuItems: MenuItem[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['marketing', 'pm', 'gm', 'hr', 'employee'] },
-  { path: '/projects', label: 'Create Project', icon: FileText, roles: ['marketing'] },
-  { path: '/project-overview', label: 'Project Overview', icon: Folder, roles: ['pm'] },
-  { path: '/planning', label: 'Planning', icon: CalendarCheck, roles: ['gm'] },
-  { path: '/decision-panel', label: 'Decision Panel', icon: Gavel, roles: ['gm'] },
-  { path: '/hr-validation', label: 'HR Validation', icon: ClipboardCheck, roles: ['hr'] },
-  { path: '/employee-management', label: 'Employee Management', icon: Users, roles: ['hr'] },
-  { path: '/my-projects', label: 'My Projects', icon: Briefcase, roles: ['employee'] },
-  { path: '/resource-overview', label: 'Resource Overview', icon: Users, roles: ['gm'] },
-  { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['gm', 'hr'] },
-  { path: '/settings', label: 'Settings', icon: Settings, roles: ['marketing', 'pm', 'gm', 'hr', 'employee'] },
+  { path: '/marketing/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['marketing'] },
+  { path: '/pm/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['pm'] },
+  { path: '/gm/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['gm'] },
+  { path: '/hr/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['hr'] },
+  { path: '/employee/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee'] },
+
+  { path: '/marketing/projects', label: 'Create Project', icon: FileText, roles: ['marketing'] },
+  { path: '/pm/project-overview', label: 'Project Overview', icon: Folder, roles: ['pm'] },
+  { path: '/pm/project-manager', label: 'Project Manager', icon: Briefcase, roles: ['pm'] },
+  { path: '/gm/planning', label: 'Planning', icon: CalendarCheck, roles: ['gm'] },
+  { path: '/gm/decision-panel', label: 'Decision Panel', icon: Gavel, roles: ['gm'] },
+  { path: '/hr/hr-validation', label: 'HR Validation', icon: ClipboardCheck, roles: ['hr'] },
+  { path: '/hr/employee-management', label: 'Employee Management', icon: Users, roles: ['hr'] },
+  { path: '/employee/my-projects', label: 'My Projects', icon: Briefcase, roles: ['employee'] },
+  { path: '/employee/employee', label: 'My Profile', icon: User, roles: ['employee'] },
+  { path: '/gm/resource-overview', label: 'Resource Overview', icon: Users, roles: ['gm'] },
+
+  // Settings/Reports could be role-prefixed or shared. Assuming role-prefixed for consistency.
+  { path: '/marketing/settings', label: 'Settings', icon: Settings, roles: ['marketing'] },
+  { path: '/pm/settings', label: 'Settings', icon: Settings, roles: ['pm'] },
+  { path: '/gm/settings', label: 'Settings', icon: Settings, roles: ['gm'] },
+  { path: '/hr/settings', label: 'Settings', icon: Settings, roles: ['hr'] },
+  { path: '/employee/settings', label: 'Settings', icon: Settings, roles: ['employee'] },
 ];
 
 // Role-based notification filtering helper
@@ -99,7 +111,7 @@ const initialNotifications: Notification[] = [
     message: 'You have been assigned to "Website Redesign" project',
     timestamp: '5 minutes ago',
     read: false,
-    navigationTarget: '/employee',
+    navigationTarget: '/employee/my-projects',
   },
   {
     id: '2',
@@ -108,7 +120,7 @@ const initialNotifications: Notification[] = [
     message: 'Resource assignment pending your approval for Mobile App project',
     timestamp: '1 hour ago',
     read: false,
-    navigationTarget: '/hr-validation',
+    navigationTarget: '/hr/hr-validation',
   },
   {
     id: '3',
@@ -117,7 +129,7 @@ const initialNotifications: Notification[] = [
     message: 'Marketing Campaign may miss deadline due to resource shortage',
     timestamp: '2 hours ago',
     read: false,
-    navigationTarget: '/planning',
+    navigationTarget: '/gm/planning',
     highlightProject: 'marketing-campaign',
   },
   {
@@ -127,7 +139,7 @@ const initialNotifications: Notification[] = [
     message: 'David Lee is allocated at 110% - immediate action required',
     timestamp: '3 hours ago',
     read: true,
-    navigationTarget: '/planning',
+    navigationTarget: '/gm/planning',
     highlightProject: 'resource-conflict',
   },
 ];

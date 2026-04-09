@@ -10,11 +10,11 @@ interface ProfileDropdownProps {
 }
 
 const roleDefaultPages: Record<UserRole, string> = {
-  marketing: '/projects',
-  pm: '/project-overview',
-  gm: '/planning',
-  hr: '/hr-validation',
-  employee: '/my-projects',
+  marketing: '/marketing/projects',
+  pm: '/pm/project-overview',
+  gm: '/gm/planning',
+  hr: '/hr/hr-validation',
+  employee: '/employee/my-projects',
 };
 
 export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
