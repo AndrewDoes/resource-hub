@@ -1,21 +1,9 @@
 'use client';
 import React, { useState } from 'react';
 import { Calendar, Users, AlertTriangle, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { TimelineProject } from './types';
+import { getPhaseColor } from './utils';
 import { StatusBadge, ProjectStatus } from '../system/WorkflowSystem';
-
-export interface TimelineProject {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  progress: number;
-  status: ProjectStatus;
-  teamMembers: string[];
-  description: string;
-  hasConflict?: boolean;
-  conflictMessage?: string;
-  phase?: 'planning' | 'execution' | 'review' | 'delivery';
-}
 
 interface GanttTimelineProps {
   projects: TimelineProject[];
@@ -182,7 +170,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
         <div className="min-w-[800px]">
           {/* Timeline Header with Dates */}
           <div className="flex mb-4">
-            <div className="w-64 flex-shrink-0" />
+            <div className="w-64 shrink-0" />
             <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${timelineColumns.length}, 1fr)` }}>
               {timelineColumns.map((date, index) => (
                 <div key={index} className="text-center border-l border-gray-200 px-2">
@@ -201,12 +189,12 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
               return (
                 <div key={project.id} className="flex items-center group">
                   {/* Project Info */}
-                  <div className="w-64 flex-shrink-0 pr-4">
+                  <div className="w-64 shrink-0 pr-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <h4 className="font-medium text-gray-900 text-sm truncate">{project.name}</h4>
                         {project.hasConflict && (
-                          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -297,7 +285,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
                             </div>
                             {project.hasConflict && (
                               <div className="pt-2 border-t border-red-800 flex items-start gap-2">
-                                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                                 <div>
                                   <p className="text-xs font-semibold text-red-400">Conflict Detected</p>
                                   <p className="text-xs text-red-300 mt-1">{project.conflictMessage}</p>

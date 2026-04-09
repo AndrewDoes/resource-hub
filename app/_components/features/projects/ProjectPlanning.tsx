@@ -10,8 +10,8 @@ import {
   ZoomOut,
   X,
 } from 'lucide-react';
-import { DecisionPanelAI } from '../decision-panel/DecisionPanelAI';
-import type { ProjectData } from '../decision-panel/DecisionPanelAI';
+import { AIDecisionPanel } from '../decision-panel/components/AIDecisionPanel';
+import type { ProjectData } from '../decision-panel/types';
 
 interface GanttProject {
   id: string;
@@ -172,8 +172,8 @@ export function ProjectPlanning() {
               <button
                 onClick={() => setViewMode('weekly')}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'weekly'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 <ZoomIn className="w-3.5 h-3.5 inline mr-1" />
@@ -182,8 +182,8 @@ export function ProjectPlanning() {
               <button
                 onClick={() => setViewMode('monthly')}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'monthly'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 <ZoomOut className="w-3.5 h-3.5 inline mr-1" />
@@ -291,7 +291,7 @@ export function ProjectPlanning() {
 
         {/* Decision Panel (AI Assisted) */}
         <div>
-          <DecisionPanelAI
+          <AIDecisionPanel
             selectedProject={selectedProject ? convertToProjectData(selectedProject) : null}
           />
         </div>

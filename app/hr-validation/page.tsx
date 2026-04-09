@@ -1,5 +1,5 @@
-import { HRManagementPanel } from "../_components/features/hr/HRManagementPanel";
+import { UnifiedEmployeeManagement } from "../_components/features/hr/UnifiedEmployeeManagement";
 
 export default function HRValidationPage() {
-  return <HRManagementPanel />;
+  return <UnifiedEmployeeManagement />;
 }

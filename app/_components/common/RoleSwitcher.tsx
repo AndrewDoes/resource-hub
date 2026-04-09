@@ -1,7 +1,6 @@
-'use client';
-import { useRole, roleConfig } from '../context/RoleContext';
+import { useRole, roleConfig } from '@/app/context/RoleContext';
 import { Check } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole } from '@/app/types';
 
 export function RoleSwitcher() {
   const { currentUser, setCurrentUser } = useRole();

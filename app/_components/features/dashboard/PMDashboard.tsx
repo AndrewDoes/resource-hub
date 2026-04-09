@@ -1,211 +1,21 @@
 'use client';
+
 import React, { useState, useEffect } from 'react';
-import { GanttTimeline, TimelineProject } from './GanttTimeline';
-import { SmartFilters, FilterOptions } from '../../common/SmartFilters';
-import {
-  ResourcePlanningSystem,
-  ResourceConflict,
-  SystemSuggestion,
-  SystemAlert,
-  Project as IntelligenceProject,
-  Employee,
-} from '../system/SystemIntelligence';
-import { useFeedbackToast } from '../../../context/ToastContext';
 import Link from 'next/link';
-import {
-  BarChart3,
-  Users,
-  AlertTriangle,
-  TrendingUp,
-  CheckCircle,
-  Clock,
-  Calendar,
-  MessageSquare,
-  Settings,
-  RefreshCw,
-  GitBranch
-} from 'lucide-react';
+import { Settings, MessageSquare, RefreshCw, GitBranch } from 'lucide-react';
+import { useFeedbackToast } from '../../../context/ToastContext';
 
-// Mock employee data for conflict detection
-const mockEmployees: Employee[] = [
-  {
-    id: 'emp-1',
-    name: 'Sarah Chen',
-    skills: ['Frontend', 'React', 'Design'],
-    availability: 40,
-    currentProjects: ['1', '4', '6'],
-    status: 'active',
-  },
-  {
-    id: 'emp-2',
-    name: 'Mike Johnson',
-    skills: ['Full Stack', 'Node.js', 'React'],
-    availability: 0,
-    currentProjects: ['1', '2'],
-    status: 'active',
-  },
-  {
-    id: 'emp-3',
-    name: 'Alex Rivera',
-    skills: ['Frontend', 'React', 'UI/UX'],
-    availability: 60,
-    currentProjects: ['1', '5'],
-    status: 'active',
-  },
-  {
-    id: 'emp-4',
-    name: 'Emma Wilson',
-    skills: ['Mobile', 'React Native', 'iOS'],
-    availability: 45,
-    currentProjects: ['2', '5'],
-    status: 'active',
-  },
-  {
-    id: 'emp-5',
-    name: 'David Park',
-    skills: ['Backend', 'Database', 'DevOps'],
-    availability: 30,
-    currentProjects: ['2', '4'],
-    status: 'active',
-  },
-  {
-    id: 'emp-6',
-    name: 'Lisa Anderson',
-    skills: ['Marketing', 'Content', 'SEO'],
-    availability: 55,
-    currentProjects: ['3'],
-    status: 'active',
-  },
-  {
-    id: 'emp-7',
-    name: 'Tom Harris',
-    skills: ['Marketing', 'Analytics', 'Ads'],
-    availability: 45,
-    currentProjects: ['3'],
-    status: 'active',
-  },
-  {
-    id: 'emp-8',
-    name: 'Chris Martinez',
-    skills: ['Security', 'Backend', 'Testing'],
-    availability: 70,
-    currentProjects: ['6'],
-    status: 'active',
-  },
-];
+// Components
+import { GanttTimeline } from './GanttTimeline';
+import { SmartFilters, FilterOptions } from '../../common/SmartFilters';
+import { DashboardStats } from './components/DashboardStats';
+import { ProjectGrid } from './components/ProjectGrid';
 
-// Mock data for PM Timeline Dashboard
-const mockProjects: TimelineProject[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    description: 'Complete overhaul of company website with new branding',
-    startDate: '2026-04-01',
-    endDate: '2026-05-15',
-    progress: 65,
-    status: 'in-progress',
-    teamMembers: ['Sarah Chen', 'Mike Johnson', 'Alex Rivera'],
-    phase: 'execution',
-    hasConflict: false,
-  },
-  {
-    id: '2',
-    name: 'Mobile App Launch',
-    description: 'iOS and Android app development and launch',
-    startDate: '2026-04-10',
-    endDate: '2026-06-30',
-    progress: 35,
-    status: 'in-progress',
-    teamMembers: ['Mike Johnson', 'Emma Wilson', 'David Park'],
-    phase: 'execution',
-    hasConflict: true,
-    conflictMessage: 'Mike Johnson is allocated to 2 overlapping projects (150% capacity)',
-  },
-  {
-    id: '3',
-    name: 'Q2 Marketing Campaign',
-    description: 'Multi-channel marketing campaign for Q2 product launch',
-    startDate: '2026-04-15',
-    endDate: '2026-05-30',
-    progress: 45,
-    status: 'in-progress',
-    teamMembers: ['Lisa Anderson', 'Tom Harris'],
-    phase: 'execution',
-    hasConflict: false,
-  },
-  {
-    id: '4',
-    name: 'Database Migration',
-    description: 'Migrate legacy database to new cloud infrastructure',
-    startDate: '2026-05-01',
-    endDate: '2026-06-15',
-    progress: 15,
-    status: 'assigned',
-    teamMembers: ['David Park', 'Sarah Chen'],
-    phase: 'planning',
-    hasConflict: false,
-  },
-  {
-    id: '5',
-    name: 'Customer Portal v2',
-    description: 'Enhanced customer self-service portal',
-    startDate: '2026-03-15',
-    endDate: '2026-04-10',
-    progress: 100,
-    status: 'completed',
-    teamMembers: ['Alex Rivera', 'Emma Wilson'],
-    phase: 'delivery',
-    hasConflict: false,
-  },
-  {
-    id: '6',
-    name: 'Security Audit',
-    description: 'Comprehensive security review and penetration testing',
-    startDate: '2026-05-20',
-    endDate: '2026-06-30',
-    progress: 0,
-    status: 'assigned',
-    teamMembers: ['Chris Martinez', 'Sarah Chen'],
-    phase: 'planning',
-    hasConflict: true,
-    conflictMessage: 'Sarah Chen is allocated to 3 overlapping projects (120% capacity)',
-  },
-];
-
-const statsData = [
-  {
-    label: 'Active Projects',
-    value: '8',
-    change: '+2 this week',
-    icon: BarChart3,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-  },
-  {
-    label: 'Total Team Members',
-    value: '24',
-    change: '6 teams',
-    icon: Users,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-  },
-  {
-    label: 'Conflicts Detected',
-    value: '3',
-    change: 'Needs attention',
-    icon: AlertTriangle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
-  },
-  {
-    label: 'Avg Progress',
-    value: '67%',
-    change: '+12% vs last month',
-    icon: TrendingUp,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-  },
-];
+// Types, Data, Utils
+import { TimelineProject } from './types';
+import { mockProjects, mockEmployees, statsData } from './data';
+import { convertToIntelligenceProjects } from './utils';
+import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert } from '../system/SystemIntelligence';
 
 export function PMDashboard() {
   const { addToast } = useFeedbackToast();
@@ -218,28 +28,12 @@ export function PMDashboard() {
     sortOrder: 'asc',
   });
 
-  const [filteredProjects, setFilteredProjects] = useState(mockProjects);
+  const [filteredProjects, setFilteredProjects] = useState<TimelineProject[]>(mockProjects);
   const [detectedConflicts, setDetectedConflicts] = useState<ResourceConflict[]>([]);
-
-  // Convert TimelineProject to IntelligenceProject format
-  const convertToIntelligenceProjects = (projects: TimelineProject[]): IntelligenceProject[] => {
-    return projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      status: p.status as any,
-      startDate: p.startDate,
-      endDate: p.endDate,
-      requiredSkills: [],
-      assignedEmployees: mockEmployees
-        .filter((emp) => emp.currentProjects.includes(p.id))
-        .map((emp) => emp.id),
-      workload: p.status === 'completed' ? 0 : p.status === 'in-progress' ? 50 : 30,
-    }));
-  };
 
   // Run conflict detection on mount and when projects change
   useEffect(() => {
-    const intelligenceProjects = convertToIntelligenceProjects(mockProjects);
+    const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
     const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
 
     // Generate recommendations for each conflict
@@ -323,10 +117,7 @@ export function PMDashboard() {
 
   const handleProjectClick = (projectId: string) => {
     console.log('Project clicked:', projectId);
-    // Navigate to project detail page or open modal
   };
-
-  const conflictProjects = filteredProjects.filter((p) => p.hasConflict);
 
   const handleApplySuggestion = (suggestion: SystemSuggestion) => {
     addToast({
@@ -353,7 +144,7 @@ export function PMDashboard() {
   };
 
   const handleRefreshConflicts = () => {
-    const intelligenceProjects = convertToIntelligenceProjects(mockProjects);
+    const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
     const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
 
     const conflictsWithSuggestions = conflicts.map((conflict) => ({
@@ -416,26 +207,7 @@ export function PMDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsData.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-gray-200 shadow-sm p-5"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className={`${stat.bgColor} rounded-lg p-2.5`}>
-                  <Icon className={`w-5 h-5 ${stat.color}`} />
-                </div>
-              </div>
-              <p className="text-2xl font-semibold text-gray-900 mb-1">{stat.value}</p>
-              <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-              <p className="text-xs text-gray-500">{stat.change}</p>
-            </div>
-          );
-        })}
-      </div>
+      <DashboardStats stats={statsData} />
 
       {/* System Intelligence Alerts */}
       {detectedConflicts.length > 0 && (
@@ -483,80 +255,23 @@ export function PMDashboard() {
       />
 
       {/* Project Overview Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredProjects.slice(0, 4).map((project) => (
-          <div
-            key={project.id}
-            className={`bg-white rounded-xl border shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer ${project.hasConflict ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
-              }`}
-            onClick={() => handleProjectClick(project.id)}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="font-semibold text-gray-900">{project.name}</h3>
-                  {project.hasConflict && (
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">{project.description}</p>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-gray-600 font-medium">Progress</span>
-                <span className="text-gray-900 font-semibold">{project.progress}%</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${project.status === 'completed' ? 'bg-green-500' :
-                    project.status === 'in-progress' ? 'bg-blue-500' :
-                      'bg-purple-500'
-                    }`}
-                  style={{ width: `${project.progress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Dates and Team */}
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-gray-600">
-                  <Calendar className="w-4 h-4" />
-                  <span>
-                    {new Date(project.startDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                    {' - '}
-                    {new Date(project.endDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-gray-600">
-                  <Users className="w-4 h-4" />
-                  <span>{project.teamMembers.length} members</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <ProjectGrid 
+        projects={filteredProjects.slice(0, 4)} 
+        onProjectClick={handleProjectClick} 
+      />
 
       {/* Empty State */}
       {filteredProjects.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-          <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Projects Found</h3>
-          <p className="text-gray-600">
-            {filters.search || filters.status !== 'all'
-              ? 'Try adjusting your filters to see more projects'
-              : 'You have no assigned projects at this time'}
-          </p>
+          <div className="flex flex-col items-center justify-center">
+            <GitBranch className="w-16 h-16 text-gray-300 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Projects Found</h3>
+            <p className="text-gray-600">
+              {filters.search || filters.status !== 'all'
+                ? 'Try adjusting your filters to see more projects'
+                : 'You have no assigned projects at this time'}
+            </p>
+          </div>
         </div>
       )}
     </div>

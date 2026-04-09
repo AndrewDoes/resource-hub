@@ -1,10 +1,12 @@
 export type ProjectStatus =
   | 'draft'
   | 'submitted'
+  | 'under-review'
   | 'approved'
   | 'rejected'
   | 'assigned'
   | 'in-progress'
+  | 'on-hold'
   | 'completed'
   | 'cancelled'
   | 'on-track'
