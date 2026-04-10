@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { Briefcase, Download, Plus } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 
@@ -16,11 +15,15 @@ import { EmployeeDetailSidebar } from './components/EmployeeDetailSidebar';
 import { EmployeeDeleteModal } from './components/EmployeeDeleteModal';
 import { Employee, TabType } from './types';
 import { mockEmployees } from './data';
+import { useEffect, useState } from 'react';
+import { fetchHREmployeeList, mapToUIEmployee } from '@/functions/api/humanResource';
 
 
 export function EmployeeManagement() {
 
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -34,6 +37,32 @@ export function EmployeeManagement() {
 
   const { addToast } = useFeedbackToast();
 
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        setIsLoading(true);
+        const apiEmployees = await fetchHREmployeeList();
+        const uiEmployees = apiEmployees.map(mapToUIEmployee);
+        setEmployees(uiEmployees);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading employees:', err);
+        setError('Failed to load employees. Please try again later.');
+        // Fallback to mock data if API fails during development
+        setEmployees(mockEmployees);
+        addToast({
+          type: 'error',
+          title: 'Connection Error',
+          message: 'Could not connect to the server. Using offline data.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadEmployees();
+  }, [addToast]);
+
   // Filter employees based on active tab and search/filter criteria
   const getFilteredEmployees = () => {
     let filtered = employees;
@@ -44,7 +73,7 @@ export function EmployeeManagement() {
         filtered = filtered.filter((e) => e.status === 'active');
         break;
       case 'available':
-        filtered = filtered.filter((e) => e.availability >= 50 && e.status === 'active');
+        filtered = filtered.filter((e) => e.assignedHours <= ((70 / 100) * 8) && e.status === 'active');
         break;
       case 'assigned':
         filtered = filtered.filter(
@@ -52,7 +81,7 @@ export function EmployeeManagement() {
         );
         break;
       case 'overloaded':
-        filtered = filtered.filter((e) => e.workload > 100 && e.status === 'active');
+        filtered = filtered.filter((e) => e.assignedHours > 8 && e.status === 'active');
         break;
     }
 
@@ -92,9 +121,9 @@ export function EmployeeManagement() {
   const stats = {
     total: employees.length,
     active: employees.filter((e) => e.status === 'active').length,
-    available: employees.filter((e) => e.availability >= 50 && e.status === 'active').length,
-    assigned: employees.filter((e) => e.currentProjects.length > 0).length,
-    overloaded: employees.filter((e) => e.workload > 100).length,
+    available: employees.filter((e) => (e.workload <= 70) && e.status === 'active').length,
+    assigned: employees.filter((e) => e.currentProjects.length > 0 && e.status === 'active').length,
+    overloaded: employees.filter((e) => e.workload > 100 && e.status === 'active').length,
   };
 
   const handleDeleteEmployee = (employee: Employee) => {
@@ -174,12 +203,33 @@ export function EmployeeManagement() {
       />
 
       {/* Employee Table */}
-      <EmployeeTable
-        employees={filteredEmployees}
-        onSelect={setSelectedEmployee}
-        onEdit={handleEditEmployee}
-        onDelete={handleDeleteEmployee}
-      />
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-medium">Loading employee data...</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-white rounded-xl border border-red-200 shadow-sm">
+          <div className="p-4 bg-red-50 rounded-full mb-4">
+            <Briefcase className="w-8 h-8 text-red-400" />
+          </div>
+          <p className="text-sm font-medium text-red-900 mb-1">Error Loading Data</p>
+          <p className="text-xs text-red-500 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      ) : (
+        <EmployeeTable
+          employees={filteredEmployees}
+          onSelect={setSelectedEmployee}
+          onEdit={handleEditEmployee}
+          onDelete={handleDeleteEmployee}
+        />
+      )}
 
       {/* Employee Detail Sidebar */}
       <EmployeeDetailSidebar

@@ -47,8 +47,7 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
           <tbody className="divide-y divide-gray-200">
             {employees.map((employee) => {
               const availStatus = getAvailabilityStatus(
-                employee.availability,
-                employee.workload
+                employee.assignedHours
               );
               const isOverloaded = employee.workload > 100;
 
@@ -105,11 +104,13 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                     <div className="flex items-center gap-2">
                       <div className="flex-1 w-20 bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${employee.workload <= 80
-                            ? 'bg-green-500'
-                            : employee.workload <= 100
+                          className={`h-2 rounded-full ${employee.workload <= 40
+                            ? 'bg-green-500' :
+                            employee.workload <= 70
                               ? 'bg-yellow-500'
-                              : 'bg-red-500'
+                              : employee.workload <= 100
+                                ? 'bg-orange-500'
+                                : 'bg-red-500'
                             }`}
                           style={{ width: `${Math.min(employee.workload, 100)}%` }}
                         ></div>

@@ -5,7 +5,7 @@ import {
   EmployeeStatus, 
   AssignmentRequest, 
   Employee 
-} from './types';
+} from '../types';
 
 export const mockGMDecisions: GMDecision[] = [
   {
