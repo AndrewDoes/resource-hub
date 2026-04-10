@@ -9,8 +9,15 @@ export interface HREmployeeListItem {
   department: string | null;
   availabilityPercent: number;
   workloadPercent: number;
+  phone: string;
   status: string;
   assignedHours: number;
+  assignments: any[];
+}
+
+export interface DepartmentLookup {
+  id: string;
+  name: string;
 }
 
 interface GetEmployeeListResponse {
@@ -69,7 +76,9 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 100),
       workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
       assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
+      phone: asString(record.phone, "N/A"),
       status: asString(record.status, "Active"),
+      assignments: Array.isArray(record.assignments) ? record.assignments : [],
     };
   });
 };
@@ -96,7 +105,7 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     avatar: getInitials(apiItem.fullName),
     role: apiItem.jobTitle,
     email: apiItem.email,
-    phone: "", // Not in list API
+    phone: apiItem.phone,
     location: "", // Not in list API
     department: apiItem.department ?? "General",
     skills: [], // Not in list API yet
@@ -104,7 +113,7 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,
     assignedHours: apiItem.assignedHours,
-    currentProjects: [], // Need separate API call if needed, or placeholder
+    currentProjects: apiItem.assignments.map((a: any) => a.projectName || "Unknown Project"),
     projectHistory: [],
     joinedDate: new Date().toISOString(),
   };
@@ -144,13 +153,18 @@ export const mapToUIContractAction = (decision: GeneralManagerContractDecision):
  * Maps the GeneralManagerDecision into the UI-ready GMDecision type.
  * This classifies decisions as Extend Contract, Terminate Contract, or Hire Resource.
  */
+/**
+ * Maps the GeneralManagerDecision into the UI-ready GMDecision type.
+ * This classifies decisions as Extend Contract, Terminate Contract, Hire Resource, or Project Assignment.
+ */
 export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
-  let type: 'extend-contract' | 'terminate-contract' | 'hire-resource' = 'extend-contract';
+  let type: 'extend-contract' | 'terminate-contract' | 'hire-resource' | 'project-assignment' = 'extend-contract';
   const apiType = decision.type.toLowerCase();
 
   if (apiType.includes('extend')) type = 'extend-contract';
   else if (apiType.includes('terminate')) type = 'terminate-contract';
   else if (apiType.includes('hire')) type = 'hire-resource';
+  else if (apiType.includes('projectassignment')) type = 'project-assignment';
 
   return {
     id: decision.id,
@@ -164,6 +178,36 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
     details: decision.details,
   };
 };
+
+export async function executeDecision(decisionId: string, notes?: string): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.executeDecision, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decisionId, notes }),
+  });
+
+  return response.ok;
+}
+
+export async function executeContractAction(decisionId: string): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.executeContract, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decisionId }),
+  });
+
+  return response.ok;
+}
+
+export async function startHiring(decisionId: string): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.startHiring, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decisionId }),
+  });
+
+  return response.ok;
+}
 
 export interface HRAssignmentRequestItem {
   id: string;
@@ -273,4 +317,80 @@ export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
       daysWaiting: asNumber(item.daysWaiting, 0),
     })) : [],
   };
+}
+
+export async function fetchDepartmentsLookup(): Promise<DepartmentLookup[]> {
+  const response = await fetch(`${BackendApiUrl.lookups}/departments/list?pageSize=100`);
+  if (!response.ok) {
+    throw new Error(`Failed to load departments (${response.status})`);
+  }
+  const payload: any = await response.json();
+  return (payload.departments || []).map((d: any) => ({
+    id: d.id,
+    name: d.name
+  }));
+}
+
+export async function createEmployee(data: any): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(BackendApiUrl.employeeCreate, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const body = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        message: body.message || body.title || "Failed to create employee"
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function updateEmployee(id: string, data: any): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(BackendApiUrl.employeeUpdate(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const body = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        message: body.message || body.title || "Failed to update employee"
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function deleteEmployee(id: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(BackendApiUrl.employeeDelete(id), {
+      method: 'DELETE',
+    });
+
+    const body = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        message: body.message || body.title || "Failed to delete employee"
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
 }

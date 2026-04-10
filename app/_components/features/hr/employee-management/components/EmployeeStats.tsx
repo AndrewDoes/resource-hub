@@ -84,7 +84,7 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
                 Resource Overload Warning
               </h3>
               <p className="text-sm text-red-700">
-                {stats.overloaded} employee(s) are over-allocated (workload &gt; 100%). Review
+                {stats.overloaded} &nbsp;employee(s) are over-allocated (workload &gt; 100%). Review
                 assignments to prevent burnout.
               </p>
             </div>
