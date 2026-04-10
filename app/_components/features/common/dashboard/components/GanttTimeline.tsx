@@ -5,7 +5,6 @@ import { TimelineProject } from '@/app/_components/features/common/dashboard/typ
 
 import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
 import { ProjectStatus } from '@/app/types';
-import { getPhaseColor } from '@/app/_components/features/common/dashboard/utils';
 
 
 interface GanttTimelineProps {
@@ -169,8 +168,8 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
       </div>
 
       {/* Timeline Grid */}
-      <div className="p-6 overflow-x-auto">
-        <div className="min-w-[800px]">
+      <div className="relative z-20 p-6 overflow-x-auto overflow-y-visible">
+        <div className="min-w-[800px] overflow-visible">
           {/* Timeline Header with Dates */}
           <div className="flex mb-4">
             <div className="w-64 shrink-0" />
@@ -184,13 +183,17 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
           </div>
 
           {/* Project Rows */}
-          <div className="space-y-3">
-            {projects.map((project) => {
+          <div className="relative space-y-3 pt-8 pb-24">
+            {projects.map((project, index) => {
               const position = getProjectPosition(project);
               const isHovered = hoveredProject === project.id;
+              const showTooltipBelow = index < 2;
 
               return (
-                <div key={project.id} className="flex items-center group">
+                <div
+                  key={project.id}
+                  className={`group relative flex items-center ${isHovered ? 'z-50' : 'z-10'}`}
+                >
                   {/* Project Info */}
                   <div className="w-64 shrink-0 pr-4">
                     <div className="space-y-1">
@@ -216,7 +219,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
                   </div>
 
                   {/* Timeline Bar Container */}
-                  <div className="flex-1 relative h-16">
+                  <div className="relative flex-1 h-16 overflow-visible">
                     {/* Grid Lines */}
                     <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${timelineColumns.length}, 1fr)` }}>
                       {timelineColumns.map((_, index) => (
@@ -227,7 +230,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
                     {/* Project Bar */}
                     <div
                       className={`absolute top-1/2 -translate-y-1/2 h-10 rounded-lg cursor-pointer transition-all ${project.hasConflict ? 'ring-2 ring-red-400' : ''
-                        } ${isHovered ? 'scale-105 shadow-lg z-10' : 'shadow'}`}
+                        } ${isHovered ? 'scale-105 shadow-lg z-20' : 'shadow'}`}
                       style={{
                         left: `${position.left}%`,
                         width: `${position.width}%`,
@@ -260,7 +263,9 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
 
                       {/* Hover Tooltip */}
                       {isHovered && (
-                        <div className="absolute top-full mt-2 left-0 bg-gray-900 text-white p-3 rounded-lg shadow-xl z-20 min-w-[280px]">
+                        <div
+                          className={`absolute left-0 bg-gray-900 text-white p-3 rounded-lg shadow-xl z-50 min-w-[280px] ${showTooltipBelow ? 'top-full mt-2' : 'bottom-full mb-2'}`}
+                        >
                           <div className="space-y-2">
                             <div>
                               <p className="font-semibold">{project.name}</p>
@@ -318,7 +323,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
       </div>
 
       {/* Legend */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+      <div className="relative z-10 px-6 py-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center gap-6 text-xs">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-green-500 rounded" />

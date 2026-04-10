@@ -101,6 +101,27 @@ const computeStats = (projects: TimelineProject[], conflictCount: number): Dashb
   ];
 };
 
+const buildDetectedConflicts = (projects: TimelineProject[], employees: Employee[]) => {
+  const activeProjects = projects.filter((project) => project.status !== 'completed');
+  const activeProjectIds = new Set(activeProjects.map((project) => project.id));
+  const activeEmployees = employees.map((employee) => ({
+    ...employee,
+    currentProjects: employee.currentProjects.filter((projectId) => activeProjectIds.has(projectId)),
+  }));
+
+  const intelligenceProjects = convertToIntelligenceProjects(activeProjects, activeEmployees);
+  const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, activeEmployees);
+
+  return conflicts.map((conflict) => ({
+    ...conflict,
+    suggestions: ResourcePlanningSystem.generateRecommendations(
+      conflict,
+      activeEmployees,
+      intelligenceProjects
+    ),
+  }));
+};
+
 
 export function PMDashboard() {
   const { addToast } = useFeedbackToast();
@@ -188,20 +209,11 @@ export function PMDashboard() {
 
         const inferredEmployees = employeeMap.size > 0 ? Array.from(employeeMap.values()) : mockEmployees;
 
-        const intelligenceProjects = convertToIntelligenceProjects(liveProjects, inferredEmployees);
-        const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, inferredEmployees);
-        const conflictsWithSuggestions = conflicts.map((conflict) => ({
-          ...conflict,
-          suggestions: ResourcePlanningSystem.generateRecommendations(
-            conflict,
-            inferredEmployees,
-            intelligenceProjects
-          ),
-        }));
+        const conflictsWithSuggestions = buildDetectedConflicts(liveProjects, inferredEmployees);
 
         const conflictProjectIds = new Set(conflictsWithSuggestions.flatMap((conflict) => conflict.projectIds));
         const projectsWithConflicts = liveProjects.map((project) => {
-          if (!conflictProjectIds.has(project.id)) {
+          if (project.status === 'completed' || !conflictProjectIds.has(project.id)) {
             return project;
           }
 
@@ -224,16 +236,7 @@ export function PMDashboard() {
           return;
         }
 
-        const intelligenceProjects = convertToIntelligenceProjects(mockProjects, mockEmployees);
-        const fallbackConflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, mockEmployees);
-        const fallbackConflictsWithSuggestions = fallbackConflicts.map((conflict) => ({
-          ...conflict,
-          suggestions: ResourcePlanningSystem.generateRecommendations(
-            conflict,
-            mockEmployees,
-            intelligenceProjects
-          ),
-        }));
+        const fallbackConflictsWithSuggestions = buildDetectedConflicts(mockProjects, mockEmployees);
 
         setEmployees(mockEmployees);
         setAllProjects(mockProjects);
@@ -350,17 +353,7 @@ export function PMDashboard() {
   };
 
   const handleRefreshConflicts = () => {
-    const intelligenceProjects = convertToIntelligenceProjects(allProjects, employees);
-    const conflicts = ResourcePlanningSystem.detectConflicts(intelligenceProjects, employees);
-
-    const conflictsWithSuggestions = conflicts.map((conflict) => ({
-      ...conflict,
-      suggestions: ResourcePlanningSystem.generateRecommendations(
-        conflict,
-        employees,
-        intelligenceProjects
-      ),
-    }));
+    const conflictsWithSuggestions = buildDetectedConflicts(allProjects, employees);
 
     setDetectedConflicts(conflictsWithSuggestions);
     setStats(computeStats(allProjects, conflictsWithSuggestions.length));
@@ -382,13 +375,6 @@ export function PMDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/workflow"
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors"
-          >
-            <GitBranch className="w-4 h-4" />
-            View System Flow
-          </Link>
           <button
             onClick={handleRefreshConflicts}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors"
@@ -435,9 +421,6 @@ export function PMDashboard() {
             <h2 className="text-lg font-semibold text-gray-900">
               System Detected Conflicts ({detectedConflicts.length})
             </h2>
-            <p className="text-sm text-gray-600">
-              AI-powered conflict detection with smart recommendations
-            </p>
           </div>
           {detectedConflicts.map((conflict) => (
             <SystemAlert
