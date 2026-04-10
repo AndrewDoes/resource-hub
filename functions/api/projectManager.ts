@@ -142,30 +142,48 @@ const withQuery = (path: string, params: Record<string, string | undefined>): st
 };
 
 const normalizeProjects = (payload: unknown): ProjectManagerProjectSummary[] => {
+  const record = (payload ?? {}) as Record<string, unknown>;
+  const dataRecord = (record.data ?? record.Data ?? null) as Record<string, unknown> | null;
+
   const source = Array.isArray(payload)
     ? payload
-    : Array.isArray((payload as ProjectManagerProjectsListResponse | null)?.projects)
-      ? (payload as ProjectManagerProjectsListResponse).projects
-      : Array.isArray((payload as ProjectManagerProjectsListResponse | null)?.items)
-        ? (payload as ProjectManagerProjectsListResponse).items
-        : Array.isArray((payload as ProjectManagerProjectsListResponse | null)?.data)
-          ? (payload as ProjectManagerProjectsListResponse).data
-          : [];
+    : Array.isArray(record.projects)
+      ? record.projects
+      : Array.isArray(record.Projects)
+        ? record.Projects
+        : Array.isArray(record.items)
+          ? record.items
+          : Array.isArray(record.Items)
+            ? record.Items
+            : Array.isArray(record.data)
+              ? record.data
+              : Array.isArray(record.Data)
+                ? record.Data
+                : Array.isArray(dataRecord?.projects)
+                  ? dataRecord.projects
+                  : Array.isArray(dataRecord?.Projects)
+                    ? dataRecord.Projects
+                    : Array.isArray(dataRecord?.items)
+                      ? dataRecord.items
+                      : Array.isArray(dataRecord?.Items)
+                        ? dataRecord.Items
+                        : [];
 
   return source.map((item, index) => {
     const record = item as Record<string, unknown>;
+    const fallbackProjectId = String(index + 1);
 
     return {
-      id: asString(record.id, String(index + 1)),
-      name: asString(record.name, "Untitled Project"),
-      startDate: asString(record.startDate ?? record.start_date, "2026-01-01"),
-      endDate: asString(record.endDate ?? record.end_date, "2026-12-31"),
+      id: asString(record.id ?? record.Id ?? record.projectId ?? record.ProjectId ?? record.project_id, fallbackProjectId),
+      name: asString(record.name ?? record.Name, "Untitled Project"),
+      startDate: asString(record.startDate ?? record.StartDate ?? record.start_date, "2026-01-01"),
+      endDate: asString(record.endDate ?? record.EndDate ?? record.end_date, "2026-12-31"),
       status: fallbackStatus(
-        typeof record.status === "string" ? record.status.toLowerCase() : undefined
+        typeof (record.status ?? record.Status) === "string" ? String(record.status ?? record.Status).toLowerCase() : undefined
       ),
-      progress: asNumber(record.progress, 0),
-      teamSize: asNumber(record.teamSize ?? record.team_size, 0),
-      description: asString(record.description, "No description provided"),
+      progress: asNumber(record.progress ?? record.Progress ?? record.progressPercent ?? record.ProgressPercent ?? record.progress_percent, 0),
+      teamSize: asNumber(record.teamSize ?? record.TeamSize ?? record.team_size, 0),
+      description: asString(record.description ?? record.Description ?? record.clientName ?? record.ClientName ?? record.client_name, "No description provided"),
     };
   });
 };
