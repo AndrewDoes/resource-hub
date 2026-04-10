@@ -38,7 +38,7 @@ export function DecisionInbox({ gmDecisions, onExecute, onClarify }: DecisionInb
           pendingDecisions.map((decision) => (
             <div
               key={decision.id}
-              className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-6 border-2 border-purple-200"
+              className="bg-linear-to-br from-purple-50 to-blue-50 rounded-lg p-6 border-2 border-purple-200"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">

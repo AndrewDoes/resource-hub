@@ -72,6 +72,22 @@ export interface GeneralManagerContractDecision {
   decisionStatus: string;
 }
 
+/**
+ * Represents a high-level decision made by the General Manager (e.g., Extend Contract, Hire Resource).
+ * These are typically grouped by project and can affect multiple employees.
+ */
+export interface GeneralManagerDecision {
+  id: string;
+  type: string;
+  title: string;
+  details: string;
+  projectName: string;
+  affectedEmployees: string[];
+  deadline: string | null;
+  submittedAt: string;
+  status: string;
+}
+
 interface GeneralManagerWorkforceSummaryResponse {
   totalEmployeeCount?: unknown;
   activeEmployeeCount?: unknown;
@@ -279,6 +295,46 @@ export async function fetchGeneralManagerContractDecisions(): Promise<GeneralMan
 
   const payload: unknown = await response.json();
   return normalizeContractDecisions(payload);
+}
+
+/**
+ * Normalizes the raw API response for general decisions into the frontend interface.
+ */
+const normalizeDecisions = (payload: unknown): GeneralManagerDecision[] => {
+  const source = (payload as { decisions?: unknown } | null)?.decisions ?? payload;
+  const decisions = Array.isArray(source) ? source : [];
+
+  return decisions.map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id, String(index + 1)),
+      type: asString(record.type, "Unknown"),
+      title: asString(record.title, "Untitled Decision"),
+      details: asString(record.details, ""),
+      projectName: asString(record.projectName ?? record.project_name, "General"),
+      affectedEmployees: Array.isArray(record.affectedEmployees ?? record.affected_employees)
+        ? (record.affectedEmployees ?? record.affected_employees) as string[]
+        : [],
+      deadline: typeof record.deadline === "string" ? record.deadline : null,
+      submittedAt: asString(record.submittedAt ?? record.submitted_at, new Date().toISOString()),
+      status: asString(record.status, "Pending"),
+    };
+  });
+};
+
+/**
+ * Fetches the list of all high-level decisions made by the General Manager.
+ */
+export async function fetchGeneralManagerDecisions(): Promise<GeneralManagerDecision[]> {
+  const response = await fetch(BackendApiUrl.generalManagerDecisions);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load decisions (${response.status})`);
+  }
+
+  const payload: unknown = await response.json();
+  return normalizeDecisions(payload);
 }
 
 export const generalManagerFallbackSummary: GeneralManagerWorkforceSummary = {
