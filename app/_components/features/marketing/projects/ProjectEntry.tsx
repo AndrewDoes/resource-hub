@@ -1,39 +1,42 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Paperclip, Plus, Save, Send, XCircle } from 'lucide-react';
-import { useFeedbackToast } from '@/app/context/ToastContext';
-import { WorkflowVisualizer } from '@/app/_components/system/WorkflowSystem';
-import type { ProjectStatus } from '@/app/_components/system/WorkflowSystem';
-
+import React, { useState } from "react";
+import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
+import { useFeedbackToast } from "@/app/context/ToastContext";
+import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
+import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
 
 // Types, Data
-import { ResourceRequirement, RejectedProject, SuggestedEmployee } from './types';
-import { rejectedProjects } from './data';
-
+import {
+  ResourceRequirement,
+  RejectedProject,
+  SuggestedEmployee,
+} from "./types";
+import { rejectedProjects } from "./data";
 
 // Sub-components
-import { ProjectBasicInfo } from './components/ProjectBasicInfo';
-import { SkillSelector } from './components/SkillSelector';
-import { ResourceRequirementItem } from './components/ResourceRequirementItem';
-import { SuggestedResources } from './components/SuggestedResources';
-import { RejectedProjectsModal } from './components/RejectedProjectsModal';
-
+import { ProjectBasicInfo } from "./components/ProjectBasicInfo";
+import { SkillSelector } from "./components/SkillSelector";
+import { ResourceRequirementItem } from "./components/ResourceRequirementItem";
+import { SuggestedResources } from "./components/SuggestedResources";
+import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
 
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
-  
+
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [projectStatus, setProjectStatus] = useState<ProjectStatus>('draft');
+  const [projectStatus, setProjectStatus] = useState<ProjectStatus>("draft");
   const [showRejectedProjects, setShowRejectedProjects] = useState(false);
-  const [resourceRequirements, setResourceRequirements] = useState<ResourceRequirement[]>([
+  const [resourceRequirements, setResourceRequirements] = useState<
+    ResourceRequirement[]
+  >([
     {
-      id: '1',
-      role: '',
+      id: "1",
+      role: "",
       quantity: 1,
-      experienceLevel: 'Mid',
+      experienceLevel: "Mid",
       requiredSkills: [],
-      notes: '',
+      notes: "",
     },
   ]);
 
@@ -43,11 +46,11 @@ export function ProjectEntry() {
       ...resourceRequirements,
       {
         id: Date.now().toString(),
-        role: '',
+        role: "",
         quantity: 1,
-        experienceLevel: 'Mid',
+        experienceLevel: "Mid",
         requiredSkills: [],
-        notes: '',
+        notes: "",
       },
     ]);
   };
@@ -58,28 +61,52 @@ export function ProjectEntry() {
     }
   };
 
-  const updateResourceRequirement = (id: string, field: string | number | symbol, value: any) => {
+  const updateResourceRequirement = (
+    id: string,
+    field: string | number | symbol,
+    value: any,
+  ) => {
     setResourceRequirements(
-      resourceRequirements.map((r) => (r.id === id ? { ...r, [field]: value } as ResourceRequirement : r))
+      resourceRequirements.map((r) =>
+        r.id === id ? ({ ...r, [field]: value } as ResourceRequirement) : r,
+      ),
     );
   };
 
   // Calculate total resources automatically
-  const totalResources = resourceRequirements.reduce((sum, req) => sum + req.quantity, 0);
+  const totalResources = resourceRequirements.reduce(
+    (sum, req) => sum + req.quantity,
+    0,
+  );
 
   // Mock suggested employees based on skills
-  const suggestedEmployees: SuggestedEmployee[] = selectedSkills.length > 0 ? [
-    { name: 'Agus Pratama', skills: ['Critical Thinking', 'Leadership', 'Project Management'], match: 85 },
-    { name: 'Budi Santoso', skills: ['Node.js', 'API Development', 'Backend'], match: 92 },
-    { name: 'Sarah Chen', skills: ['React', 'UI/UX Design', 'Frontend'], match: 88 },
-  ] : [];
+  const suggestedEmployees: SuggestedEmployee[] =
+    selectedSkills.length > 0
+      ? [
+          {
+            name: "Agus Pratama",
+            skills: ["Critical Thinking", "Leadership", "Project Management"],
+            match: 85,
+          },
+          {
+            name: "Budi Santoso",
+            skills: ["Node.js", "API Development", "Backend"],
+            match: 92,
+          },
+          {
+            name: "Sarah Chen",
+            skills: ["React", "UI/UX Design", "Frontend"],
+            match: 88,
+          },
+        ]
+      : [];
 
   const handleSaveDraft = () => {
-    setProjectStatus('draft');
+    setProjectStatus("draft");
     addToast({
-      type: 'success',
-      title: 'Draft Saved',
-      message: 'Your project proposal has been saved as draft',
+      type: "success",
+      title: "Draft Saved",
+      message: "Your project proposal has been saved as draft",
     });
   };
 
@@ -90,27 +117,27 @@ export function ProjectEntry() {
     const hasEmptyRole = resourceRequirements.some((r) => !r.role);
     if (hasEmptyRole) {
       addToast({
-        type: 'error',
-        title: 'Incomplete Resource Requirements',
-        message: 'Please specify a role for all resource requirements',
+        type: "error",
+        title: "Incomplete Resource Requirements",
+        message: "Please specify a role for all resource requirements",
       });
       return;
     }
 
     if (selectedSkills.length === 0) {
       addToast({
-        type: 'error',
-        title: 'Skills Required',
-        message: 'Please select at least one required skill',
+        type: "error",
+        title: "Skills Required",
+        message: "Please select at least one required skill",
       });
       return;
     }
 
-    setProjectStatus('submitted');
+    setProjectStatus("submitted");
     addToast({
-      type: 'success',
-      title: 'Project Submitted',
-      message: 'Your proposal has been sent to GM for approval',
+      type: "success",
+      title: "Project Submitted",
+      message: "Your proposal has been sent to GM for approval",
     });
   };
 
@@ -118,8 +145,8 @@ export function ProjectEntry() {
     setShowRejectedProjects(false);
     // In a real app, would populate form with rejected project data
     addToast({
-      type: 'info',
-      title: 'Revising Project',
+      type: "info",
+      title: "Revising Project",
       message: `Revising ${project.name}. Update the details and resubmit for GM review.`,
     });
   };
@@ -128,8 +155,12 @@ export function ProjectEntry() {
     <div className="max-w-7xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Create New Project</h1>
-          <p className="text-sm text-gray-500 mt-1">Marketing Department - Project Request Form</p>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Create New Project
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Marketing Department - Project Request Form
+          </p>
         </div>
         {rejectedProjects.length > 0 && (
           <button
@@ -151,10 +182,14 @@ export function ProjectEntry() {
               <ProjectBasicInfo totalResources={totalResources} />
 
               {/* Required Skills */}
-              <SkillSelector 
+              <SkillSelector
                 selectedSkills={selectedSkills}
-                onAddSkill={(skill) => setSelectedSkills([...selectedSkills, skill])}
-                onRemoveSkill={(skill) => setSelectedSkills(selectedSkills.filter(s => s !== skill))}
+                onAddSkill={(skill) =>
+                  setSelectedSkills([...selectedSkills, skill])
+                }
+                onRemoveSkill={(skill) =>
+                  setSelectedSkills(selectedSkills.filter((s) => s !== skill))
+                }
               />
 
               {/* Resource Requirements Section */}
@@ -162,10 +197,12 @@ export function ProjectEntry() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Resource Requirements <span className="text-red-500">*</span>
+                      Resource Requirements{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <p className="text-xs text-gray-600">
-                      Define resource roles clearly to improve assignment accuracy
+                      Define resource roles clearly to improve assignment
+                      accuracy
                     </p>
                   </div>
                   <button
@@ -180,7 +217,7 @@ export function ProjectEntry() {
 
                 <div className="space-y-4">
                   {resourceRequirements.map((resource, index) => (
-                    <ResourceRequirementItem 
+                    <ResourceRequirementItem
                       key={resource.id}
                       resource={resource}
                       index={index}
@@ -253,7 +290,7 @@ export function ProjectEntry() {
 
       {/* Rejected Projects Modal */}
       {showRejectedProjects && (
-        <RejectedProjectsModal 
+        <RejectedProjectsModal
           rejectedProjects={rejectedProjects}
           onClose={() => setShowRejectedProjects(false)}
           onRevise={handleReviseRejected}
