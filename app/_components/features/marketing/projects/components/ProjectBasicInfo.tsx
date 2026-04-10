@@ -1,12 +1,15 @@
 'use client';
 
 import { Calendar } from 'lucide-react';
+import { ProjectFormData } from '../types';
 
 interface ProjectBasicInfoProps {
   totalResources: number;
+  formData: ProjectFormData;
+  onFormDataChange: (field: keyof ProjectFormData, value: string) => void;
 }
 
-export function ProjectBasicInfo({ totalResources }: ProjectBasicInfoProps) {
+export function ProjectBasicInfo({ totalResources, formData, onFormDataChange }: ProjectBasicInfoProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Project Name */}
@@ -16,6 +19,8 @@ export function ProjectBasicInfo({ totalResources }: ProjectBasicInfoProps) {
         </label>
         <input
           type="text"
+          value={formData.name}
+          onChange={(e) => onFormDataChange('name', e.target.value)}
           placeholder="e.g., Q2 Marketing Campaign"
           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required
@@ -29,6 +34,8 @@ export function ProjectBasicInfo({ totalResources }: ProjectBasicInfoProps) {
         </label>
         <input
           type="text"
+          value={formData.clientName}
+          onChange={(e) => onFormDataChange('clientName', e.target.value)}
           placeholder="e.g., Acme Corporation"
           className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required
@@ -64,6 +71,8 @@ export function ProjectBasicInfo({ totalResources }: ProjectBasicInfoProps) {
         <div className="relative">
           <input
             type="date"
+            value={formData.startDate}
+            onChange={(e) => onFormDataChange('startDate', e.target.value)}
             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
@@ -78,6 +87,8 @@ export function ProjectBasicInfo({ totalResources }: ProjectBasicInfoProps) {
         <div className="relative">
           <input
             type="date"
+            value={formData.endDate}
+            onChange={(e) => onFormDataChange('endDate', e.target.value)}
             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />

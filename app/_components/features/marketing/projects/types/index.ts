@@ -1,9 +1,23 @@
+export interface SkillItem {
+  id: string;
+  name: string;
+  category: string;
+}
+
+export interface ProjectFormData {
+  name: string;
+  clientName: string;
+  startDate: string;
+  endDate: string;
+  notes: string;
+}
+
 export interface ResourceRequirement {
   id: string;
   role: string;
   quantity: number;
   experienceLevel: string;
-  requiredSkills: string[];
+  requiredSkills: SkillItem[];
   notes: string;
 }
 

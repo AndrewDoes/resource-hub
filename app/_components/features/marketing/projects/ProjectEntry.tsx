@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
 import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
@@ -11,6 +11,8 @@ import {
   ResourceRequirement,
   RejectedProject,
   SuggestedEmployee,
+  SkillItem,
+  ProjectFormData,
 } from "./types";
 import { rejectedProjects } from "./data";
 
@@ -24,9 +26,20 @@ import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
 
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [formData, setFormData] = useState<ProjectFormData>({
+    name: "",
+    clientName: "",
+    startDate: "",
+    endDate: "",
+    notes: "",
+  });
+
+  const [selectedSkills, setSelectedSkills] = useState<SkillItem[]>([]);
   const [projectStatus, setProjectStatus] = useState<ProjectStatus>("draft");
   const [showRejectedProjects, setShowRejectedProjects] = useState(false);
+  const [allSkillItems, setAllSkillItems] = useState<SkillItem[]>([]);
+  const [skillCategories, setSkillCategories] = useState<Record<string, SkillItem[]>>({});
+  
   const [resourceRequirements, setResourceRequirements] = useState<
     ResourceRequirement[]
   >([
@@ -63,7 +76,7 @@ export function ProjectEntry() {
 
   const updateResourceRequirement = (
     id: string,
-    field: string | number | symbol,
+    field: keyof ResourceRequirement,
     value: any,
   ) => {
     setResourceRequirements(
@@ -101,6 +114,46 @@ export function ProjectEntry() {
         ]
       : [];
 
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const response = await fetch("/api/gateway/api/lookups/skills/list", {
+          headers: {
+            "X-Debug-Role": "marketing",
+            "X-Debug-User": "marketing-user",
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const skills: SkillItem[] = data.skills;
+          setAllSkillItems(skills);
+
+          // Group by category
+          const grouped = skills.reduce((acc, skill) => {
+            if (!acc[skill.category]) {
+              acc[skill.category] = [];
+            }
+            acc[skill.category].push(skill);
+            return acc;
+          }, {} as Record<string, SkillItem[]>);
+          setSkillCategories(grouped);
+        }
+      } catch (error) {
+        console.error("Failed to fetch skills", error);
+        addToast({
+          type: "error",
+          title: "Error Loading Skills",
+          message: "Failed to load skills from the database.",
+        });
+      }
+    };
+    fetchSkills();
+  }, [addToast]);
+
+  const handleFormDataChange = (field: keyof ProjectFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleSaveDraft = () => {
     setProjectStatus("draft");
     addToast({
@@ -110,7 +163,7 @@ export function ProjectEntry() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -133,12 +186,54 @@ export function ProjectEntry() {
       return;
     }
 
-    setProjectStatus("submitted");
-    addToast({
-      type: "success",
-      title: "Project Submitted",
-      message: "Your proposal has been sent to GM for approval",
-    });
+    try {
+      const payload = {
+        // createdByUserId: "11111111-1111-1111-1111-111111111111", // Placeholder until auth is integrated
+        createdByUserId: "6a974394-53c7-4ab4-8fc5-03e9b3e8f3e0", // Marketing user from DB
+        name: formData.name,
+        clientName: formData.clientName,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        notes: formData.notes,
+        skillIds: selectedSkills.map(s => s.id),
+        resourceRequirements: resourceRequirements.map((r, index) => ({
+          roleName: r.role,
+          quantity: r.quantity,
+          experienceLevel: r.experienceLevel,
+          notes: r.notes,
+          sortOrder: index,
+          skillIds: r.requiredSkills.map(s => s.id),
+        })),
+      };
+
+      const response = await fetch("/api/gateway/api/projects/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Role": "marketing",
+          "X-Debug-User": "marketing-user",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit project");
+      }
+
+      setProjectStatus("submitted");
+      addToast({
+        type: "success",
+        title: "Project Submitted",
+        message: "Your proposal has been sent to GM for approval",
+      });
+    } catch (error) {
+      console.error(error);
+      addToast({
+        type: "error",
+        title: "Submission Failed",
+        message: "There was an error submitting your project.",
+      });
+    }
   };
 
   const handleReviseRejected = (project: RejectedProject) => {
@@ -179,7 +274,11 @@ export function ProjectEntry() {
           <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Project Basic Info */}
-              <ProjectBasicInfo totalResources={totalResources} />
+              <ProjectBasicInfo 
+                totalResources={totalResources} 
+                formData={formData} 
+                onFormDataChange={handleFormDataChange} 
+              />
 
               {/* Required Skills */}
               <SkillSelector
@@ -187,9 +286,10 @@ export function ProjectEntry() {
                 onAddSkill={(skill) =>
                   setSelectedSkills([...selectedSkills, skill])
                 }
-                onRemoveSkill={(skill) =>
-                  setSelectedSkills(selectedSkills.filter((s) => s !== skill))
+                onRemoveSkill={(skillId) =>
+                  setSelectedSkills(selectedSkills.filter((s) => s.id !== skillId))
                 }
+                skillCategories={skillCategories}
               />
 
               {/* Resource Requirements Section */}
@@ -224,6 +324,7 @@ export function ProjectEntry() {
                       onUpdate={updateResourceRequirement}
                       onRemove={removeResourceRequirement}
                       showRemove={resourceRequirements.length > 1}
+                      allSkills={allSkillItems}
                     />
                   ))}
                 </div>
@@ -239,6 +340,8 @@ export function ProjectEntry() {
                 </label>
                 <textarea
                   rows={4}
+                  value={formData.notes}
+                  onChange={(e) => handleFormDataChange('notes', e.target.value)}
                   placeholder="Additional information about the project..."
                   className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 ></textarea>
