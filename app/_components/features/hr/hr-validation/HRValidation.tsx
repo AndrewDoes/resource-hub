@@ -7,7 +7,7 @@ import { useFeedbackToast } from '@/app/context/ToastContext';
 import { GMDecision, ContractAction, AssignmentRequest, HiringRequest, EmployeeStatus } from './types';
 import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockHiringRequests, mockEmployeeStatus } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus } from '@/functions/api/humanResource';
+import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring } from '@/functions/api/humanResource';
 import { fetchGeneralManagerContractDecisions, fetchGeneralManagerDecisions } from '@/functions/api/generalManager';
 
 // Sub-components
@@ -82,21 +82,56 @@ export function HRValidation() {
     loadData();
   }, [addToast]);
 
-  const handleExecuteDecision = (id: string) => {
+  // Helper to sync "Executed" status across all local lists
+  const markDecisionExecuted = (id: string, newStatus: string = 'executed') => {
     setGmDecisions((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: 'executed' } : d))
+      prev.map((d) => (d.id === id ? { ...d, status: newStatus as any } : d))
     );
-    addToast({
-      type: 'success',
-      title: 'Decision Executed',
-      message: 'The GM workflow has been executed correctly.',
-    });
+    setContractActions((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, status: newStatus as any } : c))
+    );
+    setHiringRequests((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, status: newStatus === 'executed' ? 'in-progress' : newStatus as any } : h))
+    );
+  };
+
+  const handleExecuteDecision = async (id: string) => {
+    const decision = gmDecisions.find(d => d.id === id);
+    if (!decision) return;
+
+    try {
+      let success = false;
+      const type = decision.type.toLowerCase();
+
+      // Route to correct API based on decision type
+      if (type.includes('contract')) {
+        success = await executeContractAction(id);
+      } else if (type.includes('hire')) {
+        success = await startHiring(id);
+      } else {
+        // Default to project assignment / generic decision
+        success = await executeDecision(id);
+      }
+
+      if (success) {
+        markDecisionExecuted(id);
+        addToast({
+          type: 'success',
+          title: 'Action Executed',
+          message: `The ${decision.type} has been successfully processed.`,
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Execution Failed',
+        message: 'Could not execute the decision at this time.',
+      });
+    }
   };
 
   const handleClarifyDecision = (id: string) => {
-    setGmDecisions((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: 'clarification-requested' } : d))
-    );
+    markDecisionExecuted(id, 'clarification-requested');
     addToast({
       type: 'info',
       title: 'Clarification Requested',
@@ -104,15 +139,24 @@ export function HRValidation() {
     });
   };
 
-  const handleExecuteContract = (id: string) => {
-    setContractActions((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: 'executed' } : c))
-    );
-    addToast({
-      type: 'success',
-      title: 'Contract Executed',
-      message: 'The contract has been executed successfully.',
-    });
+  const handleExecuteContract = async (id: string) => {
+    try {
+      const success = await executeContractAction(id);
+      if (success) {
+        markDecisionExecuted(id);
+        addToast({
+          type: 'success',
+          title: 'Contract Executed',
+          message: 'The contract has been executed successfully.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Execution Failed',
+        message: 'Could not execute the contract action.',
+      });
+    }
   };
 
   const handleApproveAssignment = async (id: string) => {
@@ -159,15 +203,24 @@ export function HRValidation() {
     }
   };
 
-  const handleStartHiring = (id: string) => {
-    setHiringRequests((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, status: 'in-progress' } : h))
-    );
-    addToast({
-      type: 'success',
-      title: 'Hiring Process Started',
-      message: 'The hiring process has been initiated successfully.',
-    });
+  const handleStartHiring = async (id: string) => {
+    try {
+      const success = await startHiring(id);
+      if (success) {
+        markDecisionExecuted(id, 'executed');
+        addToast({
+          type: 'success',
+          title: 'Hiring Process Started',
+          message: 'Recruitment process tracking record created.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Init Failed',
+        message: 'Could not start the hiring process.',
+      });
+    }
   };
 
   return (

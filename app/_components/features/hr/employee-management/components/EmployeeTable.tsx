@@ -125,19 +125,35 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                   </td>
                   <td className="px-6 py-4">
                     {employee.currentProjects.length > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <Briefcase className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm text-gray-900">
-                          {employee.currentProjects.length} active
-                        </span>
+                      <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                        {/* {employee.currentProjects.slice(0, 2).map((project, idx) => (
+                          <div key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100 min-w-0">
+                            <Briefcase className="w-3 h-3 shrink-0" />
+                            <span className="text-xs font-medium truncate" title={project}>
+                              {project}
+                            </span>
+                          </div>
+                        ))}
+                        {employee.currentProjects.length > 2 && (
+                          <span className="text-[10px] text-gray-500 font-medium px-1">
+                            +{employee.currentProjects.length - 2} more
+                          </span>
+                        )} */}
+
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100 min-w-0">
+                          <Briefcase className="w-3 h-3 shrink-0" />
+                          <span className="text-xs font-medium truncate">
+                            {employee.currentProjects.length} Active
+                          </span>
+                        </div>
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-400 italic">No assignments</span>
+                      <span className="text-xs text-gray-400 italic">No assignments</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
-                      <span
+                      {employee.status === 'active' && (<span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${availStatus.color === 'green'
                           ? 'bg-green-100 text-green-700'
                           : availStatus.color === 'yellow'
@@ -147,6 +163,7 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                               : 'bg-red-100 text-red-700'
                           }`}
                       >
+
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${availStatus.color === 'green'
                             ? 'bg-green-500'
@@ -159,6 +176,7 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                         ></span>
                         {availStatus.label}
                       </span>
+                      )}
                       {employee.status !== 'active' && (
                         <div>
                           <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">

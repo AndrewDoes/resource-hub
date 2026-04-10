@@ -13,10 +13,11 @@ import { EmployeeFilterBar } from './components/EmployeeFilterBar';
 import { EmployeeTable } from './components/EmployeeTable';
 import { EmployeeDetailSidebar } from './components/EmployeeDetailSidebar';
 import { EmployeeDeleteModal } from './components/EmployeeDeleteModal';
+import { EmployeeFormModal } from './components/EmployeeFormModal';
 import { Employee, TabType } from './types';
 import { mockEmployees } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployee } from '@/functions/api/humanResource';
+import { fetchHREmployeeList, mapToUIEmployee, deleteEmployee, createEmployee, updateEmployee, fetchDepartmentsLookup, DepartmentLookup } from '@/functions/api/humanResource';
 
 
 export function EmployeeManagement() {
@@ -34,6 +35,7 @@ export function EmployeeManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [dbDepartments, setDbDepartments] = useState<DepartmentLookup[]>([]);
 
   const { addToast } = useFeedbackToast();
 
@@ -60,7 +62,17 @@ export function EmployeeManagement() {
       }
     };
 
+    const loadDepartments = async () => {
+      try {
+        const data = await fetchDepartmentsLookup();
+        setDbDepartments(data);
+      } catch (err) {
+        console.error('Error loading departments:', err);
+      }
+    };
+
     loadEmployees();
+    loadDepartments();
   }, [addToast]);
 
   // Filter employees based on active tab and search/filter criteria
@@ -114,8 +126,8 @@ export function EmployeeManagement() {
 
   const filteredEmployees = getFilteredEmployees();
 
-  // Get department list
-  const departments = Array.from(new Set(employees.map((e) => e.department)));
+  // Get department list for filtering (derived from employees)
+  const filterDepartments = Array.from(new Set(employees.map((e) => e.department)));
 
   // Calculate stats
   const stats = {
@@ -131,7 +143,7 @@ export function EmployeeManagement() {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!employeeToDelete) return;
 
     // Check if employee has active projects
@@ -145,20 +157,79 @@ export function EmployeeManagement() {
       return;
     }
 
-    setEmployees((prev) => prev.filter((e) => e.id !== employeeToDelete.id));
-    addToast({
-      type: 'success',
-      title: 'Employee Removed',
-      message: `${employeeToDelete.name} has been removed from the system.`,
-    });
-    setIsDeleteModalOpen(false);
-    setEmployeeToDelete(null);
+    try {
+      const result = await deleteEmployee(employeeToDelete.id);
+      if (result.success) {
+        setEmployees((prev) => prev.filter((e) => e.id !== employeeToDelete.id));
+        addToast({
+          type: 'success',
+          title: 'Employee Removed',
+          message: `${employeeToDelete.name} has been removed from the system.`,
+        });
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Deletion Failed',
+          message: result.message || 'Could not delete the employee.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Network Error',
+        message: 'Failed to connect to the server.',
+      });
+    } finally {
+      setIsDeleteModalOpen(false);
+      setEmployeeToDelete(null);
+    }
   };
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
     setIsEditModalOpen(true);
   };
+
+  const handleSaveEmployee = async (formData: any) => {
+    // Sanitize data (GUIDs cannot be empty strings)
+    const sanitizedData = {
+      ...formData,
+      departmentId: formData.departmentId === '' ? null : formData.departmentId,
+      employeeCode: formData.employeeCode === '' ? null : formData.employeeCode,
+      location: formData.location === '' ? null : formData.location,
+      phone: formData.phone === '' ? null : formData.phone,
+      hireDate: null, // Explicitly send null for now as it's not in the form yet
+    };
+
+    try {
+      if (isEditModalOpen && selectedEmployee) {
+        const result = await updateEmployee(selectedEmployee.id, sanitizedData);
+        if (result.success) {
+          addToast({ type: 'success', title: 'Employee Updated', message: 'Profile changes saved.' });
+          // Refresh list
+          const apiEmployees = await fetchHREmployeeList();
+          setEmployees(apiEmployees.map(mapToUIEmployee));
+          setIsEditModalOpen(false);
+        } else {
+          addToast({ type: 'error', title: 'Update Failed', message: result.message || 'Please check the form for errors.' });
+        }
+      } else {
+        const result = await createEmployee(sanitizedData);
+        if (result.success) {
+          addToast({ type: 'success', title: 'Employee Created', message: 'New employee and user account added.' });
+          // Refresh list
+          const apiEmployees = await fetchHREmployeeList();
+          setEmployees(apiEmployees.map(mapToUIEmployee));
+          setIsAddModalOpen(false);
+        } else {
+          addToast({ type: 'error', title: 'Creation Failed', message: result.message || 'Please check the form for errors.' });
+        }
+      }
+    } catch (err) {
+      addToast({ type: 'error', title: 'Error', message: 'An unexpected error occurred.' });
+    }
+  };
+
 
   return (
     <div className="max-w-450 mx-auto space-y-6">
@@ -198,7 +269,7 @@ export function EmployeeManagement() {
         setDepartmentFilter={setDepartmentFilter}
         skillFilter={skillFilter}
         setSkillFilter={setSkillFilter}
-        departments={departments}
+        departments={filterDepartments}
         counts={stats}
       />
 
@@ -245,6 +316,19 @@ export function EmployeeManagement() {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={confirmDelete}
         employee={employeeToDelete}
+      />
+
+      {/* Add/Edit Modal */}
+      <EmployeeFormModal
+        isOpen={isAddModalOpen || isEditModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setIsEditModalOpen(false);
+          setSelectedEmployee(null);
+        }}
+        onSave={handleSaveEmployee}
+        employee={isEditModalOpen ? selectedEmployee : null}
+        departments={dbDepartments}
       />
     </div>
   );
