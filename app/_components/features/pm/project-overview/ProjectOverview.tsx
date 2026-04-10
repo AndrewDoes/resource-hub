@@ -9,6 +9,8 @@ import {
   type ProjectManagerProjectSummary,
 } from "@/functions/api/projectManager";
 
+const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+
 const formatDate = (value: string) => {
   const date = new Date(value);
 
@@ -33,7 +35,7 @@ export function ProjectOverview() {
 
     const loadProjects = async () => {
       try {
-        const response = await fetchProjectManagerProjects();
+        const response = await fetchProjectManagerProjects(defaultPmUserId);
 
         if (!isMounted) {
           return;

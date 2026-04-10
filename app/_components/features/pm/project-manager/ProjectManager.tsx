@@ -35,15 +35,6 @@ interface TeamMember {
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
-const fallbackProject = {
-  name: 'Website Redesign',
-  description: 'Complete overhaul of company website with modern design',
-  progress: 65,
-  startDate: '2026-04-10',
-  endDate: '2026-06-30',
-  daysRemaining: 89,
-};
-
 const fallbackMilestones: Milestone[] = [
   { id: '1', title: 'Requirements Gathering', date: '2026-04-15', completed: true },
   { id: '2', title: 'Design System Creation', date: '2026-04-30', completed: true },
@@ -198,6 +189,7 @@ const mapTimelineTasks = (items: ProjectManagerTimelineTask[]) => {
 };
 
 export function ProjectManager() {
+  const [projectList, setProjectList] = useState<ProjectManagerProjectSummary[]>(projectManagerFallbackProjects);
   const [selectedProject, setSelectedProject] = useState<ProjectManagerProjectSummary | null>(null);
   const [projectOverview, setProjectOverview] = useState<ProjectManagerProjectOverview | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(fallbackTeamMembers);
@@ -210,72 +202,95 @@ export function ProjectManager() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadProjectData = async () => {
+    const loadProjectList = async () => {
       try {
         const projects = await fetchProjectManagerProjects(defaultPmUserId);
-        const activeProject = projects[0] ?? projectManagerFallbackProjects[0];
+        const resolvedProjects = projects.length > 0 ? projects : projectManagerFallbackProjects;
 
         if (!isMounted) {
           return;
         }
 
-        setSelectedProject(activeProject);
+        setProjectList(resolvedProjects);
+        setSelectedProject((currentProject) => {
+          if (currentProject && resolvedProjects.some((project) => project.id === currentProject.id)) {
+            return currentProject;
+          }
 
-        const [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult] = await Promise.allSettled([
-          fetchProjectManagerProjectOverview(defaultPmUserId, activeProject.id),
-          fetchProjectManagerProjectTeam(defaultPmUserId, activeProject.id),
-          fetchProjectManagerProjectActivity(defaultPmUserId, activeProject.id),
-          fetchProjectManagerMilestones(defaultPmUserId, activeProject.id),
-          fetchProjectManagerTimelineTasks(defaultPmUserId, activeProject.id),
-        ]);
-
-        if (!isMounted) {
-          return;
-        }
-
-        setProjectOverview(
-          overviewResult.status === 'fulfilled' ? overviewResult.value : mapSummaryToOverview(activeProject)
-        );
-        setTeamMembers(
-          teamResult.status === 'fulfilled' ? mapTeamMembers(teamResult.value) : fallbackTeamMembers
-        );
-        setActivities(
-          activityResult.status === 'fulfilled' ? mapActivities(activityResult.value) : fallbackActivities
-        );
-        setMilestones(
-          milestoneResult.status === 'fulfilled' ? mapMilestones(milestoneResult.value) : fallbackMilestones
-        );
-        setGanttTasks(
-          timelineTaskResult.status === 'fulfilled'
-            ? mapTimelineTasks(timelineTaskResult.value)
-            : fallbackGanttTasks
-        );
+          return resolvedProjects[0] ?? null;
+        });
         setError(null);
       } catch (loadError) {
         if (!isMounted) {
           return;
         }
 
+        setProjectList(projectManagerFallbackProjects);
         setSelectedProject(projectManagerFallbackProjects[0]);
-        setProjectOverview(mapSummaryToOverview(projectManagerFallbackProjects[0]));
-        setTeamMembers(fallbackTeamMembers);
-        setActivities(fallbackActivities);
-        setMilestones(fallbackMilestones);
-        setGanttTasks(fallbackGanttTasks);
         setError(loadError instanceof Error ? loadError.message : 'Failed to load project manager data');
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
       }
     };
 
-    void loadProjectData();
+    void loadProjectList();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadSelectedProjectData = async () => {
+      setIsLoading(true);
+
+      const [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult] = await Promise.allSettled([
+        fetchProjectManagerProjectOverview(defaultPmUserId, selectedProject.id),
+        fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id),
+        fetchProjectManagerProjectActivity(defaultPmUserId, selectedProject.id),
+        fetchProjectManagerMilestones(defaultPmUserId, selectedProject.id),
+        fetchProjectManagerTimelineTasks(defaultPmUserId, selectedProject.id),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setProjectOverview(
+        overviewResult.status === 'fulfilled' ? overviewResult.value : mapSummaryToOverview(selectedProject)
+      );
+      setTeamMembers(
+        teamResult.status === 'fulfilled' ? mapTeamMembers(teamResult.value) : fallbackTeamMembers
+      );
+      setActivities(
+        activityResult.status === 'fulfilled' ? mapActivities(activityResult.value) : fallbackActivities
+      );
+      setMilestones(
+        milestoneResult.status === 'fulfilled' ? mapMilestones(milestoneResult.value) : fallbackMilestones
+      );
+      setGanttTasks(
+        timelineTaskResult.status === 'fulfilled'
+          ? mapTimelineTasks(timelineTaskResult.value)
+          : fallbackGanttTasks
+      );
+
+      const hasAnyFailure = [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult]
+        .some((result) => result.status === 'rejected');
+
+      setError(hasAnyFailure ? 'Some project data is unavailable. Showing partial fallback data.' : null);
+      setIsLoading(false);
+    };
+
+    void loadSelectedProjectData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedProject]);
 
   const overview = useMemo(() => {
     if (projectOverview) {
@@ -290,6 +305,26 @@ export function ProjectManager() {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">{overview.name}</h1>
         <p className="text-sm text-gray-500 mt-1">{overview.description}</p>
+        <div className="mt-3 max-w-sm">
+          <label htmlFor="pm-project-selector" className="mb-1 block text-xs font-medium text-gray-500">
+            Selected project
+          </label>
+          <select
+            id="pm-project-selector"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+            value={selectedProject?.id ?? ''}
+            onChange={(event) => {
+              const nextProject = projectList.find((project) => project.id === event.target.value) ?? null;
+              setSelectedProject(nextProject);
+            }}
+          >
+            {projectList.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {error && (
           <p className="mt-2 text-sm text-amber-700">
             Showing fallback data because the backend request failed: {error}
