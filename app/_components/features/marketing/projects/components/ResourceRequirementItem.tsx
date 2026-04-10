@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import { Users, Trash2, X } from 'lucide-react';
-import { ResourceRequirement } from '../types';
-import { roleOptions, experienceLevels, allSkills } from '../data';
+import { ResourceRequirement, SkillItem } from '../types';
+import { roleOptions, experienceLevels } from '../data';
+// import { allSkills } from '../data';
 
 interface ResourceRequirementItemProps {
   resource: ResourceRequirement;
   index: number;
-  onUpdate: (id: string, field: string | number | symbol, value: any) => void;
+  onUpdate: (id: string, field: keyof ResourceRequirement, value: any) => void;
   onRemove: (id: string) => void;
   showRemove: boolean;
+  allSkills: SkillItem[];
 }
 
 export function ResourceRequirementItem({
@@ -19,23 +21,24 @@ export function ResourceRequirementItem({
   onUpdate,
   onRemove,
   showRemove,
+  allSkills
 }: ResourceRequirementItemProps) {
   const [skillInput, setSkillInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const addSkill = (skill: string) => {
-    if (!resource.requiredSkills.includes(skill)) {
+  const addSkill = (skill: SkillItem) => {
+    if (!resource.requiredSkills.some(s => s.id === skill.id)) {
       onUpdate(resource.id, 'requiredSkills', [...resource.requiredSkills, skill]);
       setSkillInput('');
       setShowDropdown(false);
     }
   };
 
-  const removeSkill = (skill: string) => {
+  const removeSkill = (skillId: string) => {
     onUpdate(
       resource.id,
       'requiredSkills',
-      resource.requiredSkills.filter((s) => s !== skill)
+      resource.requiredSkills.filter((s) => s.id !== skillId)
     );
   };
 
@@ -135,17 +138,17 @@ export function ResourceRequirementItem({
               {allSkills
                 .filter(
                   (skill) =>
-                    skill.toLowerCase().includes(skillInput.toLowerCase()) &&
-                    !resource.requiredSkills.includes(skill)
+                    skill.name.toLowerCase().includes(skillInput.toLowerCase()) &&
+                    !resource.requiredSkills.some(s => s.id === skill.id)
                 )
                 .map((skill) => (
                   <button
-                    key={skill}
+                    key={skill.id}
                     type="button"
                     onClick={() => addSkill(skill)}
                     className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 transition-colors"
                   >
-                    {skill}
+                    {skill.name}
                   </button>
                 ))}
             </div>
@@ -155,13 +158,13 @@ export function ResourceRequirementItem({
           <div className="flex flex-wrap gap-2 mt-2">
             {resource.requiredSkills.map((skill) => (
               <span
-                key={skill}
+                key={skill.id}
                 className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700"
               >
-                {skill}
+                {skill.name}
                 <button
                   type="button"
-                  onClick={() => removeSkill(skill)}
+                  onClick={() => removeSkill(skill.id)}
                   className="hover:bg-gray-100 rounded p-0.5 transition-colors"
                 >
                   <X className="w-3 h-3" />

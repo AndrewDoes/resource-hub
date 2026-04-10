@@ -1,8 +1,8 @@
-'use client';
-import { useRouter } from 'next/navigation';
-import { Check, ChevronDown } from 'lucide-react';
-import { roleConfig, useRole } from '@/app/context/RoleContext';
-import { UserRole } from '@/app/types';
+"use client";
+import { useRouter } from "next/navigation";
+import { Check, ChevronDown } from "lucide-react";
+import { roleConfig, useRole } from "@/app/context/RoleContext";
+import { UserRole } from "@/app/types";
 
 interface ProfileDropdownProps {
   isOpen: boolean;
@@ -10,44 +10,44 @@ interface ProfileDropdownProps {
 }
 
 const roleDefaultPages: Record<UserRole, string> = {
-  marketing: '/marketing/projects',
-  pm: '/pm/project-overview',
-  gm: '/gm/planning',
-  hr: '/hr/hr-validation',
-  employee: '/employee/my-projects',
+  marketing: "/marketing/dashboard",
+  pm: "/pm/project-overview",
+  gm: "/gm/planning",
+  hr: "/hr/hr-validation",
+  employee: "/employee/my-projects",
 };
 
 export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
   const { currentUser, setCurrentUser } = useRole();
   const router = useRouter();
 
-  const roles: UserRole[] = ['marketing', 'pm', 'gm', 'hr', 'employee'];
+  const roles: UserRole[] = ["marketing", "pm", "gm", "hr", "employee"];
 
   const roleUserData = {
     marketing: {
-      name: 'Sarah Martinez',
-      email: 'sarah.martinez@company.com',
-      avatar: 'SM',
+      name: "Sarah Martinez",
+      email: "sarah.martinez@company.com",
+      avatar: "SM",
     },
     pm: {
-      name: 'Alex Johnson',
-      email: 'alex.johnson@company.com',
-      avatar: 'AJ',
+      name: "Alex Johnson",
+      email: "alex.johnson@company.com",
+      avatar: "AJ",
     },
     gm: {
-      name: 'John Doe',
-      email: 'john.doe@company.com',
-      avatar: 'JD',
+      name: "John Doe",
+      email: "john.doe@company.com",
+      avatar: "JD",
     },
     hr: {
-      name: 'Emily Chen',
-      email: 'emily.chen@company.com',
-      avatar: 'EC',
+      name: "Emily Chen",
+      email: "emily.chen@company.com",
+      avatar: "EC",
     },
     employee: {
-      name: 'David Lee',
-      email: 'david.lee@company.com',
-      avatar: 'DL',
+      name: "David Lee",
+      email: "david.lee@company.com",
+      avatar: "DL",
     },
   };
 
@@ -70,18 +70,19 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 z-40" onClick={onClose}></div>
 
       {/* Dropdown */}
       <div className="absolute top-16 right-6 z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
         {/* User Info Section */}
-        <div className={`bg-linear-to-br ${roleConfig[currentUser.role].color} p-6 text-white`}>
+        <div
+          className={`bg-linear-to-br ${roleConfig[currentUser.role].color} p-6 text-white`}
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-full flex items-center justify-center">
-              <span className="text-xl font-semibold">{currentUser.avatar}</span>
+              <span className="text-xl font-semibold">
+                {currentUser.avatar}
+              </span>
             </div>
             <div>
               <p className="font-semibold text-lg">{currentUser.name}</p>
@@ -90,7 +91,9 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
           </div>
           <div className="bg-white/20 backdrop-blur rounded-lg px-3 py-2 inline-block">
             <p className="text-xs opacity-75 mb-0.5">Current Role</p>
-            <p className="text-sm font-semibold">{roleConfig[currentUser.role].label}</p>
+            <p className="text-sm font-semibold">
+              {roleConfig[currentUser.role].label}
+            </p>
           </div>
         </div>
 
@@ -108,25 +111,33 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
                 <button
                   key={role}
                   onClick={() => handleRoleSwitch(role)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${isActive
-                    ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${
+                    isActive
+                      ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
+                      : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isActive
-                        ? 'bg-white/20 backdrop-blur'
-                        : `bg-linear-to-br ${roleConfig[role].color}`
-                        }`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isActive
+                          ? "bg-white/20 backdrop-blur"
+                          : `bg-linear-to-br ${roleConfig[role].color}`
+                      }`}
                     >
-                      <span className={`text-xs font-medium ${isActive ? 'text-white' : 'text-white'}`}>
+                      <span
+                        className={`text-xs font-medium ${isActive ? "text-white" : "text-white"}`}
+                      >
                         {roleUserData[role].avatar}
                       </span>
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{roleConfig[role].label}</p>
-                      <p className={`text-xs ${isActive ? 'text-white/75' : 'text-gray-500'}`}>
+                      <p className="text-sm font-medium">
+                        {roleConfig[role].label}
+                      </p>
+                      <p
+                        className={`text-xs ${isActive ? "text-white/75" : "text-gray-500"}`}
+                      >
                         {roleUserData[role].name}
                       </p>
                     </div>

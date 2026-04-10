@@ -1,39 +1,55 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Paperclip, Plus, Save, Send, XCircle } from 'lucide-react';
-import { useFeedbackToast } from '@/app/context/ToastContext';
-import { WorkflowVisualizer } from '@/app/_components/system/WorkflowSystem';
-import type { ProjectStatus } from '@/app/_components/system/WorkflowSystem';
-
+import React, { useState, useEffect } from "react";
+import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
+import { useFeedbackToast } from "@/app/context/ToastContext";
+import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
+import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
 
 // Types, Data
-import { ResourceRequirement, RejectedProject, SuggestedEmployee } from './types';
-import { rejectedProjects } from './data';
-
+import {
+  ResourceRequirement,
+  RejectedProject,
+  SuggestedEmployee,
+  SkillItem,
+  ProjectFormData,
+} from "./types";
+import { rejectedProjects } from "./data";
 
 // Sub-components
-import { ProjectBasicInfo } from './components/ProjectBasicInfo';
-import { SkillSelector } from './components/SkillSelector';
-import { ResourceRequirementItem } from './components/ResourceRequirementItem';
-import { SuggestedResources } from './components/SuggestedResources';
-import { RejectedProjectsModal } from './components/RejectedProjectsModal';
-
+import { ProjectBasicInfo } from "./components/ProjectBasicInfo";
+import { SkillSelector } from "./components/SkillSelector";
+import { ResourceRequirementItem } from "./components/ResourceRequirementItem";
+import { SuggestedResources } from "./components/SuggestedResources";
+import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
 
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
-  
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [projectStatus, setProjectStatus] = useState<ProjectStatus>('draft');
+
+  const [formData, setFormData] = useState<ProjectFormData>({
+    name: "",
+    clientName: "",
+    startDate: "",
+    endDate: "",
+    notes: "",
+  });
+
+  const [selectedSkills, setSelectedSkills] = useState<SkillItem[]>([]);
+  const [projectStatus, setProjectStatus] = useState<ProjectStatus>("draft");
   const [showRejectedProjects, setShowRejectedProjects] = useState(false);
-  const [resourceRequirements, setResourceRequirements] = useState<ResourceRequirement[]>([
+  const [allSkillItems, setAllSkillItems] = useState<SkillItem[]>([]);
+  const [skillCategories, setSkillCategories] = useState<Record<string, SkillItem[]>>({});
+  
+  const [resourceRequirements, setResourceRequirements] = useState<
+    ResourceRequirement[]
+  >([
     {
-      id: '1',
-      role: '',
+      id: "1",
+      role: "",
       quantity: 1,
-      experienceLevel: 'Mid',
+      experienceLevel: "Mid",
       requiredSkills: [],
-      notes: '',
+      notes: "",
     },
   ]);
 
@@ -43,11 +59,11 @@ export function ProjectEntry() {
       ...resourceRequirements,
       {
         id: Date.now().toString(),
-        role: '',
+        role: "",
         quantity: 1,
-        experienceLevel: 'Mid',
+        experienceLevel: "Mid",
         requiredSkills: [],
-        notes: '',
+        notes: "",
       },
     ]);
   };
@@ -58,68 +74,174 @@ export function ProjectEntry() {
     }
   };
 
-  const updateResourceRequirement = (id: string, field: string | number | symbol, value: any) => {
+  const updateResourceRequirement = (
+    id: string,
+    field: keyof ResourceRequirement,
+    value: any,
+  ) => {
     setResourceRequirements(
-      resourceRequirements.map((r) => (r.id === id ? { ...r, [field]: value } as ResourceRequirement : r))
+      resourceRequirements.map((r) =>
+        r.id === id ? ({ ...r, [field]: value } as ResourceRequirement) : r,
+      ),
     );
   };
 
   // Calculate total resources automatically
-  const totalResources = resourceRequirements.reduce((sum, req) => sum + req.quantity, 0);
+  const totalResources = resourceRequirements.reduce(
+    (sum, req) => sum + req.quantity,
+    0,
+  );
 
   // Mock suggested employees based on skills
-  const suggestedEmployees: SuggestedEmployee[] = selectedSkills.length > 0 ? [
-    { name: 'Agus Pratama', skills: ['Critical Thinking', 'Leadership', 'Project Management'], match: 85 },
-    { name: 'Budi Santoso', skills: ['Node.js', 'API Development', 'Backend'], match: 92 },
-    { name: 'Sarah Chen', skills: ['React', 'UI/UX Design', 'Frontend'], match: 88 },
-  ] : [];
+  const suggestedEmployees: SuggestedEmployee[] =
+    selectedSkills.length > 0
+      ? [
+          {
+            name: "Agus Pratama",
+            skills: ["Critical Thinking", "Leadership", "Project Management"],
+            match: 85,
+          },
+          {
+            name: "Budi Santoso",
+            skills: ["Node.js", "API Development", "Backend"],
+            match: 92,
+          },
+          {
+            name: "Sarah Chen",
+            skills: ["React", "UI/UX Design", "Frontend"],
+            match: 88,
+          },
+        ]
+      : [];
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const response = await fetch("/api/gateway/api/lookups/skills/list", {
+          headers: {
+            "X-Debug-Role": "marketing",
+            "X-Debug-User": "marketing-user",
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const skills: SkillItem[] = data.skills;
+          setAllSkillItems(skills);
+
+          // Group by category
+          const grouped = skills.reduce((acc, skill) => {
+            if (!acc[skill.category]) {
+              acc[skill.category] = [];
+            }
+            acc[skill.category].push(skill);
+            return acc;
+          }, {} as Record<string, SkillItem[]>);
+          setSkillCategories(grouped);
+        }
+      } catch (error) {
+        console.error("Failed to fetch skills", error);
+        addToast({
+          type: "error",
+          title: "Error Loading Skills",
+          message: "Failed to load skills from the database.",
+        });
+      }
+    };
+    fetchSkills();
+  }, [addToast]);
+
+  const handleFormDataChange = (field: keyof ProjectFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSaveDraft = () => {
-    setProjectStatus('draft');
+    setProjectStatus("draft");
     addToast({
-      type: 'success',
-      title: 'Draft Saved',
-      message: 'Your project proposal has been saved as draft',
+      type: "success",
+      title: "Draft Saved",
+      message: "Your project proposal has been saved as draft",
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
     const hasEmptyRole = resourceRequirements.some((r) => !r.role);
     if (hasEmptyRole) {
       addToast({
-        type: 'error',
-        title: 'Incomplete Resource Requirements',
-        message: 'Please specify a role for all resource requirements',
+        type: "error",
+        title: "Incomplete Resource Requirements",
+        message: "Please specify a role for all resource requirements",
       });
       return;
     }
 
     if (selectedSkills.length === 0) {
       addToast({
-        type: 'error',
-        title: 'Skills Required',
-        message: 'Please select at least one required skill',
+        type: "error",
+        title: "Skills Required",
+        message: "Please select at least one required skill",
       });
       return;
     }
 
-    setProjectStatus('submitted');
-    addToast({
-      type: 'success',
-      title: 'Project Submitted',
-      message: 'Your proposal has been sent to GM for approval',
-    });
+    try {
+      const payload = {
+        // createdByUserId: "11111111-1111-1111-1111-111111111111", // Placeholder until auth is integrated
+        createdByUserId: "6a974394-53c7-4ab4-8fc5-03e9b3e8f3e0", // Marketing user from DB
+        name: formData.name,
+        clientName: formData.clientName,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        notes: formData.notes,
+        skillIds: selectedSkills.map(s => s.id),
+        resourceRequirements: resourceRequirements.map((r, index) => ({
+          roleName: r.role,
+          quantity: r.quantity,
+          experienceLevel: r.experienceLevel,
+          notes: r.notes,
+          sortOrder: index,
+          skillIds: r.requiredSkills.map(s => s.id),
+        })),
+      };
+
+      const response = await fetch("/api/gateway/api/projects/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Role": "marketing",
+          "X-Debug-User": "marketing-user",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit project");
+      }
+
+      setProjectStatus("submitted");
+      addToast({
+        type: "success",
+        title: "Project Submitted",
+        message: "Your proposal has been sent to GM for approval",
+      });
+    } catch (error) {
+      console.error(error);
+      addToast({
+        type: "error",
+        title: "Submission Failed",
+        message: "There was an error submitting your project.",
+      });
+    }
   };
 
   const handleReviseRejected = (project: RejectedProject) => {
     setShowRejectedProjects(false);
     // In a real app, would populate form with rejected project data
     addToast({
-      type: 'info',
-      title: 'Revising Project',
+      type: "info",
+      title: "Revising Project",
       message: `Revising ${project.name}. Update the details and resubmit for GM review.`,
     });
   };
@@ -128,8 +250,12 @@ export function ProjectEntry() {
     <div className="max-w-7xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Create New Project</h1>
-          <p className="text-sm text-gray-500 mt-1">Marketing Department - Project Request Form</p>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Create New Project
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Marketing Department - Project Request Form
+          </p>
         </div>
         {rejectedProjects.length > 0 && (
           <button
@@ -148,13 +274,22 @@ export function ProjectEntry() {
           <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Project Basic Info */}
-              <ProjectBasicInfo totalResources={totalResources} />
+              <ProjectBasicInfo 
+                totalResources={totalResources} 
+                formData={formData} 
+                onFormDataChange={handleFormDataChange} 
+              />
 
               {/* Required Skills */}
-              <SkillSelector 
+              <SkillSelector
                 selectedSkills={selectedSkills}
-                onAddSkill={(skill) => setSelectedSkills([...selectedSkills, skill])}
-                onRemoveSkill={(skill) => setSelectedSkills(selectedSkills.filter(s => s !== skill))}
+                onAddSkill={(skill) =>
+                  setSelectedSkills([...selectedSkills, skill])
+                }
+                onRemoveSkill={(skillId) =>
+                  setSelectedSkills(selectedSkills.filter((s) => s.id !== skillId))
+                }
+                skillCategories={skillCategories}
               />
 
               {/* Resource Requirements Section */}
@@ -162,10 +297,12 @@ export function ProjectEntry() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Resource Requirements <span className="text-red-500">*</span>
+                      Resource Requirements{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <p className="text-xs text-gray-600">
-                      Define resource roles clearly to improve assignment accuracy
+                      Define resource roles clearly to improve assignment
+                      accuracy
                     </p>
                   </div>
                   <button
@@ -180,13 +317,14 @@ export function ProjectEntry() {
 
                 <div className="space-y-4">
                   {resourceRequirements.map((resource, index) => (
-                    <ResourceRequirementItem 
+                    <ResourceRequirementItem
                       key={resource.id}
                       resource={resource}
                       index={index}
                       onUpdate={updateResourceRequirement}
                       onRemove={removeResourceRequirement}
                       showRemove={resourceRequirements.length > 1}
+                      allSkills={allSkillItems}
                     />
                   ))}
                 </div>
@@ -202,6 +340,8 @@ export function ProjectEntry() {
                 </label>
                 <textarea
                   rows={4}
+                  value={formData.notes}
+                  onChange={(e) => handleFormDataChange('notes', e.target.value)}
                   placeholder="Additional information about the project..."
                   className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 ></textarea>
@@ -253,7 +393,7 @@ export function ProjectEntry() {
 
       {/* Rejected Projects Modal */}
       {showRejectedProjects && (
-        <RejectedProjectsModal 
+        <RejectedProjectsModal
           rejectedProjects={rejectedProjects}
           onClose={() => setShowRejectedProjects(false)}
           onRevise={handleReviseRejected}
