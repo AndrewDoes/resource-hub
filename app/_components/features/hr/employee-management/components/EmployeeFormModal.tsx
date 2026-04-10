@@ -38,24 +38,29 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
         status: employee.status === 'active' ? 'Active' : 'Inactive'
       });
     } else {
-      setFormData({
-        fullName: '',
-        email: '',
-        jobTitle: '',
-        departmentId: '',
-        employeeCode: '',
-        phone: '',
-        location: '',
-        status: 'Active'
-      });
+      emptyForm();
     }
   }, [employee]);
+
+  const emptyForm = () => {
+    setFormData({
+      fullName: '',
+      email: '',
+      jobTitle: '',
+      departmentId: '',
+      employeeCode: '',
+      phone: '',
+      location: '',
+      status: 'Active'
+    });
+  }
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
+    emptyForm();
   };
 
   return (
@@ -115,7 +120,10 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
                 onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
-                <option value={employee?.department}>{employee?.department}</option>
+                {employee?.department ?
+                  <option value={employee?.department}>{employee?.department}</option>
+                  :
+                  <option value="">Select Dept</option>}
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
