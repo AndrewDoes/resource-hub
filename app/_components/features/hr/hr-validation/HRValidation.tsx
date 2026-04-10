@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 // Types & Data
 import { GMDecision, ContractAction, AssignmentRequest, HiringRequest, EmployeeStatus } from './types';
 import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockHiringRequests, mockEmployeeStatus } from './data';
+import { useEffect, useState } from 'react';
+import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus } from '@/functions/api/humanResource';
+import { fetchGeneralManagerContractDecisions, fetchGeneralManagerDecisions } from '@/functions/api/generalManager';
 
 // Sub-components
 import { DecisionInbox } from './components/DecisionInbox';
@@ -22,8 +24,63 @@ export function HRValidation() {
   const [contractActions, setContractActions] = useState<ContractAction[]>(mockContractActions);
   const [assignmentRequests, setAssignmentRequests] = useState<AssignmentRequest[]>(mockAssignmentRequests);
   const [hiringRequests, setHiringRequests] = useState<HiringRequest[]>(mockHiringRequests);
-  const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus[]>(mockEmployeeStatus);
+  const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { addToast } = useFeedbackToast();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch Employees, Contract Decisions, and General Decisions in parallel
+        const [apiEmployees, apiContractDecisions, apiGeneralDecisions, apiAssignmentRequests] = await Promise.all([
+          fetchHREmployeeList(),
+          fetchGeneralManagerContractDecisions(),
+          fetchGeneralManagerDecisions(),
+          fetchHRAssignmentRequests()
+        ]);
+
+        // Map Employee Status
+        const uiStatus = apiEmployees.map(mapToUIEmployeeStatus);
+        setEmployeeStatus(uiStatus);
+
+        // Map Contract Actions
+        const uiContractActions = apiContractDecisions.map(mapToUIContractAction);
+        setContractActions(uiContractActions);
+
+        // Map General Decisions
+        const uiGeneralDecisions = apiGeneralDecisions.map(mapToUIDecision);
+        setGmDecisions(uiGeneralDecisions);
+
+        // Map Assignment Requests
+        const uiAssignments = apiAssignmentRequests.map(mapToUIAssignmentRequest);
+        setAssignmentRequests(uiAssignments);
+
+        setError(null);
+      } catch (err) {
+        console.error('Error loading validation data:', err);
+        setError('Failed to load validation data.');
+
+        // Fallbacks
+        setEmployeeStatus(mockEmployeeStatus);
+        setContractActions(mockContractActions);
+        setGmDecisions(mockGMDecisions);
+        setAssignmentRequests(mockAssignmentRequests);
+
+        addToast({
+          type: 'error',
+          title: 'Connection Error',
+          message: 'Using offline data for validation highlights.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [addToast]);
 
   const handleExecuteDecision = (id: string) => {
     setGmDecisions((prev) =>
@@ -58,26 +115,48 @@ export function HRValidation() {
     });
   };
 
-  const handleApproveAssignment = (id: string) => {
-    setAssignmentRequests((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'approved' } : a))
-    );
-    addToast({
-      type: 'success',
-      title: 'Assignment Approved',
-      message: 'The requested resource allocation has been approved.',
-    });
+  const handleApproveAssignment = async (id: string) => {
+    try {
+      const success = await updateAssignmentStatus(id, 'Approved');
+      if (success) {
+        setAssignmentRequests((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: 'approved' } : a))
+        );
+        addToast({
+          type: 'success',
+          title: 'Assignment Approved',
+          message: 'The requested resource allocation has been approved.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Could not approve the assignment at this time.',
+      });
+    }
   };
 
-  const handleRejectAssignment = (id: string) => {
-    setAssignmentRequests((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'rejected' } : a))
-    );
-    addToast({
-      type: 'error',
-      title: 'Assignment Rejected',
-      message: 'The assignment request has been rejected.',
-    });
+  const handleRejectAssignment = async (id: string) => {
+    try {
+      const success = await updateAssignmentStatus(id, 'Rejected');
+      if (success) {
+        setAssignmentRequests((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: 'rejected' } : a))
+        );
+        addToast({
+          type: 'error',
+          title: 'Assignment Rejected',
+          message: 'The assignment request has been rejected.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Could not reject the assignment at this time.',
+      });
+    }
   };
 
   const handleStartHiring = (id: string) => {
@@ -112,33 +191,62 @@ export function HRValidation() {
 
       <div className="grid grid-cols-1 gap-6">
         <WorkloadStatusIndicator />
-        <WorkloadKPIs employeeStatus={employeeStatus} />
+
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200 shadow-sm animate-pulse">
+            <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-500 font-medium">Loading live resource status...</p>
+          </div>
+        ) : (
+          <WorkloadKPIs employeeStatus={employeeStatus} />
+        )}
+
         <div className="space-y-6">
-          <DecisionInbox
-            gmDecisions={gmDecisions}
-            onExecute={handleExecuteDecision}
-            onClarify={handleClarifyDecision}
-          />
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200 shadow-sm animate-pulse">
+              <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-500 font-medium">Loading decision inbox...</p>
+            </div>
+          ) : (
+            <DecisionInbox
+              gmDecisions={gmDecisions}
+              onExecute={handleExecuteDecision}
+              onClarify={handleClarifyDecision}
+            />
+          )}
 
         </div>
         <div className="grid grid-cols-2 gap-6">
-          <ContractExecutionPanel
-            contractActions={contractActions}
-            onExecute={handleExecuteContract}
-          />
+          {isLoading ? (
+            <div className="h-64 bg-gray-50 rounded-xl border border-dashed border-gray-300 flex items-center justify-center">
+              <p className="text-gray-400 text-sm">Loading contract actions...</p>
+            </div>
+          ) : (
+            <ContractExecutionPanel
+              contractActions={contractActions}
+              onExecute={handleExecuteContract}
+            />
+          )}
           <HiringActionPanel
             hiringRequests={hiringRequests}
             onStartHiring={handleStartHiring}
           />
         </div>
         <div className="grid grid-cols-1 gap-6">
-          <EmployeeStatusControl
-            employeeStatus={employeeStatus}
-          />
+          {isLoading ? (
+            <div className="h-64 bg-gray-50 rounded-xl border border-dashed border-gray-300 flex items-center justify-center">
+              <p className="text-gray-400 text-sm">Loading employee status table...</p>
+            </div>
+          ) : (
+            <EmployeeStatusControl
+              employeeStatus={employeeStatus}
+            />
+          )}
           <AssignmentValidation
             assignmentRequests={assignmentRequests}
             onApprove={handleApproveAssignment}
             onReject={handleRejectAssignment}
+            isLoading={isLoading}
           />
         </div>
       </div>
