@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  X, Mail, Phone, MapPin, Calendar, Award, Briefcase, Edit2, Trash2
+  X, Mail, Phone, MapPin, Calendar, Award, Briefcase, Edit2, Trash2, ShieldCheck, Fingerprint, History
 } from 'lucide-react';
 import { Employee } from '../types';
 
@@ -68,8 +68,40 @@ export function EmployeeDetailSidebar({
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Calendar className="w-4 h-4 text-gray-400" />
-                Joined {new Date(employee.joinedDate).toLocaleDateString()}
+                Joined {new Date(employee.hireDate || employee.joinedDate).toLocaleDateString()}
               </div>
+            </div>
+          </div>
+
+          {/* Identity Management Placeholder */}
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-500" />
+              Identity Management
+            </h4>
+            <div className="p-3 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+              <div className="space-y-2 opacity-30 select-none">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2">
+                    <Fingerprint className="w-3 h-3" />
+                    MFA Status
+                  </span>
+                  <span className="font-medium text-green-600 uppercase">Enabled</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-gray-500">
+                    Last Login
+                  </span>
+                  <span className="font-medium">Yesterday, 14:20</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-gray-500">
+                    Account Security
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">VERIFIED</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 text-center mt-2 italic">Module coming soon</p>
             </div>
           </div>
 
@@ -135,16 +167,21 @@ export function EmployeeDetailSidebar({
 
           {/* Project History */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-900 uppercase">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase flex items-center gap-2">
+              <History className="w-4 h-4 text-blue-500" />
               Project History
             </h4>
             <div className="space-y-2">
-              {employee.projectHistory.map((project, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm text-gray-700">{project}</span>
-                </div>
-              ))}
+              {employee.projectHistory && employee.projectHistory.length > 0 ? (
+                employee.projectHistory.map((project, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm text-gray-700">{project}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic px-1">No historical projects recorded</p>
+              )}
             </div>
           </div>
 

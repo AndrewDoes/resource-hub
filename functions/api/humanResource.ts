@@ -13,11 +13,24 @@ export interface HREmployeeListItem {
   status: string;
   assignedHours: number;
   assignments: any[];
+  hireDate?: string;
+  skills?: string[];
 }
 
 export interface DepartmentLookup {
   id: string;
   name: string;
+}
+
+export interface ProjectLookup {
+  id: string;
+  name: string;
+}
+
+export interface SkillLookup {
+  id: string;
+  name: string;
+  category: string;
 }
 
 interface GetEmployeeListResponse {
@@ -79,6 +92,8 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       phone: asString(record.phone, "N/A"),
       status: asString(record.status, "Active"),
       assignments: Array.isArray(record.assignments) ? record.assignments : [],
+      hireDate: asString(record.hireDate, ""),
+      skills: Array.isArray(record.skills) ? record.skills as string[] : [],
     };
   });
 };
@@ -108,14 +123,15 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     phone: apiItem.phone,
     location: "", // Not in list API
     department: apiItem.department ?? "General",
-    skills: [], // Not in list API yet
-    status: apiItem.status.toLowerCase() === "active" ? "active" : "inactive",
+    skills: apiItem.skills || [],
+    status: apiItem.status.toLowerCase() === "active" ? "active" : apiItem.status.toLowerCase() === "inactive" ? "inactive" : "terminated",
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,
     assignedHours: apiItem.assignedHours,
     currentProjects: apiItem.assignments.map((a: any) => a.projectName || "Unknown Project"),
     projectHistory: [],
-    joinedDate: new Date().toISOString(),
+    joinedDate: apiItem.hireDate || new Date().toISOString(),
+    hireDate: apiItem.hireDate || "",
   };
 };
 
@@ -328,6 +344,32 @@ export async function fetchDepartmentsLookup(): Promise<DepartmentLookup[]> {
   return (payload.departments || []).map((d: any) => ({
     id: d.id,
     name: d.name
+  }));
+}
+
+export async function fetchProjectsLookup(): Promise<ProjectLookup[]> {
+  const response = await fetch(`${BackendApiUrl.projects}/list?pageSize=100`);
+  if (!response.ok) {
+    throw new Error(`Failed to load projects (${response.status})`);
+  }
+  const payload: any = await response.json();
+  return (payload.projects || payload.items || payload.data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name || p.fullName || "Untitled Project"
+  }));
+}
+
+export async function fetchSkillsLookup(): Promise<SkillLookup[]> {
+  const response = await fetch(`${BackendApiUrl.lookups}/skills/list?pageSize=1000`);
+  if (!response.ok) {
+    throw new Error(`Failed to load skills (${response.status})`);
+  }
+  const payload: any = await response.json();
+  const skills = Array.isArray(payload.skills) ? payload.skills : [];
+  return skills.map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    category: s.category
   }));
 }
 

@@ -17,7 +17,19 @@ import { EmployeeFormModal } from './components/EmployeeFormModal';
 import { Employee, TabType } from './types';
 import { mockEmployees } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployee, deleteEmployee, createEmployee, updateEmployee, fetchDepartmentsLookup, DepartmentLookup } from '@/functions/api/humanResource';
+import { 
+  fetchHREmployeeList, 
+  mapToUIEmployee, 
+  deleteEmployee, 
+  createEmployee, 
+  updateEmployee, 
+  fetchDepartmentsLookup, 
+  DepartmentLookup,
+  fetchProjectsLookup,
+  ProjectLookup,
+  fetchSkillsLookup,
+  SkillLookup
+} from '@/functions/api/humanResource';
 
 
 export function EmployeeManagement() {
@@ -36,6 +48,8 @@ export function EmployeeManagement() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [dbDepartments, setDbDepartments] = useState<DepartmentLookup[]>([]);
+  const [dbProjects, setDbProjects] = useState<ProjectLookup[]>([]);
+  const [dbSkills, setDbSkills] = useState<SkillLookup[]>([]);
 
   const { addToast } = useFeedbackToast();
 
@@ -62,17 +76,23 @@ export function EmployeeManagement() {
       }
     };
 
-    const loadDepartments = async () => {
+    const loadLookups = async () => {
       try {
-        const data = await fetchDepartmentsLookup();
-        setDbDepartments(data);
+        const [depts, projs, skills] = await Promise.all([
+          fetchDepartmentsLookup(),
+          fetchProjectsLookup(),
+          fetchSkillsLookup()
+        ]);
+        setDbDepartments(depts);
+        setDbProjects(projs);
+        setDbSkills(skills);
       } catch (err) {
-        console.error('Error loading departments:', err);
+        console.error('Error loading lookups:', err);
       }
     };
 
     loadEmployees();
-    loadDepartments();
+    loadLookups();
   }, [addToast]);
 
   // Filter employees based on active tab and search/filter criteria
@@ -198,7 +218,8 @@ export function EmployeeManagement() {
       employeeCode: formData.employeeCode === '' ? null : formData.employeeCode,
       location: formData.location === '' ? null : formData.location,
       phone: formData.phone === '' ? null : formData.phone,
-      hireDate: null, // Explicitly send null for now as it's not in the form yet
+      hireDate: formData.hireDate === '' ? null : formData.hireDate,
+      skills: formData.skills
     };
 
     try {
@@ -230,6 +251,44 @@ export function EmployeeManagement() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (employees.length === 0) return;
+
+    const headers = ['Name', 'Email', 'Role', 'Department', 'Status', 'Hire Date', 'Skills', 'Availability', 'Workload'];
+    const rows = employees.map(e => [
+      e.name,
+      e.email,
+      e.role,
+      e.department,
+      e.status,
+      e.hireDate || e.joinedDate.split('T')[0],
+      `"${e.skills.join(', ')}"`,
+      `${e.availability}%`,
+      `${e.workload}%`
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `employees_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addToast({
+      type: 'success',
+      title: 'Export Successful',
+      message: `Exported ${employees.length} employees to CSV.`
+    });
+  };
+
 
   return (
     <div className="max-w-450 mx-auto space-y-6">
@@ -242,7 +301,10 @@ export function EmployeeManagement() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
             <Download className="w-4 h-4" />
             Export
           </button>
@@ -329,6 +391,8 @@ export function EmployeeManagement() {
         onSave={handleSaveEmployee}
         employee={isEditModalOpen ? selectedEmployee : null}
         departments={dbDepartments}
+        projects={dbProjects}
+        availableSkills={dbSkills}
       />
     </div>
   );

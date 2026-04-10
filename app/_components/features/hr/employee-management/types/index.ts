@@ -63,13 +63,14 @@ export interface Employee {
   location: string;
   department: string;
   skills: string[];
-  status: 'active' | 'inactive' | 'resigned';
+  status: 'active' | 'inactive' | 'resigned' | 'terminated';
   availability: number;
   workload: number;
   assignedHours: number;
   currentProjects: string[];
   projectHistory: string[];
   joinedDate: string;
+  hireDate: string;
 }
 
 export type TabType = 'all' | 'active' | 'available' | 'assigned' | 'overloaded';

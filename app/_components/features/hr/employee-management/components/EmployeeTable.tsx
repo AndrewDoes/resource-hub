@@ -2,7 +2,7 @@
 
 import { Mail, Briefcase, ChevronRight, Edit2, Trash2, Award } from 'lucide-react';
 import { Employee } from '../types';
-import { getAvailabilityStatus } from '../utils';
+import { getAvailabilityStatus, getEmployeeStatus } from '../utils';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -12,6 +12,12 @@ interface EmployeeTableProps {
 }
 
 export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: EmployeeTableProps) {
+  const sortedEmployees = [...employees].sort((a, b) => {
+    if (a.status === 'terminated' && b.status !== 'terminated') return 1;
+    if (a.status !== 'terminated' && b.status === 'terminated') return -1;
+    return 0;
+  });
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mt-6 overflow-hidden">
       <div className="overflow-x-auto">
@@ -45,18 +51,23 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {employees.map((employee) => {
+            {sortedEmployees.map((employee) => {
               const availStatus = getAvailabilityStatus(
                 employee.assignedHours
               );
               const isOverloaded = employee.workload > 100;
+              const isTerminated = employee.status === 'terminated';
 
               return (
                 <tr
                   key={employee.id}
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${isOverloaded ? 'bg-red-50/30' : ''
+                  className={`transition-colors ${isTerminated
+                    ? 'bg-gray-50/50 opacity-60 grayscale cursor-default'
+                    : isOverloaded
+                      ? 'bg-red-50/30 hover:bg-red-50/50 cursor-pointer'
+                      : 'hover:bg-gray-50 cursor-pointer'
                     }`}
-                  onClick={() => onSelect(employee)}
+                  onClick={() => !isTerminated && onSelect(employee)}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -153,36 +164,36 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
-                      {employee.status === 'active' && (<span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${availStatus.color === 'green'
-                          ? 'bg-green-100 text-green-700'
-                          : availStatus.color === 'yellow'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : availStatus.color === 'orange'
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                      >
-
+                      {employee.status === 'active' ? (
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${availStatus.color === 'green'
-                            ? 'bg-green-500'
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${availStatus.color === 'green'
+                            ? 'bg-green-100 text-green-700'
                             : availStatus.color === 'yellow'
-                              ? 'bg-yellow-500'
+                              ? 'bg-yellow-100 text-yellow-700'
                               : availStatus.color === 'orange'
-                                ? 'bg-orange-500'
-                                : 'bg-red-500'
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-red-100 text-red-700'
                             }`}
-                        ></span>
-                        {availStatus.label}
-                      </span>
-                      )}
-                      {employee.status !== 'active' && (
-                        <div>
-                          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            {employee.status}
-                          </span>
-                        </div>
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${availStatus.color === 'green'
+                              ? 'bg-green-500'
+                              : availStatus.color === 'yellow'
+                                ? 'bg-yellow-500'
+                                : availStatus.color === 'orange'
+                                  ? 'bg-orange-500'
+                                  : 'bg-red-500'
+                              }`}
+                          ></span>
+                          {availStatus.label}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${employee.status === 'terminated'
+                          ? 'bg-gray-100 text-gray-500 border border-gray-200'
+                          : 'bg-red-50/50 text-red-700 border border-red-100'
+                          }`}>
+                          {getEmployeeStatus(employee.status).label}
+                        </span>
                       )}
                     </div>
                   </td>
@@ -191,30 +202,42 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEdit(employee);
+                          if (!isTerminated) onEdit(employee);
                         }}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Edit Employee"
+                        disabled={isTerminated}
+                        className={`p-2 rounded-lg transition-colors ${isTerminated
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-blue-600 hover:bg-blue-50'
+                          }`}
+                        title={isTerminated ? "Cannot edit terminated employee" : "Edit Employee"}
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDelete(employee);
+                          if (!isTerminated) onDelete(employee);
                         }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Employee"
+                        disabled={isTerminated}
+                        className={`p-2 rounded-lg transition-colors ${isTerminated
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-red-600 hover:bg-red-50'
+                          }`}
+                        title={isTerminated ? "Cannot remove terminated employee record" : "Remove Employee"}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onSelect(employee);
+                          if (!isTerminated) onSelect(employee);
                         }}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="View Details"
+                        disabled={isTerminated}
+                        className={`p-2 rounded-lg transition-colors ${isTerminated
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        title={isTerminated ? "Details unavailable for terminated employee" : "View Details"}
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>
