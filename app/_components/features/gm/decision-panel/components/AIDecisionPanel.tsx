@@ -14,28 +14,24 @@ interface AIDecisionPanelProps {
 export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
   const { addToast } = useFeedbackToast();
 
-  const handleApplyRecommendation = (recommendation: AIRecommendation) => {
+  const handleApplyRecommendation = async (recommendation: AIRecommendation) => {
     addToast({
       type: 'success',
       title: 'Recommendation Applied',
       message: `${recommendation.title} has been applied to the project plan`,
     });
+
+    return true;
   };
 
-  const handleModifyPlan = () => {
-    addToast({
-      type: 'info',
-      title: 'Manual Modification',
-      message: 'Navigate to Planning page to manually adjust the plan',
-    });
-  };
-
-  const handleRejectRecommendation = (recommendation: AIRecommendation) => {
+  const handleRejectRecommendation = async (recommendation: AIRecommendation) => {
     addToast({
       type: 'info',
       title: 'Recommendation Rejected',
       message: `${recommendation.title} was not applied`,
     });
+
+    return true;
   };
 
   const recommendations = selectedProject ? generateRecommendations(selectedProject) : [];
@@ -65,7 +61,6 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
         recommendations={recommendations}
         onApply={handleApplyRecommendation}
         onReject={handleRejectRecommendation}
-        onModify={handleModifyPlan}
       />
     </div>
   );

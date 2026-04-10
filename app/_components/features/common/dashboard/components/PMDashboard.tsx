@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Settings, MessageSquare, RefreshCw, GitBranch, BarChart3, Users, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Settings, MessageSquare, RefreshCw, GitBranch, BarChart3, Users, AlertTriangle, TrendingUp, X } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 
@@ -19,6 +19,7 @@ import { mockProjects, mockEmployees } from '@/app/_components/features/common/d
 import { convertToIntelligenceProjects } from '@/app/_components/features/common/dashboard/utils';
 import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert, Employee } from '@/app/_components/system/SystemIntelligence';
 import {
+  createProjectManagerChangeRequest,
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
   projectManagerFallbackProjects,
@@ -139,6 +140,18 @@ export function PMDashboard() {
   const [stats, setStats] = useState<DashboardStat[]>(computeStats(mockProjects, 0));
   const [detectedConflicts, setDetectedConflicts] = useState<ResourceConflict[]>([]);
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [selectedConflict, setSelectedConflict] = useState<ResourceConflict | null>(null);
+  const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
+  const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
+  const [changeRequestForm, setChangeRequestForm] = useState({
+    projectId: '',
+    roleName: '',
+    requiredSkills: '',
+    allocationPercent: 50,
+    startDate: '',
+    endDate: '',
+    additionalNeeds: '',
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -328,20 +341,202 @@ export function PMDashboard() {
     console.log('Project clicked:', projectId);
   };
 
-  const handleApplySuggestion = (suggestion: SystemSuggestion) => {
+  const handleApplySuggestion = (conflict: ResourceConflict, suggestion: SystemSuggestion) => {
+    if (suggestion.type !== 'split-workload') {
+      addToast({
+        type: 'success',
+        title: 'Suggestion Applied',
+        message: `${suggestion.title} has been applied. Changes are pending GM approval.`,
+      });
+      return;
+    }
+
+    const affectedEmployee = employees.find((employee) => employee.id === conflict.employeeId);
+    if (!affectedEmployee) {
+      addToast({
+        type: 'error',
+        title: 'Unable To Split',
+        message: 'The affected employee could not be found.',
+      });
+      return;
+    }
+
+    const targetProjectId = conflict.projectIds.find((projectId) => affectedEmployee.currentProjects.includes(projectId));
+    if (!targetProjectId) {
+      addToast({
+        type: 'error',
+        title: 'Unable To Split',
+        message: 'No transferable project was found for this conflict.',
+      });
+      return;
+    }
+
+    const skilledCoworkers = employees
+      .filter((employee) => employee.id !== affectedEmployee.id)
+      .filter((employee) => employee.status === 'active')
+      .filter((employee) => employee.availability > 10)
+      .filter((employee) => employee.skills.some((skill) => affectedEmployee.skills.includes(skill)))
+      .sort((a, b) => b.availability - a.availability);
+
+    const receivingCoworker = skilledCoworkers[0];
+
+    if (!receivingCoworker) {
+      addToast({
+        type: 'error',
+        title: 'No Skilled Coworker Found',
+        message: 'No active coworker with matching skills has enough availability to split this workload.',
+      });
+      return;
+    }
+
+    const updatedEmployees = employees.map((employee) => {
+      if (employee.id === affectedEmployee.id) {
+        return {
+          ...employee,
+          currentProjects: employee.currentProjects.filter((projectId) => projectId !== targetProjectId),
+          availability: Math.min(100, employee.availability + 20),
+        };
+      }
+
+      if (employee.id === receivingCoworker.id) {
+        return {
+          ...employee,
+          currentProjects: employee.currentProjects.includes(targetProjectId)
+            ? employee.currentProjects
+            : [...employee.currentProjects, targetProjectId],
+          availability: Math.max(0, employee.availability - 20),
+        };
+      }
+
+      return employee;
+    });
+
+    const updatedProjects = allProjects.map((project) => {
+      if (project.id !== targetProjectId) {
+        return project;
+      }
+
+      return {
+        ...project,
+        teamMembers: project.teamMembers
+          .filter((member) => member !== affectedEmployee.name)
+          .concat(project.teamMembers.includes(receivingCoworker.name) ? [] : [receivingCoworker.name]),
+      };
+    });
+
+    const refreshedConflicts = buildDetectedConflicts(updatedProjects, updatedEmployees);
+    const conflictProjectIds = new Set(refreshedConflicts.flatMap((item) => item.projectIds));
+    const refreshedProjects = updatedProjects.map((project) => {
+      if (!conflictProjectIds.has(project.id)) {
+        return {
+          ...project,
+          hasConflict: false,
+          conflictMessage: undefined,
+        };
+      }
+
+      const relatedConflict = refreshedConflicts.find((item) => item.projectIds.includes(project.id));
+      return {
+        ...project,
+        hasConflict: true,
+        conflictMessage: relatedConflict?.details,
+      };
+    });
+
+    setEmployees(updatedEmployees);
+    setAllProjects(refreshedProjects);
+    setFilteredProjects(refreshedProjects);
+    setDetectedConflicts(refreshedConflicts);
+    setStats(computeStats(refreshedProjects, refreshedConflicts.length));
+
     addToast({
       type: 'success',
-      title: 'Suggestion Applied',
-      message: `${suggestion.title} has been applied. Changes are pending GM approval.`,
+      title: 'Workload Split Applied',
+      message: `${affectedEmployee.name}'s workload was split to ${receivingCoworker.name} based on matching skills.`,
     });
   };
 
   const handleRequestChange = () => {
-    addToast({
-      type: 'info',
-      title: 'Change Request Sent',
-      message: 'Your resource change request has been sent to the General Manager for review.',
-    });
+    const initialProject = allProjects[0];
+
+    if (!initialProject) {
+      addToast({
+        type: 'error',
+        title: 'No Project Available',
+        message: 'No project is available to submit a change request.',
+      });
+      return;
+    }
+
+    setChangeRequestForm((prev) => ({
+      ...prev,
+      projectId: prev.projectId || initialProject.id,
+      startDate: prev.startDate || initialProject.startDate.slice(0, 10),
+      endDate: prev.endDate || initialProject.endDate.slice(0, 10),
+    }));
+    setShowChangeRequestModal(true);
+  };
+
+  const handleSubmitChangeRequest = async () => {
+    if (!changeRequestForm.projectId) {
+      addToast({
+        type: 'error',
+        title: 'Project Required',
+        message: 'Select a project before sending the request.',
+      });
+      return;
+    }
+
+    if (!changeRequestForm.roleName.trim()) {
+      addToast({
+        type: 'error',
+        title: 'Role Required',
+        message: 'Please provide the role/personnel needed.',
+      });
+      return;
+    }
+
+    const requiredSkills = changeRequestForm.requiredSkills
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter((skill) => skill.length > 0);
+
+    setIsSubmittingChangeRequest(true);
+
+    try {
+      await createProjectManagerChangeRequest({
+        projectId: changeRequestForm.projectId,
+        assignedByUserId: defaultPmUserId,
+        roleName: changeRequestForm.roleName.trim(),
+        startDate: changeRequestForm.startDate,
+        endDate: changeRequestForm.endDate,
+        allocationPercent: changeRequestForm.allocationPercent,
+        requiredSkills,
+        additionalNeeds: changeRequestForm.additionalNeeds.trim(),
+      });
+
+      setShowChangeRequestModal(false);
+      setChangeRequestForm((prev) => ({
+        ...prev,
+        roleName: '',
+        requiredSkills: '',
+        additionalNeeds: '',
+      }));
+
+      addToast({
+        type: 'success',
+        title: 'Request Sent To GM',
+        message: 'Backend created the change request. GM can now review and approve/reject it.',
+      });
+    } catch (submitError) {
+      addToast({
+        type: 'error',
+        title: 'Request Failed',
+        message: submitError instanceof Error ? submitError.message : 'Unable to send change request.',
+      });
+    } finally {
+      setIsSubmittingChangeRequest(false);
+    }
   };
 
   const handleSendFeedback = () => {
@@ -426,13 +621,7 @@ export function PMDashboard() {
             <SystemAlert
               key={conflict.id}
               conflict={conflict}
-              onViewDetails={() => {
-                addToast({
-                  type: 'info',
-                  title: 'Conflict Details',
-                  message: `Viewing detailed analysis for ${conflict.employeeName}`,
-                });
-              }}
+              onViewDetails={(selected) => setSelectedConflict(selected)}
               onApplySuggestion={handleApplySuggestion}
             />
           ))}
@@ -473,6 +662,244 @@ export function PMDashboard() {
                 ? 'Try adjusting your filters to see more projects'
                 : 'You have no assigned projects at this time'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {showChangeRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Request Project Change</h3>
+                <p className="text-xs text-gray-500 mt-1">Send personnel and skill requirements to GM</p>
+              </div>
+              <button
+                onClick={() => setShowChangeRequestModal(false)}
+                className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="Close change request modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600">Project</span>
+                <select
+                  value={changeRequestForm.projectId}
+                  onChange={(event) => {
+                    const selected = allProjects.find((project) => project.id === event.target.value);
+                    setChangeRequestForm((prev) => ({
+                      ...prev,
+                      projectId: event.target.value,
+                      startDate: selected?.startDate.slice(0, 10) ?? prev.startDate,
+                      endDate: selected?.endDate.slice(0, 10) ?? prev.endDate,
+                    }));
+                  }}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                >
+                  {allProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-gray-600">Needed Role</span>
+                <input
+                  value={changeRequestForm.roleName}
+                  onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, roleName: event.target.value }))}
+                  placeholder="QA Engineer"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-gray-600">Allocation %</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={100}
+                  value={changeRequestForm.allocationPercent}
+                  onChange={(event) =>
+                    setChangeRequestForm((prev) => ({
+                      ...prev,
+                      allocationPercent: Math.max(10, Math.min(100, Number(event.target.value) || 10)),
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600">Required Skills (comma separated)</span>
+                <input
+                  value={changeRequestForm.requiredSkills}
+                  onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, requiredSkills: event.target.value }))}
+                  placeholder="React, Node.js, QA Automation"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-gray-600">Start Date</span>
+                <input
+                  type="date"
+                  value={changeRequestForm.startDate}
+                  onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, startDate: event.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-gray-600">End Date</span>
+                <input
+                  type="date"
+                  value={changeRequestForm.endDate}
+                  onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, endDate: event.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600">Other Needs</span>
+                <textarea
+                  rows={3}
+                  value={changeRequestForm.additionalNeeds}
+                  onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, additionalNeeds: event.target.value }))}
+                  placeholder="Urgency, tool requirements, contract preference"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-4">
+              <button
+                onClick={() => setShowChangeRequestModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleSubmitChangeRequest()}
+                disabled={isSubmittingChangeRequest}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmittingChangeRequest ? 'Sending...' : 'Send To GM'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedConflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Conflict Details</h3>
+                <p className="text-xs text-gray-500 mt-1">{selectedConflict.employeeName} workload breakdown</p>
+              </div>
+              <button
+                onClick={() => setSelectedConflict(null)}
+                className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="Close conflict details"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Employee</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedConflict.employeeName}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Current Allocation</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedConflict.allocation}%</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Severity</p>
+                  <p className="text-sm font-semibold text-gray-900 capitalize">{selectedConflict.severity}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Project</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Conflicting Task</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Workload %</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Conflict Timeframe</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {selectedConflict.projectIds.map((projectId) => {
+                      const project = allProjects.find((item) => item.id === projectId);
+                      const peers = selectedConflict.projectIds
+                        .filter((id) => id !== projectId)
+                        .map((id) => allProjects.find((item) => item.id === id))
+                        .filter((item): item is TimelineProject => Boolean(item));
+
+                      const overlapWindows = project
+                        ? peers
+                            .map((peer) => {
+                              const overlapStart = new Date(
+                                Math.max(
+                                  new Date(project.startDate).getTime(),
+                                  new Date(peer.startDate).getTime()
+                                )
+                              );
+                              const overlapEnd = new Date(
+                                Math.min(
+                                  new Date(project.endDate).getTime(),
+                                  new Date(peer.endDate).getTime()
+                                )
+                              );
+
+                              if (overlapStart.getTime() > overlapEnd.getTime()) {
+                                return null;
+                              }
+
+                              return `${overlapStart.toLocaleDateString()} - ${overlapEnd.toLocaleDateString()}`;
+                            })
+                            .filter((window): window is string => Boolean(window))
+                        : [];
+
+                      const conflictTask = project
+                        ? selectedConflict.type === 'overlap' && peers.length > 0
+                          ? `${project.phase ?? 'execution'} tasks overlapping with ${peers.map((peer) => peer.name).join(', ')}`
+                          : selectedConflict.type === 'overload'
+                            ? `Concurrent ${project.phase ?? 'execution'} tasks exceed available capacity`
+                            : `Assigned ${project.phase ?? 'execution'} tasks`
+                        : 'Assigned project tasks';
+
+                      const conflictTimeframe = project
+                        ? overlapWindows.length > 0
+                          ? overlapWindows.join(' | ')
+                          : `${new Date(project.startDate).toLocaleDateString()} - ${new Date(project.endDate).toLocaleDateString()}`
+                        : '-';
+
+                      return (
+                        <tr key={projectId}>
+                          <td className="px-4 py-2 text-sm text-gray-900">{project?.name ?? projectId}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{conflictTask}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700">
+                            {project ? (project.status === 'assigned' ? 30 : project.status === 'in-progress' ? 50 : 0) : '-'}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700">{conflictTimeframe}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

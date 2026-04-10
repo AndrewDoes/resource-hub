@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
@@ -8,11 +8,16 @@ import {
   Filter,
   ZoomIn,
   ZoomOut,
-  X,
 } from 'lucide-react';
 import { AIDecisionPanel } from '@/app/_components/features/gm/decision-panel/components/AIDecisionPanel';
 import type { ProjectData } from '@/app/_components/features/gm/decision-panel/types';
+import {
+  fetchProjectManagerProjectTeam,
+  fetchProjectManagerProjects,
+  type ProjectManagerProjectSummary,
+} from '@/functions/api/projectManager';
 
+const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 interface GanttProject {
   id: string;
@@ -26,63 +31,44 @@ interface GanttProject {
   riskLevel: 'low' | 'medium' | 'high';
 }
 
-const ganttProjects: GanttProject[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    startDate: '2026-04-10',
-    endDate: '2026-06-30',
-    progress: 35,
-    status: 'on-track',
-    assignedResources: ['Sarah J.', 'Michael C.', 'Emily D.'],
-    resourceUtilization: 85,
-    riskLevel: 'low',
-  },
-  {
-    id: '2',
-    name: 'Mobile App Development',
-    startDate: '2026-04-01',
-    endDate: '2026-05-15',
-    progress: 60,
-    status: 'at-risk',
-    assignedResources: ['Sarah J.', 'Lisa A.'],
-    resourceUtilization: 95,
-    riskLevel: 'medium',
-  },
-  {
-    id: 'marketing-campaign',
-    name: 'Marketing Campaign',
-    startDate: '2026-05-01',
-    endDate: '2026-06-15',
-    progress: 10,
-    status: 'at-risk',
-    assignedResources: ['James W.'],
-    resourceUtilization: 110,
-    riskLevel: 'high',
-  },
-  {
-    id: '4',
-    name: 'Data Analytics Platform',
-    startDate: '2026-04-15',
-    endDate: '2026-07-15',
-    progress: 25,
-    status: 'delayed',
-    assignedResources: ['Emily D.', 'Robert B.'],
-    resourceUtilization: 105,
-    riskLevel: 'high',
-  },
-  {
-    id: '5',
-    name: 'CRM Integration',
-    startDate: '2026-05-10',
-    endDate: '2026-06-20',
-    progress: 0,
-    status: 'on-track',
-    assignedResources: ['Lisa A.'],
-    resourceUtilization: 75,
-    riskLevel: 'low',
-  },
-];
+const statusFromProject = (summary: ProjectManagerProjectSummary): GanttProject['status'] => {
+  if (summary.status === 'delayed') {
+    return 'delayed';
+  }
+
+  if (summary.status === 'at-risk') {
+    return 'at-risk';
+  }
+
+  return 'on-track';
+};
+
+const riskFromStatus = (status: GanttProject['status']): GanttProject['riskLevel'] => {
+  if (status === 'delayed') {
+    return 'high';
+  }
+
+  if (status === 'at-risk') {
+    return 'medium';
+  }
+
+  return 'low';
+};
+
+const mapSummaryToGanttProject = (
+  summary: ProjectManagerProjectSummary,
+  teamMembers: string[] = []
+): GanttProject => ({
+  id: summary.id,
+  name: summary.name,
+  startDate: summary.startDate,
+  endDate: summary.endDate,
+  progress: summary.progress,
+  status: statusFromProject(summary),
+  assignedResources: teamMembers,
+  resourceUtilization: Math.min(150, Math.round(summary.progress + teamMembers.length * 8)),
+  riskLevel: riskFromStatus(statusFromProject(summary)),
+});
 
 // Convert GanttProject to ProjectData format for SmartDecisionPanel
 const convertToProjectData = (project: GanttProject): ProjectData => ({
@@ -104,12 +90,73 @@ export function Planning() {
 
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('monthly');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [projects, setProjects] = useState<GanttProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GanttProject | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProjects = async () => {
+      const projectResult = await fetchProjectManagerProjects(defaultPmUserId)
+        .then((result) => ({ status: 'fulfilled' as const, value: result }))
+        .catch((reason) => ({ status: 'rejected' as const, reason }));
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (projectResult.status === 'fulfilled' && projectResult.value.length > 0) {
+        const teamResponses = await Promise.all(
+          projectResult.value.map(async (project) => {
+            try {
+              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
+              return { projectId: project.id, teamMembers: team.map((member) => member.fullName) };
+            } catch {
+              return { projectId: project.id, teamMembers: [] as string[] };
+            }
+          })
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        const teamMap = new Map(teamResponses.map((entry) => [entry.projectId, entry.teamMembers]));
+        const liveProjects = projectResult.value.map((summary) =>
+          mapSummaryToGanttProject(summary, teamMap.get(summary.id) ?? [])
+        );
+
+        setProjects(liveProjects);
+        setSelectedProject(liveProjects[0] ?? null);
+        setError(null);
+      } else {
+        setProjects([]);
+        setSelectedProject(null);
+        setError('No GM planning projects were returned by the backend.');
+      }
+
+      setIsLoading(false);
+    };
+
+    void loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredProjects =
     statusFilter === 'all'
-      ? ganttProjects
-      : ganttProjects.filter((p) => p.status === statusFilter);
+      ? projects
+      : projects.filter((p) => p.status === statusFilter);
+
+  useEffect(() => {
+    if (!selectedProject && filteredProjects.length > 0) {
+      setSelectedProject(filteredProjects[0]);
+    }
+  }, [filteredProjects, selectedProject]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -145,6 +192,18 @@ export function Planning() {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
+          Loading GM planning projects from backend...
+        </div>
+      )}
 
       {/* Filters and Controls */}
       <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -297,6 +356,12 @@ export function Planning() {
           />
         </div>
       </div>
+
+      {!isLoading && filteredProjects.length === 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 shadow-sm">
+          No planning projects were returned by the backend.
+        </div>
+      )}
     </div>
   );
 }

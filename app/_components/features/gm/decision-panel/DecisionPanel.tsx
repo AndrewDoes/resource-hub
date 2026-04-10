@@ -1,21 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Lightbulb } from 'lucide-react';
+import { Lightbulb, Users, CheckCircle, XCircle } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 // Types, Data and Utils
 import { ProjectData, ContractDecision, AIRecommendation } from './types';
-import { mockProjects, mockContractDecisions } from './data';
-import { generateRecommendations } from './utils';
 import {
   fetchGeneralManagerContractDecisions,
   fetchGeneralManagerProjectPrediction,
+  submitGeneralManagerRecommendationResponse,
+  fetchGeneralManagerPendingAssignmentRequests,
+  updateGeneralManagerAssignmentRequestStatus,
   type GeneralManagerProjectPrediction,
+  type GeneralManagerAssignmentRequest,
 } from '@/functions/api/generalManager';
 import {
   fetchProjectManagerProjects,
-  projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
 
@@ -64,8 +65,7 @@ const mapSummaryToProject = (
 };
 
 const buildRecommendationsFromPrediction = (
-  projectPrediction: GeneralManagerProjectPrediction,
-  fallbackProject: ProjectData
+  projectPrediction: GeneralManagerProjectPrediction
 ): AIRecommendation[] => {
   const recommendations: AIRecommendation[] = [];
 
@@ -105,21 +105,18 @@ const buildRecommendationsFromPrediction = (
     });
   });
 
-  if (recommendations.length === 0) {
-    return generateRecommendations(fallbackProject);
-  }
-
   return recommendations;
 };
 
 export function DecisionPanel() {
   const { addToast } = useFeedbackToast();
-  const [projects, setProjects] = useState<ProjectData[]>(mockProjects);
-  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(mockProjects[0]);
+  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
   const [prediction, setPrediction] = useState<GeneralManagerProjectPrediction | null>(null);
-  const [contractDecisions, setContractDecisions] = useState<ContractDecision[]>(
-    mockContractDecisions
-  );
+  const [isPredictionLoading, setIsPredictionLoading] = useState(false);
+  const [contractDecisions, setContractDecisions] = useState<ContractDecision[]>([]);
+  const [pendingAssignmentRequests, setPendingAssignmentRequests] = useState<GeneralManagerAssignmentRequest[]>([]);
+  const [isLoadingPendingRequests, setIsLoadingPendingRequests] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,34 +134,15 @@ export function DecisionPanel() {
       }
 
       if (projectResult.status === 'fulfilled') {
-        const backendProjects = projectResult.value.length > 0
-          ? projectResult.value.map((summary) => mapSummaryToProject(summary))
-          : projectManagerFallbackProjects.map((summary) => mapSummaryToProject(summary));
+        const backendProjects = projectResult.value.map((summary) => mapSummaryToProject(summary));
 
-        const initialProject = backendProjects[0] ?? mockProjects[0];
+        const initialProject = backendProjects[0] ?? null;
 
-        setProjects(backendProjects.length > 0 ? backendProjects : mockProjects);
+        setProjects(backendProjects);
         setSelectedProject(initialProject);
-
-        if (initialProject) {
-          try {
-            const projectPrediction = await fetchGeneralManagerProjectPrediction(initialProject.id, 5);
-            if (!isMounted) {
-              return;
-            }
-
-            setPrediction(projectPrediction);
-          } catch {
-            if (!isMounted) {
-              return;
-            }
-
-            setPrediction(null);
-          }
-        }
       } else {
-        setProjects(mockProjects);
-        setSelectedProject(mockProjects[0]);
+        setProjects([]);
+        setSelectedProject(null);
         setPrediction(null);
       }
 
@@ -191,7 +169,7 @@ export function DecisionPanel() {
           }))
         );
       } else {
-        setContractDecisions(mockContractDecisions);
+        setContractDecisions([]);
       }
 
       const loadError = projectResult.status === 'rejected' ? projectResult.reason : null;
@@ -206,28 +184,153 @@ export function DecisionPanel() {
     };
   }, []);
 
-  const handleApplyRecommendation = (recommendation: AIRecommendation) => {
-    addToast({
-      type: 'success',
-      title: 'Recommendation Applied',
-      message: `${recommendation.title} has been applied to the project plan`,
-    });
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPrediction = async () => {
+      if (!selectedProject) {
+        setPrediction(null);
+        return;
+      }
+
+      setIsPredictionLoading(true);
+
+      try {
+        const projectPrediction = await fetchGeneralManagerProjectPrediction(selectedProject.id, 5);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPrediction(projectPrediction);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setPrediction(null);
+      } finally {
+        if (isMounted) {
+          setIsPredictionLoading(false);
+        }
+      }
+    };
+
+    void loadPrediction();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedProject?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPendingRequests = async () => {
+      setIsLoadingPendingRequests(true);
+
+      try {
+        const requests = await fetchGeneralManagerPendingAssignmentRequests();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPendingAssignmentRequests(requests);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setPendingAssignmentRequests([]);
+      } finally {
+        if (isMounted) {
+          setIsLoadingPendingRequests(false);
+        }
+      }
+    };
+
+    void loadPendingRequests();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleApplyRecommendation = async (recommendation: AIRecommendation) => {
+    if (!selectedProject) {
+      addToast({
+        type: 'error',
+        title: 'No Project Selected',
+        message: 'Select a project before applying a recommendation.',
+      });
+      return false;
+    }
+
+    try {
+      await submitGeneralManagerRecommendationResponse({
+        projectId: selectedProject.id,
+        recommendationId: recommendation.id,
+        recommendationType: recommendation.type,
+        title: recommendation.title,
+        details: recommendation.reasoning,
+        action: 'Applied',
+      });
+
+      addToast({
+        type: 'success',
+        title: 'Recommendation Applied',
+        message: `${recommendation.title} has been submitted to backend successfully.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Apply Failed',
+        message: 'Unable to send apply action to backend. Please try again.',
+      });
+
+      return false;
+    }
   };
 
-  const handleModifyPlan = () => {
-    addToast({
-      type: 'info',
-      title: 'Manual Modification',
-      message: 'Navigate to Planning page to manually adjust the plan',
-    });
-  };
+  const handleRejectRecommendation = async (recommendation: AIRecommendation) => {
+    if (!selectedProject) {
+      addToast({
+        type: 'error',
+        title: 'No Project Selected',
+        message: 'Select a project before rejecting a recommendation.',
+      });
+      return false;
+    }
 
-  const handleRejectRecommendation = (recommendation: AIRecommendation) => {
-    addToast({
-      type: 'info',
-      title: 'Recommendation Rejected',
-      message: `${recommendation.title} was not applied`,
-    });
+    try {
+      await submitGeneralManagerRecommendationResponse({
+        projectId: selectedProject.id,
+        recommendationId: recommendation.id,
+        recommendationType: recommendation.type,
+        title: recommendation.title,
+        details: recommendation.reasoning,
+        action: 'Rejected',
+      });
+
+      addToast({
+        type: 'info',
+        title: 'Recommendation Rejected',
+        message: `${recommendation.title} has been submitted as rejected to backend.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Reject Failed',
+        message: 'Unable to send reject action to backend. Please try again.',
+      });
+
+      return false;
+    }
   };
 
   const handleContractDecision = (id: string, action: 'extended' | 'not-extended') => {
@@ -241,16 +344,52 @@ export function DecisionPanel() {
     });
   };
 
+  const handleApproveAssignmentRequest = async (requestId: string) => {
+    try {
+      await updateGeneralManagerAssignmentRequestStatus(requestId, 'Approved');
+
+      setPendingAssignmentRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      addToast({
+        type: 'success',
+        title: 'Assignment Approved',
+        message: 'Request has been approved and forwarded to HR for final validation.',
+      });
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Approval Failed',
+        message: 'Unable to approve assignment request. Please try again.',
+      });
+    }
+  };
+
+  const handleRejectAssignmentRequest = async (requestId: string) => {
+    try {
+      await updateGeneralManagerAssignmentRequestStatus(requestId, 'Rejected');
+
+      setPendingAssignmentRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      addToast({
+        type: 'info',
+        title: 'Assignment Rejected',
+        message: 'Request has been rejected. PM will be notified.',
+      });
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Rejection Failed',
+        message: 'Unable to reject assignment request. Please try again.',
+      });
+    }
+  };
+
   const recommendations = useMemo(() => {
-    if (!selectedProject) {
+    if (!selectedProject || !prediction) {
       return [];
     }
 
-    if (prediction) {
-      return buildRecommendationsFromPrediction(prediction, selectedProject);
-    }
-
-    return generateRecommendations(selectedProject);
+    return buildRecommendationsFromPrediction(prediction);
   }, [prediction, selectedProject]);
 
   return (
@@ -260,13 +399,19 @@ export function DecisionPanel() {
 
       {error && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Showing fallback project data because the backend request failed: {error}
+          Backend data unavailable for decision panel: {error}
         </div>
       )}
 
       {isLoading && (
         <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
           Loading live project predictions...
+        </div>
+      )}
+
+      {!isLoading && isPredictionLoading && (
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
+          Updating backend recommendation for the selected project...
         </div>
       )}
 
@@ -278,11 +423,7 @@ export function DecisionPanel() {
             selectedProjectId={selectedProject?.id}
             onSelect={(project) => {
               setSelectedProject(project);
-              if (prediction && selectedProject?.id !== project.id) {
-                void fetchGeneralManagerProjectPrediction(project.id, 5)
-                  .then((result) => setPrediction(result))
-                  .catch(() => setPrediction(null));
-              }
+              setPrediction(null);
             }}
           />
         </div>
@@ -300,7 +441,6 @@ export function DecisionPanel() {
                 recommendations={recommendations}
                 onApply={handleApplyRecommendation}
                 onReject={handleRejectRecommendation}
-                onModify={handleModifyPlan}
               />
 
               {/* Contract Decision Section */}
@@ -308,6 +448,113 @@ export function DecisionPanel() {
                 decisions={contractDecisions}
                 onDecision={handleContractDecision}
               />
+
+              {/* Pending Assignment Requests Section */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Pending PM Role Change Requests
+                  </h3>
+                </div>
+
+                {isLoadingPendingRequests && (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    Loading pending requests...
+                  </div>
+                )}
+
+                {!isLoadingPendingRequests && pendingAssignmentRequests.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No pending PM role change requests</p>
+                  </div>
+                )}
+
+                {!isLoadingPendingRequests && pendingAssignmentRequests.length > 0 && (
+                  <div className="space-y-3">
+                    {pendingAssignmentRequests.map((request) => {
+                      const metadata = request.conflictWarning
+                        ? (() => {
+                            try {
+                              return JSON.parse(request.conflictWarning);
+                            } catch {
+                              return {};
+                            }
+                          })()
+                        : {};
+
+                      return (
+                        <div
+                          key={request.id}
+                          className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">
+                                {request.projectName} - {request.roleName}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Requested by: {request.requestedByName}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {request.startDate && request.endDate
+                                  ? `${new Date(request.startDate).toLocaleDateString()} - ${new Date(request.endDate).toLocaleDateString()}`
+                                  : 'Dates TBD'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-blue-600">
+                                {request.allocationPercent}% allocation
+                              </p>
+                              {request.employeeName && (
+                                <p className="text-xs text-gray-500">
+                                  Auto-selected: {request.employeeName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {(metadata.requiredSkills || metadata.additionalNeeds) && (
+                            <div className="mb-3 space-y-1 text-sm">
+                              {metadata.requiredSkills && (
+                                <p className="text-gray-700">
+                                  <span className="font-medium">Required Skills:</span>{' '}
+                                  {Array.isArray(metadata.requiredSkills)
+                                    ? metadata.requiredSkills.join(', ')
+                                    : metadata.requiredSkills}
+                                </p>
+                              )}
+                              {metadata.additionalNeeds && (
+                                <p className="text-gray-700">
+                                  <span className="font-medium">Additional Needs:</span>{' '}
+                                  {metadata.additionalNeeds}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApproveAssignmentRequest(request.id)}
+                              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectAssignmentRequest(request.id)}
+                              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12">
@@ -319,8 +566,7 @@ export function DecisionPanel() {
                   Select a Project to Begin
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Choose a project from the left sidebar to view AI recommendations and make
-                  decisions
+                  No projects were returned from the backend yet.
                 </p>
               </div>
             </div>

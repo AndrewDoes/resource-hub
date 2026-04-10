@@ -73,6 +73,21 @@ export interface ProjectManagerTimelineTask {
   sortOrder: number;
 }
 
+export interface ProjectManagerCreateChangeRequestInput {
+  projectId: string;
+  assignedByUserId: string;
+  roleName: string;
+  startDate: string;
+  endDate: string;
+  allocationPercent: number;
+  requiredSkills: string[];
+  additionalNeeds?: string;
+}
+
+export interface ProjectManagerCreateChangeRequestResult {
+  assignmentId: string;
+}
+
 interface ProjectManagerOverviewResponse {
   projectId?: unknown;
   name?: unknown;
@@ -388,6 +403,38 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
 
   const payload: unknown = await response.json();
   return normalizeTimelineTasks(payload);
+}
+
+export async function createProjectManagerChangeRequest(
+  input: ProjectManagerCreateChangeRequestInput
+): Promise<ProjectManagerCreateChangeRequestResult> {
+  const response = await fetch(BackendApiUrl.assignmentsCreate, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId: input.projectId,
+      employeeId: '00000000-0000-0000-0000-000000000000',
+      assignedByUserId: input.assignedByUserId,
+      roleName: input.roleName,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      allocationPercent: input.allocationPercent,
+      requiredSkills: input.requiredSkills,
+      additionalNeeds: input.additionalNeeds ?? '',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create change request (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    assignmentId: asString(payload.assignmentId ?? payload.AssignmentId, ''),
+  };
 }
 
 export const projectManagerFallbackProjects: ProjectManagerProjectSummary[] = [

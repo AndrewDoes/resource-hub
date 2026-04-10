@@ -51,14 +51,14 @@ export function ResourceTable({ resources }: ResourceTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {resources.map((resource) => {
+            {resources.map((resource, index) => {
               const workload = calculateWorkloadFromHours(resource.assignedHours);
               const status = calculateStatusFromWorkload(workload);
               const isOverloaded = workload > 100;
 
               return (
                 <tr
-                  key={resource.id}
+                  key={`${resource.id}-${index}`}
                   className={`hover:bg-gray-50 transition-colors ${isOverloaded ? 'bg-red-50/30 border-l-4 border-l-red-500' : ''
                     }`}
                 >

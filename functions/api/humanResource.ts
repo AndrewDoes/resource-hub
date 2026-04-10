@@ -180,7 +180,7 @@ export interface HRAssignmentRequestItem {
 }
 
 export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestItem[]> {
-  const url = `${BackendApiUrl.assignmentsList}?status=Pending`;
+  const url = `${BackendApiUrl.assignmentsList}?status=Approved`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -205,7 +205,7 @@ export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestIt
   }));
 }
 
-export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected'): Promise<boolean> {
+export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected' | 'Accepted'): Promise<boolean> {
   const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
