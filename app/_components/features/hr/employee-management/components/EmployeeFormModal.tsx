@@ -31,7 +31,7 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
         fullName: employee.name,
         email: employee.email,
         jobTitle: employee.role,
-        departmentId: '', // We should ideally map from name to ID or use selectedEmployee.departmentId if available
+        departmentId: employee.department, // We should ideally map from name to ID or use selectedEmployee.departmentId if available
         employeeCode: '',
         phone: employee.phone || '',
         location: employee.location || '',
@@ -115,7 +115,7 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
                 onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
-                <option value="">Select Dept</option>
+                <option value={employee?.department}>{employee?.department}</option>
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
