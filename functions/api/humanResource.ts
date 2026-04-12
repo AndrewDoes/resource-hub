@@ -19,6 +19,12 @@ interface GetEmployeeListResponse {
   data?: unknown;
 }
 
+interface GetEmployeeAssignmentsResponse {
+  assignments?: unknown;
+  items?: unknown;
+  data?: unknown;
+}
+
 interface GMContractDecision {
   employeeName: string;
   projectName: string;
@@ -177,6 +183,70 @@ export interface HRAssignmentRequestItem {
   startDate: string;
   endDate: string;
   requestedByName: string;
+}
+
+interface EmployeeAssignmentListItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  status: string;
+}
+
+const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListItem[] => {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.assignments)
+      ? (payload as GetEmployeeAssignmentsResponse).assignments
+      : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.items)
+        ? (payload as GetEmployeeAssignmentsResponse).items
+        : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.data)
+          ? (payload as GetEmployeeAssignmentsResponse).data
+          : [];
+
+  return (source as any[]).map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id, String(index + 1)),
+      projectId: asString(record.projectId, ""),
+      projectName: asString(record.projectName, "Untitled Project"),
+      status: asString(record.status, "Pending"),
+    };
+  });
+};
+
+export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): Promise<Record<string, string[]>> {
+  const activeStatuses = new Set(["pending", "approved", "accepted", "inprogress", "in-progress"]);
+
+  const entries = await Promise.all(
+    employeeIds.map(async (employeeId) => {
+      try {
+        const response = await fetch(`${BackendApiUrl.employees}/${employeeId}/assignments?pageNumber=1&pageSize=100`);
+
+        if (!response.ok) {
+          return [employeeId, [] as string[]] as const;
+        }
+
+        const payload: unknown = await response.json();
+        const assignments = normalizeEmployeeAssignments(payload);
+
+        const currentProjects = Array.from(
+          new Set(
+            assignments
+              .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
+              .map((assignment) => assignment.projectName)
+              .filter((name) => name.trim().length > 0)
+          )
+        );
+
+        return [employeeId, currentProjects] as const;
+      } catch {
+        return [employeeId, [] as string[]] as const;
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
 }
 
 export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestItem[]> {

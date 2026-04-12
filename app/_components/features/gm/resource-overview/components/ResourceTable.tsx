@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Award, Briefcase, CheckCircle, TrendingUp } from 'lucide-react';
 import { ResourceSummary } from '../types';
-import { calculateWorkloadFromHours, calculateStatusFromWorkload, getStatusColor } from '../utils';
+import { getStatusColor } from '../utils';
 
 interface ResourceTableProps {
   resources: ResourceSummary[];
@@ -52,8 +52,8 @@ export function ResourceTable({ resources }: ResourceTableProps) {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {resources.map((resource, index) => {
-              const workload = calculateWorkloadFromHours(resource.assignedHours);
-              const status = calculateStatusFromWorkload(workload);
+              const workload = Math.max(0, Math.round(resource.workload));
+              const status = resource.status;
               const isOverloaded = workload > 100;
 
               return (
@@ -169,7 +169,7 @@ export function ResourceTable({ resources }: ResourceTableProps) {
                         </span>
                       </div>
                       <div className="absolute left-0 right-0 top-full mt-1 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-lg whitespace-nowrap">
-                        Workload: {Math.round(workload)}% = ({resource.assignedHours}h / 8h) × 100
+                        Backend workload: {Math.round(workload)}%
                       </div>
                     </div>
                   </td>

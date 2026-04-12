@@ -24,7 +24,7 @@ import {
   type GeneralManagerContractDecision,
   type GeneralManagerDecision,
 } from '@/functions/api/generalManager';
-import { fetchHREmployeeList } from '@/functions/api/humanResource';
+import { fetchHREmployeeCurrentProjectsMap, fetchHREmployeeList } from '@/functions/api/humanResource';
 import type { GMAction, ResourceConflict } from '@/app/types';
 
 const emptySummary: GeneralManagerWorkforceSummary = {
@@ -129,12 +129,16 @@ export function GMDashboard() {
       }
 
       if (employeeResult.status === 'fulfilled') {
+        const currentProjectsMap = await fetchHREmployeeCurrentProjectsMap(
+          employeeResult.value.map((employee) => employee.id)
+        );
+
         const liveConflicts = employeeResult.value
           .filter((employee) => employee.workloadPercent > 100 || employee.availabilityPercent <= 20)
           .map((employee) => ({
             employee: employee.fullName,
             allocation: Math.round(employee.workloadPercent),
-            projects: Math.max(1, Math.round(employee.assignedHours / 2)),
+            projects: currentProjectsMap[employee.id]?.length ?? 0,
             status: employee.workloadPercent >= 130 ? 'critical' : 'warning',
           }));
 
@@ -247,7 +251,7 @@ export function GMDashboard() {
               <div key={index} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
                 <div>
                   <p className="font-semibold text-gray-900">{conflict.employee}</p>
-                  <p className="text-sm text-gray-600">{conflict.projects} overlapping projects</p>
+                  <p className="text-sm text-gray-600">{conflict.projects} active projects</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-semibold text-red-600">{conflict.allocation}%</p>

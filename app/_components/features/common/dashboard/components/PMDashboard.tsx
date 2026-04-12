@@ -22,12 +22,36 @@ import {
   createProjectManagerChangeRequest,
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
+  persistSplitWorkloadToBackend,
   projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+
+const isActiveAssignmentStatus = (value: string): boolean => {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'pending' || normalized === 'approved' || normalized === 'accepted' || normalized === 'inprogress' || normalized === 'in-progress';
+};
+
+const toEmployeeStatus = (value: string): Employee['status'] => {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === 'active') {
+    return 'active';
+  }
+
+  if (normalized === 'inactive') {
+    return 'inactive';
+  }
+
+  if (normalized === 'resigned') {
+    return 'resigned';
+  }
+
+  return 'on-leave';
+};
 
 const getProjectStatus = (project: ProjectManagerProjectSummary): TimelineProject['status'] => {
   const progress = Number.isFinite(project.progress) ? project.progress : 0;
@@ -124,6 +148,130 @@ const buildDetectedConflicts = (projects: TimelineProject[], employees: Employee
 };
 
 
+const attachConflictFlags = (projects: TimelineProject[], conflicts: ResourceConflict[]) => {
+  const conflictProjectIds = new Set(conflicts.flatMap((conflict) => conflict.projectIds));
+
+  return projects.map((project) => {
+    if (project.status === 'completed' || !conflictProjectIds.has(project.id)) {
+      return {
+        ...project,
+        hasConflict: false,
+        conflictMessage: undefined,
+      };
+    }
+
+    const relatedConflicts = conflicts.filter((conflict) => conflict.projectIds.includes(project.id));
+    return {
+      ...project,
+      hasConflict: true,
+      conflictMessage: relatedConflicts[0]?.details,
+    };
+  });
+};
+
+const loadPmDashboardSnapshot = async (pmUserId: string) => {
+  try {
+    const summaries = await fetchProjectManagerProjects(pmUserId);
+    const sourceSummaries = summaries.length > 0 ? summaries : projectManagerFallbackProjects;
+
+    const teamResponses = await Promise.all(
+      sourceSummaries.map(async (project) => {
+        try {
+          const team = await fetchProjectManagerProjectTeam(pmUserId, project.id);
+          return { projectId: project.id, team };
+        } catch {
+          return { projectId: project.id, team: [] as ProjectManagerProjectTeamMember[] };
+        }
+      })
+    );
+
+    const projectTeamMap = new Map(teamResponses.map((item) => [item.projectId, item.team]));
+
+    const liveProjects: TimelineProject[] = sourceSummaries.map((project) => {
+      const team = (projectTeamMap.get(project.id) ?? [])
+        .filter((member) => isActiveAssignmentStatus(member.assignmentStatus))
+        .filter((member) => member.allocationPercent > 0);
+      return {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        progress: Math.max(0, Math.min(100, Math.round(project.progress))),
+        status: getProjectStatus(project),
+        teamMembers: team.map((member) => member.fullName),
+        phase: getProjectPhase(project),
+      };
+    });
+
+    const employeeMap = new Map<string, Employee>();
+    projectTeamMap.forEach((teamMembers, projectId) => {
+      teamMembers
+        .filter((member) => isActiveAssignmentStatus(member.assignmentStatus))
+        .filter((member) => member.allocationPercent > 0)
+        .forEach((member) => {
+        const key = member.employeeId;
+        const existing = employeeMap.get(key);
+
+        if (existing) {
+          if (!existing.currentProjects.includes(projectId)) {
+            existing.currentProjects.push(projectId);
+          }
+          const existingAllocations =
+            existing.projectAllocations && typeof existing.projectAllocations === 'object'
+              ? (existing.projectAllocations as Record<string, number>)
+              : {};
+          existing.projectAllocations = {
+            ...existingAllocations,
+            [projectId]: member.allocationPercent,
+          };
+          existing.availability = member.availabilityPercent;
+          existing.workload = member.workloadPercent;
+          existing.assignedHours = member.assignedHours;
+          existing.status = toEmployeeStatus(member.employeeStatus);
+          return;
+        }
+
+        employeeMap.set(key, {
+          id: key,
+          name: member.fullName,
+          skills: [member.jobTitle],
+          availability: member.availabilityPercent,
+          workload: member.workloadPercent,
+          assignedHours: member.assignedHours,
+          currentProjects: [projectId],
+          projectAllocations: {
+            [projectId]: member.allocationPercent,
+          },
+          status: toEmployeeStatus(member.employeeStatus),
+        });
+      });
+    });
+
+    const inferredEmployees = employeeMap.size > 0 ? Array.from(employeeMap.values()) : mockEmployees;
+    const conflictsWithSuggestions = buildDetectedConflicts(liveProjects, inferredEmployees);
+    const projectsWithConflicts = attachConflictFlags(liveProjects, conflictsWithSuggestions);
+
+    return {
+      employees: inferredEmployees,
+      projects: projectsWithConflicts,
+      conflicts: conflictsWithSuggestions,
+      error: null as string | null,
+    };
+  } catch (loadError) {
+    const fallbackConflictsWithSuggestions = buildDetectedConflicts(mockProjects, mockEmployees);
+    const fallbackProjects = attachConflictFlags(mockProjects, fallbackConflictsWithSuggestions);
+
+    return {
+      employees: mockEmployees,
+      projects: fallbackProjects,
+      conflicts: fallbackConflictsWithSuggestions,
+      error: loadError instanceof Error ? loadError.message : 'Failed to load PM dashboard',
+    };
+  }
+};
+
+
 export function PMDashboard() {
   const { addToast } = useFeedbackToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -160,103 +308,20 @@ export function PMDashboard() {
 
     const loadDashboard = async () => {
       try {
-        const summaries = await fetchProjectManagerProjects(defaultPmUserId);
-        const sourceSummaries = summaries.length > 0 ? summaries : projectManagerFallbackProjects;
-
-        const teamResponses = await Promise.all(
-          sourceSummaries.map(async (project) => {
-            try {
-              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
-              return { projectId: project.id, team };
-            } catch {
-              return { projectId: project.id, team: [] as ProjectManagerProjectTeamMember[] };
-            }
-          })
-        );
+        const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+        const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
+        const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
 
         if (!isMounted) {
           return;
         }
 
-        const projectTeamMap = new Map(teamResponses.map((item) => [item.projectId, item.team]));
-
-        const liveProjects: TimelineProject[] = sourceSummaries.map((project) => {
-          const team = projectTeamMap.get(project.id) ?? [];
-          return {
-            id: project.id,
-            name: project.name,
-            description: project.description,
-            startDate: project.startDate,
-            endDate: project.endDate,
-            progress: Math.max(0, Math.min(100, Math.round(project.progress))),
-            status: getProjectStatus(project),
-            teamMembers: team.map((member) => member.fullName),
-            phase: getProjectPhase(project),
-          };
-        });
-
-        const employeeMap = new Map<string, Employee>();
-        projectTeamMap.forEach((teamMembers, projectId) => {
-          teamMembers.forEach((member) => {
-            const key = member.employeeId;
-            const existing = employeeMap.get(key);
-
-            if (existing) {
-              if (!existing.currentProjects.includes(projectId)) {
-                existing.currentProjects.push(projectId);
-              }
-              existing.availability = Math.max(0, existing.availability - Math.round(member.allocationPercent / 2));
-              return;
-            }
-
-            employeeMap.set(key, {
-              id: key,
-              name: member.fullName,
-              skills: [member.jobTitle],
-              availability: Math.max(0, 100 - Math.round(member.allocationPercent)),
-              currentProjects: [projectId],
-              status: 'active',
-            });
-          });
-        });
-
-        const inferredEmployees = employeeMap.size > 0 ? Array.from(employeeMap.values()) : mockEmployees;
-
-        const conflictsWithSuggestions = buildDetectedConflicts(liveProjects, inferredEmployees);
-
-        const conflictProjectIds = new Set(conflictsWithSuggestions.flatMap((conflict) => conflict.projectIds));
-        const projectsWithConflicts = liveProjects.map((project) => {
-          if (project.status === 'completed' || !conflictProjectIds.has(project.id)) {
-            return project;
-          }
-
-          const relatedConflicts = conflictsWithSuggestions.filter((conflict) => conflict.projectIds.includes(project.id));
-          return {
-            ...project,
-            hasConflict: true,
-            conflictMessage: relatedConflicts[0]?.details,
-          };
-        });
-
-        setEmployees(inferredEmployees);
-        setAllProjects(projectsWithConflicts);
-        setFilteredProjects(projectsWithConflicts);
+        setEmployees(snapshot.employees);
+        setAllProjects(projectsWithConflictFlags);
+        setFilteredProjects(projectsWithConflictFlags);
         setDetectedConflicts(conflictsWithSuggestions);
-        setStats(computeStats(projectsWithConflicts, conflictsWithSuggestions.length));
-        setError(null);
-      } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-
-        const fallbackConflictsWithSuggestions = buildDetectedConflicts(mockProjects, mockEmployees);
-
-        setEmployees(mockEmployees);
-        setAllProjects(mockProjects);
-        setFilteredProjects(mockProjects);
-        setDetectedConflicts(fallbackConflictsWithSuggestions);
-        setStats(computeStats(mockProjects, fallbackConflictsWithSuggestions.length));
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load PM dashboard');
+        setStats(computeStats(projectsWithConflictFlags, conflictsWithSuggestions.length));
+        setError(snapshot.error);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -341,12 +406,12 @@ export function PMDashboard() {
     console.log('Project clicked:', projectId);
   };
 
-  const handleApplySuggestion = (conflict: ResourceConflict, suggestion: SystemSuggestion) => {
+  const handleApplySuggestion = async (conflict: ResourceConflict, suggestion: SystemSuggestion) => {
     if (suggestion.type !== 'split-workload') {
       addToast({
-        type: 'success',
-        title: 'Suggestion Applied',
-        message: `${suggestion.title} has been applied. Changes are pending GM approval.`,
+        type: 'info',
+        title: 'Suggestion Submitted',
+        message: `${suggestion.title} was recorded, but this action does not change local workload simulation.`,
       });
       return;
     }
@@ -371,40 +436,119 @@ export function PMDashboard() {
       return;
     }
 
-    const skilledCoworkers = employees
+    const affectedProjectAllocations =
+      affectedEmployee.projectAllocations && typeof affectedEmployee.projectAllocations === 'object'
+        ? (affectedEmployee.projectAllocations as Record<string, number>)
+        : {};
+    const currentTargetAllocation = Math.max(0, Math.min(100, affectedProjectAllocations[targetProjectId] ?? 0));
+    if (currentTargetAllocation <= 0) {
+      addToast({
+        type: 'error',
+        title: 'No Active Allocation',
+        message: 'The selected employee has no active positive allocation on this project to split.',
+      });
+      return;
+    }
+    const splitAmount = Math.max(10, Math.round(currentTargetAllocation / 2));
+
+    const candidateCoworkers = employees
       .filter((employee) => employee.id !== affectedEmployee.id)
       .filter((employee) => employee.status === 'active')
-      .filter((employee) => employee.availability > 10)
+      .filter((employee) => {
+        const workload = typeof employee.workload === 'number'
+          ? employee.workload
+          : Math.max(0, 100 - (typeof employee.availability === 'number' ? employee.availability : 0));
+        const capacityLeft = Math.max(0, 100 - workload);
+        return capacityLeft >= splitAmount;
+      });
+
+    const sameProjectCoworkers = candidateCoworkers
+      .filter((employee) => employee.currentProjects.includes(targetProjectId))
+      .sort((a, b) => b.availability - a.availability);
+
+    const skilledCoworkers = candidateCoworkers
       .filter((employee) => employee.skills.some((skill) => affectedEmployee.skills.includes(skill)))
       .sort((a, b) => b.availability - a.availability);
 
-    const receivingCoworker = skilledCoworkers[0];
+    const receivingCoworker = sameProjectCoworkers[0] ?? skilledCoworkers[0];
 
     if (!receivingCoworker) {
       addToast({
         type: 'error',
-        title: 'No Skilled Coworker Found',
-        message: 'No active coworker with matching skills has enough availability to split this workload.',
+        title: 'No Coworker Capacity',
+        message: `No active coworker has enough remaining capacity (${splitAmount}%) to accept this split without becoming overloaded.`,
+      });
+      return;
+    }
+    const newAffectedAllocation = Math.max(0, currentTargetAllocation - splitAmount);
+
+    try {
+      await persistSplitWorkloadToBackend({
+        projectId: targetProjectId,
+        fromEmployeeId: affectedEmployee.id,
+        toEmployeeId: receivingCoworker.id,
+        splitAllocationPercent: splitAmount,
+        roleName: affectedEmployee.skills[0] ?? 'Resource',
+        startDate: allProjects.find((project) => project.id === targetProjectId)?.startDate ?? new Date().toISOString(),
+        endDate: allProjects.find((project) => project.id === targetProjectId)?.endDate ?? new Date().toISOString(),
+        assignedByUserId: defaultPmUserId,
+      });
+    } catch (persistError) {
+      addToast({
+        type: 'error',
+        title: 'Backend Split Failed',
+        message: persistError instanceof Error
+          ? persistError.message
+          : 'Unable to persist split workload in backend.',
       });
       return;
     }
 
     const updatedEmployees = employees.map((employee) => {
       if (employee.id === affectedEmployee.id) {
+        const employeeAllocations =
+          employee.projectAllocations && typeof employee.projectAllocations === 'object'
+            ? (employee.projectAllocations as Record<string, number>)
+            : {};
+
+        const nextAllocations = {
+          ...employeeAllocations,
+          [targetProjectId]: newAffectedAllocation,
+        };
+
+        if (newAffectedAllocation === 0) {
+          delete nextAllocations[targetProjectId];
+        }
+
         return {
           ...employee,
-          currentProjects: employee.currentProjects.filter((projectId) => projectId !== targetProjectId),
-          availability: Math.min(100, employee.availability + 20),
+          currentProjects:
+            newAffectedAllocation > 0
+              ? employee.currentProjects
+              : employee.currentProjects.filter((projectId) => projectId !== targetProjectId),
+          projectAllocations: nextAllocations,
+          availability: Math.min(100, employee.availability + splitAmount),
         };
       }
 
       if (employee.id === receivingCoworker.id) {
+        const employeeAllocations =
+          employee.projectAllocations && typeof employee.projectAllocations === 'object'
+            ? (employee.projectAllocations as Record<string, number>)
+            : {};
+        const existingAllocation = Math.max(0, Math.min(100, employeeAllocations[targetProjectId] ?? 0));
+        const nextAllocation = Math.max(0, Math.min(100, existingAllocation + splitAmount));
+
         return {
           ...employee,
           currentProjects: employee.currentProjects.includes(targetProjectId)
             ? employee.currentProjects
             : [...employee.currentProjects, targetProjectId],
-          availability: Math.max(0, employee.availability - 20),
+          projectAllocations: {
+            ...employeeAllocations,
+            [targetProjectId]: nextAllocation,
+          },
+          availability: Math.max(0, employee.availability - splitAmount),
         };
       }
 
@@ -416,11 +560,20 @@ export function PMDashboard() {
         return project;
       }
 
+      const nextTeamMembers = [...project.teamMembers];
+      if (!nextTeamMembers.includes(receivingCoworker.name)) {
+        nextTeamMembers.push(receivingCoworker.name);
+      }
+      if (newAffectedAllocation === 0) {
+        return {
+          ...project,
+          teamMembers: nextTeamMembers.filter((member) => member !== affectedEmployee.name),
+        };
+      }
+
       return {
         ...project,
-        teamMembers: project.teamMembers
-          .filter((member) => member !== affectedEmployee.name)
-          .concat(project.teamMembers.includes(receivingCoworker.name) ? [] : [receivingCoworker.name]),
+        teamMembers: nextTeamMembers,
       };
     });
 
@@ -452,8 +605,10 @@ export function PMDashboard() {
     addToast({
       type: 'success',
       title: 'Workload Split Applied',
-      message: `${affectedEmployee.name}'s workload was split to ${receivingCoworker.name} based on matching skills.`,
+      message: `${affectedEmployee.name}'s workload was split to ${receivingCoworker.name} and saved to backend.`,
     });
+
+    await handleRefreshConflicts();
   };
 
   const handleRequestChange = () => {
@@ -547,16 +702,31 @@ export function PMDashboard() {
     });
   };
 
-  const handleRefreshConflicts = () => {
-    const conflictsWithSuggestions = buildDetectedConflicts(allProjects, employees);
+  const handleRefreshConflicts = async () => {
+    setIsLoading(true);
 
-    setDetectedConflicts(conflictsWithSuggestions);
-    setStats(computeStats(allProjects, conflictsWithSuggestions.length));
-    addToast({
-      type: 'success',
-      title: 'Conflicts Refreshed',
-      message: `System detected ${conflictsWithSuggestions.length} resource conflict(s).`,
-    });
+    try {
+      const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+      const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
+      const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
+
+      setEmployees(snapshot.employees);
+      setAllProjects(projectsWithConflictFlags);
+      setFilteredProjects(projectsWithConflictFlags);
+      setDetectedConflicts(conflictsWithSuggestions);
+      setStats(computeStats(projectsWithConflictFlags, conflictsWithSuggestions.length));
+      setError(snapshot.error);
+
+      addToast({
+        type: snapshot.error ? 'info' : 'success',
+        title: snapshot.error ? 'Conflicts Refreshed (Fallback)' : 'Conflicts Refreshed',
+        message: snapshot.error
+          ? `Backend refresh failed, using fallback data. Detected ${conflictsWithSuggestions.length} resource conflict(s).`
+          : `Loaded latest backend team data. Detected ${conflictsWithSuggestions.length} resource conflict(s).`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -841,6 +1011,12 @@ export function PMDashboard() {
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {selectedConflict.projectIds.map((projectId) => {
                       const project = allProjects.find((item) => item.id === projectId);
+                      const selectedEmployee = employees.find((employee) => employee.id === selectedConflict.employeeId);
+                      const selectedEmployeeAllocations =
+                        selectedEmployee?.projectAllocations && typeof selectedEmployee.projectAllocations === 'object'
+                          ? (selectedEmployee.projectAllocations as Record<string, number>)
+                          : {};
+                      const projectAllocation = selectedEmployeeAllocations[projectId];
                       const peers = selectedConflict.projectIds
                         .filter((id) => id !== projectId)
                         .map((id) => allProjects.find((item) => item.id === id))
@@ -890,7 +1066,7 @@ export function PMDashboard() {
                           <td className="px-4 py-2 text-sm text-gray-900">{project?.name ?? projectId}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">{conflictTask}</td>
                           <td className="px-4 py-2 text-sm text-gray-700">
-                            {project ? (project.status === 'assigned' ? 30 : project.status === 'in-progress' ? 50 : 0) : '-'}
+                            {typeof projectAllocation === 'number' ? `${Math.round(projectAllocation)}%` : '-'}
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-700">{conflictTimeframe}</td>
                         </tr>

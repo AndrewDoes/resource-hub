@@ -9,7 +9,7 @@ import {
   fetchGeneralManagerWorkforceSummary,
   type GeneralManagerWorkforceSummary,
 } from '@/functions/api/generalManager';
-import { fetchHREmployeeList } from '@/functions/api/humanResource';
+import { fetchHREmployeeCurrentProjectsMap, fetchHREmployeeList } from '@/functions/api/humanResource';
 
 // Sub-components
 import { ResourceStats } from './components/ResourceStats';
@@ -73,6 +73,10 @@ export function ResourceOverview() {
       }
 
       if (employeesResult.status === 'fulfilled') {
+        const currentProjectsMap = await fetchHREmployeeCurrentProjectsMap(
+          employeesResult.value.map((employee) => employee.id)
+        );
+
         const mappedResources: ResourceSummary[] = employeesResult.value.map((employee) => {
           const normalizedName = employee.fullName.trim();
           const initials = normalizedName
@@ -102,7 +106,7 @@ export function ResourceOverview() {
             availability: Math.max(0, Math.min(100, Math.round(employee.availabilityPercent))),
             workload,
             assignedHours: Math.max(0, Math.round(employee.assignedHours * 10) / 10),
-            currentProjects: [],
+            currentProjects: currentProjectsMap[employee.id] ?? [],
             status,
           };
         });
