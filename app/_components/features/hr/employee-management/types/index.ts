@@ -55,6 +55,7 @@ export interface AssignmentRequest {
 
 export interface Employee {
   id: string;
+  employeeCode: string;
   name: string;
   avatar: string;
   role: string;
@@ -71,6 +72,7 @@ export interface Employee {
   projectHistory: string[];
   joinedDate: string;
   hireDate: string;
+  contractEndDate?: string;
 }
 
 export type TabType = 'all' | 'active' | 'available' | 'assigned' | 'overloaded';

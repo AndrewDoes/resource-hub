@@ -62,12 +62,12 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                 <tr
                   key={employee.id}
                   className={`transition-colors ${isTerminated
-                    ? 'bg-gray-50/50 opacity-60 grayscale cursor-default'
+                    ? 'bg-gray-50/50 opacity-60 grayscale cursor-pointer hover:bg-gray-100'
                     : isOverloaded
                       ? 'bg-red-50/30 hover:bg-red-50/50 cursor-pointer'
                       : 'hover:bg-gray-50 cursor-pointer'
                     }`}
-                  onClick={() => !isTerminated && onSelect(employee)}
+                  onClick={() => onSelect(employee)}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -230,14 +230,13 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!isTerminated) onSelect(employee);
+                          onSelect(employee);
                         }}
-                        disabled={isTerminated}
                         className={`p-2 rounded-lg transition-colors ${isTerminated
-                          ? 'text-gray-300 cursor-not-allowed'
+                          ? 'text-gray-400 hover:bg-gray-200'
                           : 'text-gray-600 hover:bg-gray-100'
                           }`}
-                        title={isTerminated ? "Details unavailable for terminated employee" : "View Details"}
+                        title="View Details"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>

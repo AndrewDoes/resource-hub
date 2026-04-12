@@ -42,8 +42,13 @@ export function HRValidation() {
           fetchHRAssignmentRequests()
         ]);
 
-        // Map Employee Status
-        const uiStatus = apiEmployees.map(mapToUIEmployeeStatus);
+        // Map Employee Status - Filter out terminated and resigned employees for validation view
+        const uiStatus = apiEmployees
+          .filter(emp => {
+            const s = emp.status?.toLowerCase();
+            return s !== 'terminated' && s !== 'resigned';
+          })
+          .map(mapToUIEmployeeStatus);
         setEmployeeStatus(uiStatus);
 
         // Map Contract Actions
@@ -53,6 +58,35 @@ export function HRValidation() {
         // Map General Decisions
         const uiGeneralDecisions = apiGeneralDecisions.map(mapToUIDecision);
         setGmDecisions(uiGeneralDecisions);
+
+        // Map Hiring Requests from GM Decisions (type 'hire-resource')
+        const uiHiringRequests = uiGeneralDecisions
+          .filter(d => d.type === 'hire-resource' && d.status === 'pending')
+          .map(d => {
+            // Try to extract quantity and role from details string
+            // Example: "Hire 2 Backend Developers (Senior level) - Skills: Node.js, PostgreSQL, AWS"
+            const details = d.details || "";
+            const quantityMatch = details.match(/Hire (\d+)/i);
+            const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
+
+            // Try to find role name (between quantity and skills/bracket)
+            const roleMatch = details.match(/Hire \d+ (.*?) (\(|-)/i) || details.match(/Hire \d+ (.*)/i);
+            const role = roleMatch ? roleMatch[1].trim() : "New Resource";
+
+            const skillsMatch = details.match(/Skills: (.*)/i);
+            const skills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()) : [];
+
+            return {
+              id: d.id,
+              role: role,
+              quantity: quantity,
+              skillRequirements: skills,
+              projectName: d.projectName,
+              gmDecisionId: d.id,
+              status: 'pending' as const
+            };
+          });
+        setHiringRequests(uiHiringRequests);
 
         // Map Assignment Requests
         const uiAssignments = apiAssignmentRequests.map(mapToUIAssignmentRequest);
@@ -115,6 +149,8 @@ export function HRValidation() {
 
       if (success) {
         markDecisionExecuted(id);
+        // Reload all data to ensure sync
+        window.location.reload();
         addToast({
           type: 'success',
           title: 'Action Executed',
@@ -207,7 +243,7 @@ export function HRValidation() {
     try {
       const success = await startHiring(id);
       if (success) {
-        markDecisionExecuted(id, 'executed');
+        setHiringRequests(prev => prev.filter(h => h.id !== id));
         addToast({
           type: 'success',
           title: 'Hiring Process Started',

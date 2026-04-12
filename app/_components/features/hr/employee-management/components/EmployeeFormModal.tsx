@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Plus, Calendar as CalendarIcon, Briefcase, Search } from 'lucide-react';
+import { X, Plus, Calendar as CalendarIcon, Briefcase, Search, Clock, AlertTriangle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Employee } from '../types';
 import { DepartmentLookup, ProjectLookup, SkillLookup } from '@/functions/api/humanResource';
@@ -28,13 +28,14 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
     hireDate: '',
     skills: [] as string[]
   });
+  const [isEmailDirty, setIsEmailDirty] = useState(false);
 
   const [skillInput, setSkillInput] = useState('');
   const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
 
-  const filteredSuggestions = availableSkills.filter(s => 
-    s.name.toLowerCase().includes(skillInput.toLowerCase()) && 
+  const filteredSuggestions = availableSkills.filter(s =>
+    s.name.toLowerCase().includes(skillInput.toLowerCase()) &&
     !formData.skills.includes(s.name)
   ).slice(0, 5);
 
@@ -50,12 +51,19 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
 
   useEffect(() => {
     if (employee) {
+      // Try to find the local ID for a department name if we only have the name
+      let deptId = employee.department;
+      if (departments.length > 0 && employee.department && !employee.department.match(/^[0-9a-f-]{36}$/i)) {
+        const found = departments.find(d => d.name === employee.department);
+        if (found) deptId = found.id;
+      }
+
       setFormData({
         fullName: employee.name,
         email: employee.email,
         jobTitle: employee.role,
-        departmentId: employee.department, // We should ideally map from name to ID or use selectedEmployee.departmentId if available
-        employeeCode: '',
+        departmentId: deptId,
+        employeeCode: employee.employeeCode || '',
         phone: employee.phone || '',
         location: employee.location || '',
         status: employee.status === 'active' ? 'Active' : employee.status === 'terminated' ? 'Terminated' : 'Inactive',
@@ -81,6 +89,7 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
       skills: []
     });
     setSkillInput('');
+    setIsEmailDirty(false);
   }
 
   const handleAddSkill = () => {
@@ -116,7 +125,12 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    // Ensure employeeCode is null if empty string to avoid unique constraint violations
+    const payload = {
+       ...formData,
+       employeeCode: formData.employeeCode.trim() || null
+    };
+    onSave(payload);
     emptyForm();
   };
 
@@ -125,7 +139,7 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900">
-            {employee ? 'Edit Employee' : 'Add New Employee'}
+            {employee?.id ? 'Edit Employee' : 'Add New Employee'}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />
@@ -139,7 +153,18 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
               required
               type="text"
               value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              onChange={(e) => {
+                const newName = e.target.value;
+                const updates: any = { fullName: newName };
+
+                // Auto-generate email if not manually edited by user
+                if (!isEmailDirty && !employee?.id) {
+                  const emailSuggestion = newName.trim().toLowerCase().replace(/\s+/g, '.') + '@company.com';
+                  updates.email = emailSuggestion;
+                }
+
+                setFormData({ ...formData, ...updates });
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               placeholder="e.g. John Doe"
             />
@@ -152,7 +177,10 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
               disabled={!!employee}
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                setIsEmailDirty(true);
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
               placeholder="john.doe@example.com"
             />
@@ -173,14 +201,12 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">Department</label>
               <select
+                required
                 value={formData.departmentId}
                 onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
-                {employee?.department ?
-                  <option value={employee?.department}>{employee?.department}</option>
-                  :
-                  <option value="">Select Dept</option>}
+                <option value="">Select Dept</option>
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
@@ -223,7 +249,21 @@ export function EmployeeFormModal({ isOpen, onClose, onSave, employee, departmen
               <option value="Inactive">Inactive</option>
               <option value="Terminated">Terminated</option>
             </select>
+            
+            {formData.status === 'Terminated' && employee && employee.currentProjects && employee.currentProjects.length > 0 && (
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">Critical Warning: Active Assignments</p>
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    This employee is still assigned to: <span className="font-semibold">{employee.currentProjects.join(', ')}</span>. 
+                    Termination will leave these projects without this resource.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
+
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Skills</label>

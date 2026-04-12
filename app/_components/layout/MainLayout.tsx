@@ -46,6 +46,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/gm/planning', label: 'Planning', icon: CalendarCheck, roles: ['gm'] },
   { path: '/gm/decision-panel', label: 'Decision Panel', icon: Gavel, roles: ['gm'] },
   { path: '/hr/hr-validation', label: 'HR Validation', icon: ClipboardCheck, roles: ['hr'] },
+  { path: '/hr/hiring', label: 'Hiring Management', icon: Briefcase, roles: ['hr'] },
   { path: '/hr/employee-management', label: 'Employee Management', icon: Users, roles: ['hr'] },
   { path: '/employee/my-projects', label: 'My Projects', icon: Briefcase, roles: ['employee'] },
   { path: '/employee/employee', label: 'My Profile', icon: User, roles: ['employee'] },

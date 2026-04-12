@@ -17,19 +17,21 @@ import { EmployeeFormModal } from './components/EmployeeFormModal';
 import { Employee, TabType } from './types';
 import { mockEmployees } from './data';
 import { useEffect, useState } from 'react';
-import { 
-  fetchHREmployeeList, 
-  mapToUIEmployee, 
-  deleteEmployee, 
-  createEmployee, 
-  updateEmployee, 
-  fetchDepartmentsLookup, 
+import {
+  fetchHREmployeeList,
+  mapToUIEmployee,
+  deleteEmployee,
+  createEmployee,
+  updateEmployee,
+  fetchDepartmentsLookup,
   DepartmentLookup,
   fetchProjectsLookup,
   ProjectLookup,
   fetchSkillsLookup,
-  SkillLookup
+  SkillLookup,
+  rehireEmployee
 } from '@/functions/api/humanResource';
+import { RehireModal } from './components/RehireModal';
 
 
 export function EmployeeManagement() {
@@ -50,6 +52,9 @@ export function EmployeeManagement() {
   const [dbDepartments, setDbDepartments] = useState<DepartmentLookup[]>([]);
   const [dbProjects, setDbProjects] = useState<ProjectLookup[]>([]);
   const [dbSkills, setDbSkills] = useState<SkillLookup[]>([]);
+
+  const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
+  const [employeeToRehire, setEmployeeToRehire] = useState<Employee | null>(null);
 
   const { addToast } = useFeedbackToast();
 
@@ -251,6 +256,38 @@ export function EmployeeManagement() {
     }
   };
 
+  const handleRehireClick = (employee: Employee) => {
+    setEmployeeToRehire(employee);
+    setIsRehireModalOpen(true);
+  };
+
+  const confirmRehire = async (rehireData: any) => {
+    try {
+      const result = await rehireEmployee(rehireData);
+      if (result.success) {
+        addToast({
+          type: 'success',
+          title: 'Employee Rehired',
+          message: result.message || 'The employee has been successfully reactivated.'
+        });
+        // Refresh list
+        const apiEmployees = await fetchHREmployeeList();
+        setEmployees(apiEmployees.map(mapToUIEmployee));
+        setIsRehireModalOpen(false);
+        setEmployeeToRehire(null);
+        setSelectedEmployee(null); // Close sidebar
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Rehire Failed',
+          message: result.message || 'Could not complete the rehiring process.'
+        });
+      }
+    } catch (err) {
+      addToast({ type: 'error', title: 'Error', message: 'Network error occurred.' });
+    }
+  };
+
   const handleExportCSV = () => {
     if (employees.length === 0) return;
 
@@ -301,7 +338,7 @@ export function EmployeeManagement() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
@@ -370,6 +407,7 @@ export function EmployeeManagement() {
         onClose={() => setSelectedEmployee(null)}
         onEdit={handleEditEmployee}
         onDelete={handleDeleteEmployee}
+        onRehire={handleRehireClick}
       />
 
       {/* Delete Confirmation Modal */}
@@ -393,6 +431,17 @@ export function EmployeeManagement() {
         departments={dbDepartments}
         projects={dbProjects}
         availableSkills={dbSkills}
+      />
+
+      {/* Rehire Modal */}
+      <RehireModal
+        isOpen={isRehireModalOpen}
+        onClose={() => {
+          setIsRehireModalOpen(false);
+          setEmployeeToRehire(null);
+        }}
+        onConfirm={confirmRehire}
+        employee={employeeToRehire}
       />
     </div>
   );
