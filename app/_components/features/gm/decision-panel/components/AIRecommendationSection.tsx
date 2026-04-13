@@ -74,7 +74,7 @@ export function AIRecommendationSection({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Lightbulb className="w-5 h-5 text-blue-600" />
-          <h3 className="text-sm font-semibold text-gray-900">AI Recommendation</h3>
+          <h3 className="text-sm font-semibold text-gray-900">System Recommendation</h3>
         </div>
         <span className="text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded">
           {pendingCount} pending suggestion{pendingCount !== 1 ? 's' : ''}

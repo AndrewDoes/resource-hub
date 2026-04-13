@@ -108,6 +108,44 @@ const buildRecommendationsFromPrediction = (
   return recommendations;
 };
 
+const parseConflictWarning = (warning: string): { requiredSkills?: string[]; additionalNeeds?: string; rawText?: string } => {
+  if (!warning || warning.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(warning) as Record<string, unknown>;
+    const requiredSkills = Array.isArray(parsed.requiredSkills)
+      ? parsed.requiredSkills.map((item) => String(item).trim()).filter((item) => item.length > 0)
+      : typeof parsed.requiredSkills === 'string'
+        ? parsed.requiredSkills.split(',').map((item) => item.trim()).filter((item) => item.length > 0)
+        : [];
+    const additionalNeeds = typeof parsed.additionalNeeds === 'string' ? parsed.additionalNeeds.trim() : '';
+
+    return {
+      requiredSkills: requiredSkills.length > 0 ? requiredSkills : undefined,
+      additionalNeeds: additionalNeeds.length > 0 ? additionalNeeds : undefined,
+    };
+  } catch {
+    const parts = warning.split('|').map((part) => part.trim()).filter((part) => part.length > 0);
+    const skillsPart = parts.find((part) => part.toLowerCase().startsWith('requested skills:'));
+    const additionalPart = parts.find((part) => part.toLowerCase().startsWith('additional needs:'));
+
+    const requiredSkills = skillsPart
+      ? skillsPart.replace(/requested skills:/i, '').split(',').map((item) => item.trim()).filter((item) => item.length > 0)
+      : [];
+    const additionalNeeds = additionalPart
+      ? additionalPart.replace(/additional needs:/i, '').trim()
+      : '';
+
+    return {
+      requiredSkills: requiredSkills.length > 0 ? requiredSkills : undefined,
+      additionalNeeds: additionalNeeds.length > 0 ? additionalNeeds : undefined,
+      rawText: warning,
+    };
+  }
+};
+
 export function DecisionPanel() {
   const { addToast } = useFeedbackToast();
   const [projects, setProjects] = useState<ProjectData[]>([]);
@@ -119,6 +157,21 @@ export function DecisionPanel() {
   const [isLoadingPendingRequests, setIsLoadingPendingRequests] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const mapContractDecisions = (decisions: Awaited<ReturnType<typeof fetchGeneralManagerContractDecisions>>): ContractDecision[] => {
+    return decisions.map((decision) => ({
+      id: decision.decisionId,
+      employeeName: decision.employeeName,
+      employeeAvatar: decision.employeeAvatar,
+      contractEndDate: decision.contractEndDate ?? 'TBD',
+      jobTitle: decision.jobTitle,
+      availabilityPercent: decision.availabilityPercent,
+      workloadPercent: decision.workloadPercent,
+      activeAssignmentCount: decision.activeAssignmentCount,
+      decisionType: decision.decisionType,
+      decisionStatus: decision.decisionStatus,
+    }));
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -147,27 +200,7 @@ export function DecisionPanel() {
       }
 
       if (contractResult.status === 'fulfilled' && contractResult.value.length > 0) {
-        setContractDecisions(
-          contractResult.value.map((decision) => ({
-            id: decision.rowId,
-            employeeName: decision.employeeName,
-            employeeAvatar: decision.employeeAvatar,
-            contractEndDate: decision.contractEndDate ?? 'TBD',
-            performance:
-              decision.availabilityPercent >= 75 && decision.workloadPercent <= 30
-                ? 'excellent'
-                : decision.availabilityPercent >= 45 && decision.workloadPercent <= 60
-                  ? 'good'
-                  : 'average',
-            currentWorkload: `${decision.jobTitle} - ${decision.activeAssignmentCount} project${decision.activeAssignmentCount === 1 ? '' : 's'}`,
-            status:
-              decision.decisionStatus.toLowerCase() === 'executed'
-                ? decision.decisionType === 'ExtendContract'
-                  ? 'extended'
-                  : 'not-extended'
-                : 'pending',
-          }))
-        );
+        setContractDecisions(mapContractDecisions(contractResult.value));
       } else {
         setContractDecisions([]);
       }
@@ -333,17 +366,6 @@ export function DecisionPanel() {
     }
   };
 
-  const handleContractDecision = (id: string, action: 'extended' | 'not-extended') => {
-    setContractDecisions((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: action } : d))
-    );
-    addToast({
-      type: 'success',
-      title: action === 'extended' ? 'Contract Extended' : 'Contract Not Extended',
-      message: `Decision has been recorded and HR will be notified`,
-    });
-  };
-
   const handleApproveAssignmentRequest = async (requestId: string) => {
     try {
       await updateGeneralManagerAssignmentRequestStatus(requestId, 'Approved');
@@ -360,6 +382,25 @@ export function DecisionPanel() {
         type: 'error',
         title: 'Approval Failed',
         message: 'Unable to approve assignment request. Please try again.',
+      });
+    }
+  };
+
+  const handleContractDecision = async (decisionId: string, action: 'ExtendContract' | 'TerminateContract') => {
+    try {
+      addToast({
+        type: 'info',
+        title: 'HR Review Requested',
+        message:
+          action === 'ExtendContract'
+            ? 'GM request to extend contract has been forwarded to HR for final decision.'
+            : 'GM request to terminate contract has been forwarded to HR for final decision.',
+      });
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Request Failed',
+        message: 'Unable to send request to HR. Please try again.',
       });
     }
   };
@@ -446,7 +487,7 @@ export function DecisionPanel() {
               {/* Contract Decision Section */}
               <ContractDecisionSection
                 decisions={contractDecisions}
-                onDecision={handleContractDecision}
+                onRequestHrReview={handleContractDecision}
               />
 
               {/* Pending Assignment Requests Section */}
@@ -473,15 +514,7 @@ export function DecisionPanel() {
                 {!isLoadingPendingRequests && pendingAssignmentRequests.length > 0 && (
                   <div className="space-y-3">
                     {pendingAssignmentRequests.map((request) => {
-                      const metadata = request.conflictWarning
-                        ? (() => {
-                            try {
-                              return JSON.parse(request.conflictWarning);
-                            } catch {
-                              return {};
-                            }
-                          })()
-                        : {};
+                      const metadata = parseConflictWarning(request.conflictWarning);
 
                       return (
                         <div
@@ -519,15 +552,19 @@ export function DecisionPanel() {
                               {metadata.requiredSkills && (
                                 <p className="text-gray-700">
                                   <span className="font-medium">Required Skills:</span>{' '}
-                                  {Array.isArray(metadata.requiredSkills)
-                                    ? metadata.requiredSkills.join(', ')
-                                    : metadata.requiredSkills}
+                                  {metadata.requiredSkills.join(', ')}
                                 </p>
                               )}
                               {metadata.additionalNeeds && (
                                 <p className="text-gray-700">
                                   <span className="font-medium">Additional Needs:</span>{' '}
                                   {metadata.additionalNeeds}
+                                </p>
+                              )}
+                              {!metadata.requiredSkills && !metadata.additionalNeeds && metadata.rawText && (
+                                <p className="text-gray-700">
+                                  <span className="font-medium">Notes:</span>{' '}
+                                  {metadata.rawText}
                                 </p>
                               )}
                             </div>

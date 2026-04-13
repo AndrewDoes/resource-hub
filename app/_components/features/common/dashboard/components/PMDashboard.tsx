@@ -15,7 +15,6 @@ import { ProjectGrid } from './ProjectGrid';
 
 // Types, Data, Utils
 import { TimelineProject, DashboardStat } from '@/app/_components/features/common/dashboard/types';
-import { mockProjects, mockEmployees } from '@/app/_components/features/common/dashboard/data';
 import { convertToIntelligenceProjects } from '@/app/_components/features/common/dashboard/utils';
 import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert, Employee } from '@/app/_components/system/SystemIntelligence';
 import {
@@ -23,7 +22,6 @@ import {
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
   persistSplitWorkloadToBackend,
-  projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
@@ -172,7 +170,7 @@ const attachConflictFlags = (projects: TimelineProject[], conflicts: ResourceCon
 const loadPmDashboardSnapshot = async (pmUserId: string) => {
   try {
     const summaries = await fetchProjectManagerProjects(pmUserId);
-    const sourceSummaries = summaries.length > 0 ? summaries : projectManagerFallbackProjects;
+    const sourceSummaries = summaries;
 
     const teamResponses = await Promise.all(
       sourceSummaries.map(async (project) => {
@@ -248,7 +246,7 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
       });
     });
 
-    const inferredEmployees = employeeMap.size > 0 ? Array.from(employeeMap.values()) : mockEmployees;
+    const inferredEmployees = Array.from(employeeMap.values());
     const conflictsWithSuggestions = buildDetectedConflicts(liveProjects, inferredEmployees);
     const projectsWithConflicts = attachConflictFlags(liveProjects, conflictsWithSuggestions);
 
@@ -259,13 +257,10 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
       error: null as string | null,
     };
   } catch (loadError) {
-    const fallbackConflictsWithSuggestions = buildDetectedConflicts(mockProjects, mockEmployees);
-    const fallbackProjects = attachConflictFlags(mockProjects, fallbackConflictsWithSuggestions);
-
     return {
-      employees: mockEmployees,
-      projects: fallbackProjects,
-      conflicts: fallbackConflictsWithSuggestions,
+      employees: [] as Employee[],
+      projects: [] as TimelineProject[],
+      conflicts: [] as ResourceConflict[],
       error: loadError instanceof Error ? loadError.message : 'Failed to load PM dashboard',
     };
   }
@@ -283,11 +278,11 @@ export function PMDashboard() {
     sortOrder: 'asc',
   });
 
-  const [allProjects, setAllProjects] = useState<TimelineProject[]>(mockProjects);
-  const [filteredProjects, setFilteredProjects] = useState<TimelineProject[]>(mockProjects);
-  const [stats, setStats] = useState<DashboardStat[]>(computeStats(mockProjects, 0));
+  const [allProjects, setAllProjects] = useState<TimelineProject[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<TimelineProject[]>([]);
+  const [stats, setStats] = useState<DashboardStat[]>(computeStats([], 0));
   const [detectedConflicts, setDetectedConflicts] = useState<ResourceConflict[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedConflict, setSelectedConflict] = useState<ResourceConflict | null>(null);
   const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
   const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);

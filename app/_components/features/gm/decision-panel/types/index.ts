@@ -31,7 +31,10 @@ export interface ContractDecision {
   employeeName: string;
   employeeAvatar: string;
   contractEndDate: string;
-  performance: 'excellent' | 'good' | 'average';
-  currentWorkload: string;
-  status: 'pending' | 'extended' | 'not-extended';
+  jobTitle: string;
+  availabilityPercent: number;
+  workloadPercent: number;
+  activeAssignmentCount: number;
+  decisionType: string;
+  decisionStatus: string;
 }

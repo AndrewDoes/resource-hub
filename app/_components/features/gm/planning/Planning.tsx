@@ -3,11 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
-  Users,
   Calendar,
+  Users,
   Filter,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import { AIDecisionPanel } from '@/app/_components/features/gm/decision-panel/components/AIDecisionPanel';
 import type { ProjectData } from '@/app/_components/features/gm/decision-panel/types';
@@ -70,6 +68,33 @@ const mapSummaryToGanttProject = (
   riskLevel: riskFromStatus(statusFromProject(summary)),
 });
 
+const toDayStart = (value: string): Date => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const toMonthStart = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const addMonths = (date: Date, months: number): Date => {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+};
+
+const getMonthKey = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const monthKeyToDate = (monthKey: string): Date => {
+  const [yearPart, monthPart] = monthKey.split('-').map((part) => Number(part));
+  return new Date(yearPart, Math.max(0, monthPart - 1), 1);
+};
+
+const formatMonthLabel = (date: Date): string => {
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
+
 // Convert GanttProject to ProjectData format for SmartDecisionPanel
 const convertToProjectData = (project: GanttProject): ProjectData => ({
   id: project.id,
@@ -88,10 +113,11 @@ export function Planning() {
   const searchParams = useSearchParams();
   const highlightProject = searchParams.get('highlight');
 
-  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('monthly');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projects, setProjects] = useState<GanttProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GanttProject | null>(null);
+  const [timelineStartMonth, setTimelineStartMonth] = useState<string | null>(null);
+  const [timelineEndMonth, setTimelineEndMonth] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,6 +178,91 @@ export function Planning() {
       ? projects
       : projects.filter((p) => p.status === statusFilter);
 
+  const availableMonths = useMemo(() => {
+    if (filteredProjects.length === 0) {
+      return [] as Date[];
+    }
+
+    const startDates = filteredProjects.map((project) => toDayStart(project.startDate).getTime());
+    const endDates = filteredProjects.map((project) => toDayStart(project.endDate).getTime());
+
+    const minStart = new Date(Math.min(...startDates));
+    const maxEnd = new Date(Math.max(...endDates));
+    const columns: Date[] = [];
+
+    let cursor = toMonthStart(minStart);
+    const limit = toMonthStart(maxEnd);
+
+    while (cursor.getTime() <= limit.getTime()) {
+      columns.push(new Date(cursor));
+      cursor = addMonths(cursor, 1);
+    }
+
+    return columns;
+  }, [filteredProjects]);
+
+  useEffect(() => {
+    if (availableMonths.length === 0) {
+      setTimelineStartMonth(null);
+      setTimelineEndMonth(null);
+      return;
+    }
+
+    const monthKeys = availableMonths.map((month) => getMonthKey(month));
+
+    setTimelineStartMonth((current) => (current && monthKeys.includes(current) ? current : monthKeys[0]));
+    setTimelineEndMonth((current) => (current && monthKeys.includes(current) ? current : monthKeys[monthKeys.length - 1]));
+  }, [availableMonths]);
+
+  const handleTimelineStartMonthChange = (value: string) => {
+    setTimelineStartMonth(value);
+
+    if (timelineEndMonth && value > timelineEndMonth) {
+      setTimelineEndMonth(value);
+    }
+  };
+
+  const handleTimelineEndMonthChange = (value: string) => {
+    setTimelineEndMonth(value);
+
+    if (timelineStartMonth && value < timelineStartMonth) {
+      setTimelineStartMonth(value);
+    }
+  };
+
+  const timelineColumns = useMemo(() => {
+    if (availableMonths.length === 0) {
+      return [] as Date[];
+    }
+
+    const startKey = timelineStartMonth ?? getMonthKey(availableMonths[0]);
+    const endKey = timelineEndMonth ?? getMonthKey(availableMonths[availableMonths.length - 1]);
+
+    const startDate = monthKeyToDate(startKey);
+    const endDate = monthKeyToDate(endKey);
+
+    return availableMonths.filter((month) => {
+      const key = getMonthKey(month);
+      return key >= getMonthKey(startDate) && key <= getMonthKey(endDate);
+    });
+  }, [availableMonths, timelineStartMonth, timelineEndMonth]);
+
+  const timelineRange = useMemo(() => {
+    if (timelineColumns.length === 0) {
+      return null;
+    }
+
+    const rangeStart = timelineColumns[0].getTime();
+    const lastColumn = timelineColumns[timelineColumns.length - 1];
+    const rangeEnd = new Date(lastColumn.getFullYear(), lastColumn.getMonth() + 1, 1).getTime();
+
+    return {
+      start: rangeStart,
+      end: rangeEnd,
+      total: Math.max(1, rangeEnd - rangeStart),
+    };
+  }, [timelineColumns]);
+
   useEffect(() => {
     if (!selectedProject && filteredProjects.length > 0) {
       setSelectedProject(filteredProjects[0]);
@@ -175,11 +286,27 @@ export function Planning() {
     setSelectedProject(project);
   };
 
-  const getDuration = (startDate: string, endDate: string) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.ceil(days / 7);
+  const getProjectBarStyle = (project: GanttProject) => {
+    if (!timelineRange) {
+      return { left: '0%', width: '100%' };
+    }
+
+    const projectStart = toDayStart(project.startDate).getTime();
+    const projectEndExclusive = toDayStart(project.endDate).getTime() + 24 * 60 * 60 * 1000;
+    const clampedStart = Math.max(projectStart, timelineRange.start);
+    const clampedEnd = Math.min(projectEndExclusive, timelineRange.end);
+
+    const leftPercent = ((clampedStart - timelineRange.start) / timelineRange.total) * 100;
+    const widthPercent = Math.max(1, ((Math.max(clampedEnd, clampedStart + 1) - clampedStart) / timelineRange.total) * 100);
+
+    return {
+      left: `${leftPercent}%`,
+      width: `${widthPercent}%`,
+    };
+  };
+
+  const formatTimelineColumn = (date: Date) => {
+    return formatMonthLabel(date);
   };
 
   return (
@@ -226,30 +353,45 @@ export function Planning() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">View:</span>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('weekly')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'weekly'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                <ZoomIn className="w-3.5 h-3.5 inline mr-1" />
-                Weekly
-              </button>
-              <button
-                onClick={() => setViewMode('monthly')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'monthly'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                <ZoomOut className="w-3.5 h-3.5 inline mr-1" />
-                Monthly
-              </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">Monthly range:</span>
             </div>
+
+            <select
+              value={timelineStartMonth ?? ''}
+              onChange={(e) => handleTimelineStartMonthChange(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={availableMonths.length === 0}
+            >
+              {availableMonths.map((month) => {
+                const key = getMonthKey(month);
+
+                return (
+                  <option key={key} value={key}>
+                    From {formatMonthLabel(month)}
+                  </option>
+                );
+              })}
+            </select>
+
+            <select
+              value={timelineEndMonth ?? ''}
+              onChange={(e) => handleTimelineEndMonthChange(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={availableMonths.length === 0}
+            >
+              {availableMonths.map((month) => {
+                const key = getMonthKey(month);
+
+                return (
+                  <option key={key} value={key}>
+                    To {formatMonthLabel(month)}
+                  </option>
+                );
+              })}
+            </select>
           </div>
         </div>
       </div>
@@ -262,11 +404,15 @@ export function Planning() {
 
             {/* Timeline Header */}
             <div className="mb-4 pl-48">
-              <div className="flex justify-between text-xs text-gray-500 mb-2">
-                <span>Apr 2026</span>
-                <span>May 2026</span>
-                <span>Jun 2026</span>
-                <span>Jul 2026</span>
+              <div
+                className="grid gap-2 text-xs text-gray-500 mb-2"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, timelineColumns.length)}, minmax(0, 1fr))` }}
+              >
+                {timelineColumns.map((column) => (
+                  <span key={column.toISOString()} className="truncate">
+                    {formatTimelineColumn(column)}
+                  </span>
+                ))}
               </div>
               <div className="h-px bg-gray-200"></div>
             </div>
@@ -306,18 +452,18 @@ export function Planning() {
                           <div
                             className={`h-full ${getStatusColor(
                               project.status
-                            )} rounded-lg flex items-center justify-between px-3 text-white text-xs font-medium transition-all hover:brightness-110 hover:shadow-md`}
-                            style={{ width: `${getDuration(project.startDate, project.endDate) * 8}%` }}
+                            )} rounded-lg flex items-center justify-between px-3 text-white text-xs font-medium transition-all hover:brightness-110 hover:shadow-md absolute top-0`}
+                            style={getProjectBarStyle(project)}
                           >
                             <span className="truncate">{project.progress}%</span>
                             {project.resourceUtilization > 100 && (
                               <AlertTriangle className="w-4 h-4 text-white" />
                             )}
+                            <div
+                              className="absolute left-0 top-0 h-full bg-white/30 rounded-l-lg"
+                              style={{ width: `${Math.max(0, Math.min(100, project.progress))}%` }}
+                            ></div>
                           </div>
-                          <div
-                            className="absolute left-0 top-0 h-full bg-white/30"
-                            style={{ width: `${project.progress}%` }}
-                          ></div>
                         </button>
                       </div>
                     </div>

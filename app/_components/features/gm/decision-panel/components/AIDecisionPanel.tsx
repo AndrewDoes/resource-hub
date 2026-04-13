@@ -46,7 +46,7 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
           Select a Project to Begin
         </h3>
         <p className="text-sm text-gray-600">
-          Choose a project from the timeline to view AI recommendations and make decisions
+          Choose a project from the timeline to view system recommendations and make decisions
         </p>
       </div>
     );

@@ -190,6 +190,7 @@ interface EmployeeAssignmentListItem {
   projectId: string;
   projectName: string;
   status: string;
+  allocationPercent: number;
 }
 
 const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListItem[] => {
@@ -211,6 +212,7 @@ const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListI
       projectId: asString(record.projectId, ""),
       projectName: asString(record.projectName, "Untitled Project"),
       status: asString(record.status, "Pending"),
+      allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
     };
   });
 };
@@ -234,6 +236,7 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
           new Set(
             assignments
               .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
+              .filter((assignment) => assignment.allocationPercent > 0)
               .map((assignment) => assignment.projectName)
               .filter((name) => name.trim().length > 0)
           )
