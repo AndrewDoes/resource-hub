@@ -7,7 +7,7 @@ import { useFeedbackToast } from '@/app/context/ToastContext';
 import { GMDecision, ContractAction, AssignmentRequest, HiringRequest, EmployeeStatus } from './types';
 import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockHiringRequests, mockEmployeeStatus } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring } from '@/functions/api/humanResource';
+import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring, requestClarification } from '@/functions/api/humanResource';
 import { fetchGeneralManagerContractDecisions, fetchGeneralManagerDecisions } from '@/functions/api/generalManager';
 
 // Sub-components
@@ -18,6 +18,7 @@ import { HiringActionPanel } from './components/HiringActionPanel';
 import { EmployeeStatusControl } from './components/EmployeeStatusControl';
 import { WorkloadStatusIndicator } from './components/WorkloadStatusIndicator';
 import { WorkloadKPIs } from './components/WorkloadKPIs';
+import { ClarificationModal } from './components/ClarificationModal';
 
 export function HRValidation() {
   const [gmDecisions, setGmDecisions] = useState<GMDecision[]>(mockGMDecisions);
@@ -28,6 +29,11 @@ export function HRValidation() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addToast } = useFeedbackToast();
+
+  // Modal State
+  const [isClarifyModalOpen, setIsClarifyModalOpen] = useState(false);
+  const [selectedDecision, setSelectedDecision] = useState<GMDecision | null>(null);
+  const [isSubmitLoading, setIsSubmitLoading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -42,8 +48,13 @@ export function HRValidation() {
           fetchHRAssignmentRequests()
         ]);
 
-        // Map Employee Status
-        const uiStatus = apiEmployees.map(mapToUIEmployeeStatus);
+        // Map Employee Status - Filter out terminated and resigned employees for validation view
+        const uiStatus = apiEmployees
+          .filter(emp => {
+            const s = emp.status?.toLowerCase();
+            return s !== 'terminated' && s !== 'resigned';
+          })
+          .map(mapToUIEmployeeStatus);
         setEmployeeStatus(uiStatus);
 
         // Map Contract Actions
@@ -53,6 +64,35 @@ export function HRValidation() {
         // Map General Decisions
         const uiGeneralDecisions = apiGeneralDecisions.map(mapToUIDecision);
         setGmDecisions(uiGeneralDecisions);
+
+        // Map Hiring Requests from GM Decisions (type 'hire-resource')
+        const uiHiringRequests = uiGeneralDecisions
+          .filter(d => d.type === 'hire-resource' && d.status === 'pending')
+          .map(d => {
+            // Try to extract quantity and role from details string
+            // Example: "Hire 2 Backend Developers (Senior level) - Skills: Node.js, PostgreSQL, AWS"
+            const details = d.details || "";
+            const quantityMatch = details.match(/Hire (\d+)/i);
+            const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
+
+            // Try to find role name (between quantity and skills/bracket)
+            const roleMatch = details.match(/Hire \d+ (.*?) (\(|-)/i) || details.match(/Hire \d+ (.*)/i);
+            const role = roleMatch ? roleMatch[1].trim() : "New Resource";
+
+            const skillsMatch = details.match(/Skills: (.*)/i);
+            const skills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()) : [];
+
+            return {
+              id: d.id,
+              role: role,
+              quantity: quantity,
+              skillRequirements: skills,
+              projectName: d.projectName,
+              gmDecisionId: d.id,
+              status: 'pending' as const
+            };
+          });
+        setHiringRequests(uiHiringRequests);
 
         // Map Assignment Requests
         const uiAssignments = apiAssignmentRequests.map(mapToUIAssignmentRequest);
@@ -115,6 +155,8 @@ export function HRValidation() {
 
       if (success) {
         markDecisionExecuted(id);
+        // Reload all data to ensure sync
+        window.location.reload();
         addToast({
           type: 'success',
           title: 'Action Executed',
@@ -131,12 +173,39 @@ export function HRValidation() {
   };
 
   const handleClarifyDecision = (id: string) => {
-    markDecisionExecuted(id, 'clarification-requested');
-    addToast({
-      type: 'info',
-      title: 'Clarification Requested',
-      message: 'A clarification has been requested to the GM.',
-    });
+    const decision = gmDecisions.find(d => d.id === id);
+    if (!decision) return;
+    
+    setSelectedDecision(decision);
+    setIsClarifyModalOpen(true);
+  };
+
+  const handleConfirmClarification = async (reason: string) => {
+    if (!selectedDecision) return;
+
+    try {
+      setIsSubmitLoading(true);
+      const success = await requestClarification(selectedDecision.id, reason);
+      
+      if (success) {
+        markDecisionExecuted(selectedDecision.id, 'clarification-requested');
+        setIsClarifyModalOpen(false);
+        setSelectedDecision(null);
+        addToast({
+          type: 'info',
+          title: 'Clarification Requested',
+          message: 'Your feedback has been sent to the GM.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Request Failed',
+        message: 'Could not send the clarification request.',
+      });
+    } finally {
+      setIsSubmitLoading(false);
+    }
   };
 
   const handleExecuteContract = async (id: string) => {
@@ -207,7 +276,7 @@ export function HRValidation() {
     try {
       const success = await startHiring(id);
       if (success) {
-        markDecisionExecuted(id, 'executed');
+        setHiringRequests(prev => prev.filter(h => h.id !== id));
         addToast({
           type: 'success',
           title: 'Hiring Process Started',
@@ -303,6 +372,14 @@ export function HRValidation() {
           />
         </div>
       </div>
+
+      <ClarificationModal
+        isOpen={isClarifyModalOpen}
+        onClose={() => setIsClarifyModalOpen(false)}
+        onConfirm={handleConfirmClarification}
+        decisionTitle={selectedDecision?.details || 'Selected Decision'}
+        isLoading={isSubmitLoading}
+      />
     </div>
   );
 }
