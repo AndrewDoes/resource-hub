@@ -12,8 +12,11 @@ import {
   submitGeneralManagerRecommendationResponse,
   fetchGeneralManagerPendingAssignmentRequests,
   updateGeneralManagerAssignmentRequestStatus,
+  fetchGeneralManagerMarketingDraftProjects,
+  reviewGeneralManagerMarketingDraftProject,
   type GeneralManagerProjectPrediction,
   type GeneralManagerAssignmentRequest,
+  type GeneralManagerMarketingDraftProject,
 } from '@/functions/api/generalManager';
 import {
   fetchProjectManagerProjects,
@@ -28,6 +31,7 @@ import { ProjectSidebar } from './components/ProjectSidebar';
 import { ProjectContext } from './components/ProjectContext';
 import { AIRecommendationSection } from './components/AIRecommendationSection';
 import { ContractDecisionSection } from './components/ContractDecisionSection';
+import { MarketingDraftReviewSection } from './components/MarketingDraftReviewSection';
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 const defaultDecisionActorUserId = process.env.NEXT_PUBLIC_GM_USER_ID ?? defaultPmUserId;
@@ -183,6 +187,8 @@ export function DecisionPanel() {
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
   const [contractDecisions, setContractDecisions] = useState<ContractDecision[]>([]);
   const [pendingAssignmentRequests, setPendingAssignmentRequests] = useState<GeneralManagerAssignmentRequest[]>([]);
+  const [marketingDraftProjects, setMarketingDraftProjects] = useState<GeneralManagerMarketingDraftProject[]>([]);
+  const [isLoadingMarketingDraftProjects, setIsLoadingMarketingDraftProjects] = useState(false);
   const [isLoadingPendingRequests, setIsLoadingPendingRequests] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,6 +271,40 @@ export function DecisionPanel() {
     };
 
     void loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMarketingDraftProjects = async () => {
+      setIsLoadingMarketingDraftProjects(true);
+
+      try {
+        const projects = await fetchGeneralManagerMarketingDraftProjects();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setMarketingDraftProjects(projects);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setMarketingDraftProjects([]);
+      } finally {
+        if (isMounted) {
+          setIsLoadingMarketingDraftProjects(false);
+        }
+      }
+    };
+
+    void loadMarketingDraftProjects();
 
     return () => {
       isMounted = false;
@@ -531,6 +571,75 @@ export function DecisionPanel() {
     }
   };
 
+  const handleApproveMarketingDraftProject = async (project: GeneralManagerMarketingDraftProject) => {
+    try {
+      const success = await reviewGeneralManagerMarketingDraftProject(project.id, 'Approved');
+
+      if (!success) {
+        addToast({
+          type: 'error',
+          title: 'Approval Failed',
+          message: `Unable to approve ${project.name}. Please try again.`,
+        });
+        return false;
+      }
+
+      setMarketingDraftProjects((prev) => prev.filter((item) => item.id !== project.id));
+
+      addToast({
+        type: 'success',
+        title: 'Draft Approved',
+        message: `${project.name} is approved and can now move to allocation planning.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Approval Failed',
+        message: `Unable to approve ${project.name}. Please try again.`,
+      });
+
+      return false;
+    }
+  };
+
+  const handleRejectMarketingDraftProject = async (
+    project: GeneralManagerMarketingDraftProject,
+    rejectionReason: string
+  ) => {
+    try {
+      const success = await reviewGeneralManagerMarketingDraftProject(project.id, 'Rejected', rejectionReason);
+
+      if (!success) {
+        addToast({
+          type: 'error',
+          title: 'Rejection Failed',
+          message: `Unable to reject ${project.name}. Please try again.`,
+        });
+        return false;
+      }
+
+      setMarketingDraftProjects((prev) => prev.filter((item) => item.id !== project.id));
+
+      addToast({
+        type: 'info',
+        title: 'Draft Rejected',
+        message: `${project.name} was rejected and marketing has been notified with your feedback.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Rejection Failed',
+        message: `Unable to reject ${project.name}. Please try again.`,
+      });
+
+      return false;
+    }
+  };
+
   const recommendations = useMemo(() => {
     if (!selectedProject || !prediction) {
       return [];
@@ -594,6 +703,13 @@ export function DecisionPanel() {
               <ContractDecisionSection
                 decisions={contractDecisions}
                 onRequestHrReview={handleContractDecision}
+              />
+
+              <MarketingDraftReviewSection
+                projects={marketingDraftProjects}
+                isLoading={isLoadingMarketingDraftProjects}
+                onApprove={handleApproveMarketingDraftProject}
+                onReject={handleRejectMarketingDraftProject}
               />
 
               {/* Pending Assignment Requests Section */}
