@@ -118,6 +118,14 @@ export interface GeneralManagerAssignmentRequest {
   conflictWarning: string;
 }
 
+export interface GeneralManagerMarketingDraftProject {
+  id: string;
+  name: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
 interface GeneralManagerWorkforceSummaryResponse {
   totalEmployeeCount?: unknown;
   activeEmployeeCount?: unknown;
@@ -150,6 +158,15 @@ interface GeneralManagerContractDecisionResponse {
 interface GeneralManagerAssignmentListResponse {
   assignments?: unknown;
   Assignments?: unknown;
+  data?: unknown;
+  Data?: unknown;
+}
+
+interface GeneralManagerProjectListResponse {
+  projects?: unknown;
+  Projects?: unknown;
+  items?: unknown;
+  Items?: unknown;
   data?: unknown;
   Data?: unknown;
 }
@@ -345,6 +362,33 @@ const normalizeAssignmentRequests = (payload: unknown): GeneralManagerAssignment
   });
 };
 
+const normalizeMarketingDraftProjects = (payload: unknown): GeneralManagerMarketingDraftProject[] => {
+  const source =
+    (payload as GeneralManagerProjectListResponse | null)?.projects ??
+    (payload as GeneralManagerProjectListResponse | null)?.Projects ??
+    (payload as GeneralManagerProjectListResponse | null)?.items ??
+    (payload as GeneralManagerProjectListResponse | null)?.Items ??
+    (payload as GeneralManagerProjectListResponse | null)?.data ??
+    (payload as GeneralManagerProjectListResponse | null)?.Data ??
+    [];
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id ?? record.Id, String(index + 1)),
+      name: asString(record.name ?? record.Name, "Untitled Project"),
+      status: asString(record.status ?? record.Status, "Draft"),
+      startDate: asString(record.startDate ?? record.StartDate, ""),
+      endDate: asString(record.endDate ?? record.EndDate, ""),
+    };
+  });
+};
+
 export async function fetchGeneralManagerWorkforceSummary(): Promise<GeneralManagerWorkforceSummary> {
   const response = await fetch(BackendApiUrl.generalManagerWorkforceSummary);
 
@@ -479,6 +523,42 @@ export async function updateGeneralManagerAssignmentRequestStatus(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ assignmentId, status }),
+  });
+
+  return response.ok;
+}
+
+export async function fetchGeneralManagerMarketingDraftProjects(): Promise<GeneralManagerMarketingDraftProject[]> {
+  const response = await fetch(`${BackendApiUrl.projects}/list?pageNumber=1&pageSize=100`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load marketing projects (${response.status})`);
+  }
+
+  const payload: unknown = await response.json();
+  const projects = normalizeMarketingDraftProjects(payload);
+
+  return projects.filter((project) => {
+    const status = project.status.trim().toLowerCase();
+    return status === 'submitted' || status === 'draft';
+  });
+}
+
+export async function reviewGeneralManagerMarketingDraftProject(
+  projectId: string,
+  action: 'Approved' | 'Rejected',
+  rejectionReason?: string
+): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId,
+      status: action,
+      rejectionReason: action === 'Rejected' ? (rejectionReason ?? '') : undefined,
+    }),
   });
 
   return response.ok;
