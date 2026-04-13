@@ -1,18 +1,21 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
-  Users,
   Calendar,
+  Users,
   Filter,
-  ZoomIn,
-  ZoomOut,
-  X,
 } from 'lucide-react';
 import { AIDecisionPanel } from '@/app/_components/features/gm/decision-panel/components/AIDecisionPanel';
 import type { ProjectData } from '@/app/_components/features/gm/decision-panel/types';
+import {
+  fetchProjectManagerProjectTeam,
+  fetchProjectManagerProjects,
+  type ProjectManagerProjectSummary,
+} from '@/functions/api/projectManager';
 
+const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 interface GanttProject {
   id: string;
@@ -26,63 +29,86 @@ interface GanttProject {
   riskLevel: 'low' | 'medium' | 'high';
 }
 
-const ganttProjects: GanttProject[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    startDate: '2026-04-10',
-    endDate: '2026-06-30',
-    progress: 35,
-    status: 'on-track',
-    assignedResources: ['Sarah J.', 'Michael C.', 'Emily D.'],
-    resourceUtilization: 85,
-    riskLevel: 'low',
-  },
-  {
-    id: '2',
-    name: 'Mobile App Development',
-    startDate: '2026-04-01',
-    endDate: '2026-05-15',
-    progress: 60,
-    status: 'at-risk',
-    assignedResources: ['Sarah J.', 'Lisa A.'],
-    resourceUtilization: 95,
-    riskLevel: 'medium',
-  },
-  {
-    id: 'marketing-campaign',
-    name: 'Marketing Campaign',
-    startDate: '2026-05-01',
-    endDate: '2026-06-15',
-    progress: 10,
-    status: 'at-risk',
-    assignedResources: ['James W.'],
-    resourceUtilization: 110,
-    riskLevel: 'high',
-  },
-  {
-    id: '4',
-    name: 'Data Analytics Platform',
-    startDate: '2026-04-15',
-    endDate: '2026-07-15',
-    progress: 25,
-    status: 'delayed',
-    assignedResources: ['Emily D.', 'Robert B.'],
-    resourceUtilization: 105,
-    riskLevel: 'high',
-  },
-  {
-    id: '5',
-    name: 'CRM Integration',
-    startDate: '2026-05-10',
-    endDate: '2026-06-20',
-    progress: 0,
-    status: 'on-track',
-    assignedResources: ['Lisa A.'],
-    resourceUtilization: 75,
-    riskLevel: 'low',
-  },
-];
+const statusFromProject = (summary: ProjectManagerProjectSummary): GanttProject['status'] => {
+  if (summary.status === 'delayed') {
+    return 'delayed';
+  }
+
+  if (summary.status === 'at-risk') {
+    return 'at-risk';
+  }
+
+  return 'on-track';
+};
+
+const riskFromStatus = (status: GanttProject['status']): GanttProject['riskLevel'] => {
+  if (status === 'delayed') {
+    return 'high';
+  }
+
+  if (status === 'at-risk') {
+    return 'medium';
+  }
+
+  return 'low';
+};
+
+const mapSummaryToGanttProject = (
+  summary: ProjectManagerProjectSummary,
+  teamMembers: string[] = []
+): GanttProject => ({
+  id: summary.id,
+  name: summary.name,
+  startDate: summary.startDate,
+  endDate: summary.endDate,
+  progress: summary.progress,
+  status: statusFromProject(summary),
+  assignedResources: teamMembers,
+  resourceUtilization: Math.min(150, Math.round(summary.progress + teamMembers.length * 8)),
+  riskLevel: riskFromStatus(statusFromProject(summary)),
+});
+
+const toDayStart = (value: string): Date => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
+  if (summary.status === 'completed' || summary.status === 'cancelled') {
+    return true;
+  }
+
+  if (summary.progress >= 100) {
+    return true;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return toDayStart(summary.endDate).getTime() < today.getTime();
+};
+
+const toMonthStart = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const addMonths = (date: Date, months: number): Date => {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+};
+
+const getMonthKey = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const monthKeyToDate = (monthKey: string): Date => {
+  const [yearPart, monthPart] = monthKey.split('-').map((part) => Number(part));
+  return new Date(yearPart, Math.max(0, monthPart - 1), 1);
+};
+
+const formatMonthLabel = (date: Date): string => {
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
 
 // Convert GanttProject to ProjectData format for SmartDecisionPanel
 const convertToProjectData = (project: GanttProject): ProjectData => ({
@@ -102,14 +128,178 @@ export function Planning() {
   const searchParams = useSearchParams();
   const highlightProject = searchParams.get('highlight');
 
-  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('monthly');
+  const [hasMounted, setHasMounted] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [projects, setProjects] = useState<GanttProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GanttProject | null>(null);
+  const [timelineStartMonth, setTimelineStartMonth] = useState<string | null>(null);
+  const [timelineEndMonth, setTimelineEndMonth] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProjects = async () => {
+      const projectResult = await fetchProjectManagerProjects(defaultPmUserId)
+        .then((result) => ({ status: 'fulfilled' as const, value: result }))
+        .catch((reason) => ({ status: 'rejected' as const, reason }));
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (projectResult.status === 'fulfilled' && projectResult.value.length > 0) {
+        const activeSummaries = projectResult.value.filter(
+          (project) => !isFinishedProject(project)
+        );
+
+        if (activeSummaries.length === 0) {
+          setProjects([]);
+          setSelectedProject(null);
+          setError('No active GM planning projects were returned by the backend.');
+          setIsLoading(false);
+          return;
+        }
+
+        const teamResponses = await Promise.all(
+          activeSummaries.map(async (project) => {
+            try {
+              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
+              return { projectId: project.id, teamMembers: team.map((member) => member.fullName) };
+            } catch {
+              return { projectId: project.id, teamMembers: [] as string[] };
+            }
+          })
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        const teamMap = new Map(teamResponses.map((entry) => [entry.projectId, entry.teamMembers]));
+        const liveProjects = activeSummaries.map((summary) =>
+          mapSummaryToGanttProject(summary, teamMap.get(summary.id) ?? [])
+        );
+
+        setProjects(liveProjects);
+        setSelectedProject(liveProjects[0] ?? null);
+        setError(null);
+      } else {
+        setProjects([]);
+        setSelectedProject(null);
+        setError('No GM planning projects were returned by the backend.');
+      }
+
+      setIsLoading(false);
+    };
+
+    void loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredProjects =
     statusFilter === 'all'
-      ? ganttProjects
-      : ganttProjects.filter((p) => p.status === statusFilter);
+      ? projects
+      : projects.filter((p) => p.status === statusFilter);
+
+  const availableMonths = useMemo(() => {
+    if (filteredProjects.length === 0) {
+      return [] as Date[];
+    }
+
+    const startDates = filteredProjects.map((project) => toDayStart(project.startDate).getTime());
+    const endDates = filteredProjects.map((project) => toDayStart(project.endDate).getTime());
+
+    const minStart = new Date(Math.min(...startDates));
+    const maxEnd = new Date(Math.max(...endDates));
+    const columns: Date[] = [];
+
+    let cursor = toMonthStart(minStart);
+    const limit = toMonthStart(maxEnd);
+
+    while (cursor.getTime() <= limit.getTime()) {
+      columns.push(new Date(cursor));
+      cursor = addMonths(cursor, 1);
+    }
+
+    return columns;
+  }, [filteredProjects]);
+
+  useEffect(() => {
+    if (availableMonths.length === 0) {
+      setTimelineStartMonth(null);
+      setTimelineEndMonth(null);
+      return;
+    }
+
+    const monthKeys = availableMonths.map((month) => getMonthKey(month));
+
+    setTimelineStartMonth((current) => (current && monthKeys.includes(current) ? current : monthKeys[0]));
+    setTimelineEndMonth((current) => (current && monthKeys.includes(current) ? current : monthKeys[monthKeys.length - 1]));
+  }, [availableMonths]);
+
+  const handleTimelineStartMonthChange = (value: string) => {
+    setTimelineStartMonth(value);
+
+    if (timelineEndMonth && value > timelineEndMonth) {
+      setTimelineEndMonth(value);
+    }
+  };
+
+  const handleTimelineEndMonthChange = (value: string) => {
+    setTimelineEndMonth(value);
+
+    if (timelineStartMonth && value < timelineStartMonth) {
+      setTimelineStartMonth(value);
+    }
+  };
+
+  const timelineColumns = useMemo(() => {
+    if (availableMonths.length === 0) {
+      return [] as Date[];
+    }
+
+    const startKey = timelineStartMonth ?? getMonthKey(availableMonths[0]);
+    const endKey = timelineEndMonth ?? getMonthKey(availableMonths[availableMonths.length - 1]);
+
+    const startDate = monthKeyToDate(startKey);
+    const endDate = monthKeyToDate(endKey);
+
+    return availableMonths.filter((month) => {
+      const key = getMonthKey(month);
+      return key >= getMonthKey(startDate) && key <= getMonthKey(endDate);
+    });
+  }, [availableMonths, timelineStartMonth, timelineEndMonth]);
+
+  const timelineRange = useMemo(() => {
+    if (timelineColumns.length === 0) {
+      return null;
+    }
+
+    const rangeStart = timelineColumns[0].getTime();
+    const lastColumn = timelineColumns[timelineColumns.length - 1];
+    const rangeEnd = new Date(lastColumn.getFullYear(), lastColumn.getMonth() + 1, 1).getTime();
+
+    return {
+      start: rangeStart,
+      end: rangeEnd,
+      total: Math.max(1, rangeEnd - rangeStart),
+    };
+  }, [timelineColumns]);
+
+  useEffect(() => {
+    if (!selectedProject && filteredProjects.length > 0) {
+      setSelectedProject(filteredProjects[0]);
+    }
+  }, [filteredProjects, selectedProject]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -128,11 +318,27 @@ export function Planning() {
     setSelectedProject(project);
   };
 
-  const getDuration = (startDate: string, endDate: string) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.ceil(days / 7);
+  const getProjectBarStyle = (project: GanttProject) => {
+    if (!timelineRange) {
+      return { left: '0%', width: '100%' };
+    }
+
+    const projectStart = toDayStart(project.startDate).getTime();
+    const projectEndExclusive = toDayStart(project.endDate).getTime() + 24 * 60 * 60 * 1000;
+    const clampedStart = Math.max(projectStart, timelineRange.start);
+    const clampedEnd = Math.min(projectEndExclusive, timelineRange.end);
+
+    const leftPercent = ((clampedStart - timelineRange.start) / timelineRange.total) * 100;
+    const widthPercent = Math.max(1, ((Math.max(clampedEnd, clampedStart + 1) - clampedStart) / timelineRange.total) * 100);
+
+    return {
+      left: `${leftPercent}%`,
+      width: `${widthPercent}%`,
+    };
+  };
+
+  const formatTimelineColumn = (date: Date) => {
+    return formatMonthLabel(date);
   };
 
   return (
@@ -145,6 +351,18 @@ export function Planning() {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
+          Loading GM planning projects from backend...
+        </div>
+      )}
 
       {/* Filters and Controls */}
       <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -167,30 +385,45 @@ export function Planning() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">View:</span>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('weekly')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'weekly'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                <ZoomIn className="w-3.5 h-3.5 inline mr-1" />
-                Weekly
-              </button>
-              <button
-                onClick={() => setViewMode('monthly')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'monthly'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                <ZoomOut className="w-3.5 h-3.5 inline mr-1" />
-                Monthly
-              </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">Monthly range:</span>
             </div>
+
+            <select
+              value={timelineStartMonth ?? ''}
+              onChange={(e) => handleTimelineStartMonthChange(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={hasMounted && availableMonths.length === 0}
+            >
+              {availableMonths.map((month) => {
+                const key = getMonthKey(month);
+
+                return (
+                  <option key={key} value={key}>
+                    From {formatMonthLabel(month)}
+                  </option>
+                );
+              })}
+            </select>
+
+            <select
+              value={timelineEndMonth ?? ''}
+              onChange={(e) => handleTimelineEndMonthChange(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={hasMounted && availableMonths.length === 0}
+            >
+              {availableMonths.map((month) => {
+                const key = getMonthKey(month);
+
+                return (
+                  <option key={key} value={key}>
+                    To {formatMonthLabel(month)}
+                  </option>
+                );
+              })}
+            </select>
           </div>
         </div>
       </div>
@@ -203,11 +436,15 @@ export function Planning() {
 
             {/* Timeline Header */}
             <div className="mb-4 pl-48">
-              <div className="flex justify-between text-xs text-gray-500 mb-2">
-                <span>Apr 2026</span>
-                <span>May 2026</span>
-                <span>Jun 2026</span>
-                <span>Jul 2026</span>
+              <div
+                className="grid gap-2 text-xs text-gray-500 mb-2"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, timelineColumns.length)}, minmax(0, 1fr))` }}
+              >
+                {timelineColumns.map((column) => (
+                  <span key={column.toISOString()} className="truncate">
+                    {formatTimelineColumn(column)}
+                  </span>
+                ))}
               </div>
               <div className="h-px bg-gray-200"></div>
             </div>
@@ -247,18 +484,18 @@ export function Planning() {
                           <div
                             className={`h-full ${getStatusColor(
                               project.status
-                            )} rounded-lg flex items-center justify-between px-3 text-white text-xs font-medium transition-all hover:brightness-110 hover:shadow-md`}
-                            style={{ width: `${getDuration(project.startDate, project.endDate) * 8}%` }}
+                            )} rounded-lg flex items-center justify-between px-3 text-white text-xs font-medium transition-all hover:brightness-110 hover:shadow-md absolute top-0`}
+                            style={getProjectBarStyle(project)}
                           >
                             <span className="truncate">{project.progress}%</span>
                             {project.resourceUtilization > 100 && (
                               <AlertTriangle className="w-4 h-4 text-white" />
                             )}
+                            <div
+                              className="absolute left-0 top-0 h-full bg-white/30 rounded-l-lg"
+                              style={{ width: `${Math.max(0, Math.min(100, project.progress))}%` }}
+                            ></div>
                           </div>
-                          <div
-                            className="absolute left-0 top-0 h-full bg-white/30"
-                            style={{ width: `${project.progress}%` }}
-                          ></div>
                         </button>
                       </div>
                     </div>
@@ -297,6 +534,12 @@ export function Planning() {
           />
         </div>
       </div>
+
+      {!isLoading && filteredProjects.length === 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 shadow-sm">
+          No planning projects were returned by the backend.
+        </div>
+      )}
     </div>
   );
 }

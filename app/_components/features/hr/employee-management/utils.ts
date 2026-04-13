@@ -80,3 +80,16 @@ export const getAvailabilityStatus = (assignedHours: number) => {
       return { label: 'Unknown', color: 'gray' };
   }
 };
+
+export const getEmployeeStatus = (employeeStatus: string) => {
+  switch (employeeStatus) {
+    case 'active':
+      return { label: 'Active', color: 'green' };
+    case 'inactive':
+      return { label: 'Inactive', color: 'red' };
+    case 'terminated':
+      return { label: 'Terminated', color: 'gray' };
+    default:
+      return { label: 'Unknown', color: 'gray' };
+  }
+}

@@ -20,9 +20,8 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
 
   // Calculate timeline range
   const getTimelineRange = () => {
-    const today = new Date();
-    const startOfRange = new Date(today);
-    startOfRange.setDate(1);
+    const startOfRange = new Date(currentDate);
+    startOfRange.setHours(0, 0, 0, 0);
 
     if (viewMode === 'week') {
       // Show 8 weeks
@@ -38,6 +37,7 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
       // Show 6 months
       const columns = 6;
       const months = [];
+      startOfRange.setDate(1);
       for (let i = 0; i < columns; i++) {
         const monthStart = new Date(startOfRange);
         monthStart.setMonth(startOfRange.getMonth() + i);
@@ -48,20 +48,32 @@ export function GanttTimeline({ projects, viewMode, onViewModeChange, onProjectC
   };
 
   const timelineColumns = getTimelineRange();
-  const totalDays = viewMode === 'week' ? 8 * 7 : 6 * 30;
   const startRangeDate = timelineColumns[0];
 
   // Calculate project position and width
   const getProjectPosition = (project: TimelineProject) => {
     const projectStart = new Date(project.startDate);
-    const projectEnd = new Date(project.endDate);
-    const rangeStart = startRangeDate;
+    projectStart.setHours(0, 0, 0, 0);
+    const projectEndExclusive = new Date(project.endDate);
+    projectEndExclusive.setHours(0, 0, 0, 0);
+    projectEndExclusive.setDate(projectEndExclusive.getDate() + 1);
 
-    const daysFromStart = Math.floor((projectStart.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24));
-    const projectDuration = Math.floor((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24));
+    const rangeStart = new Date(startRangeDate);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = viewMode === 'week'
+      ? new Date(rangeStart.getTime() + timelineColumns.length * 7 * 24 * 60 * 60 * 1000)
+      : new Date(
+          timelineColumns[timelineColumns.length - 1].getFullYear(),
+          timelineColumns[timelineColumns.length - 1].getMonth() + 1,
+          1
+        );
 
-    const leftPercent = Math.max(0, (daysFromStart / totalDays) * 100);
-    const widthPercent = Math.min(100 - leftPercent, (projectDuration / totalDays) * 100);
+    const totalMs = Math.max(1, rangeEnd.getTime() - rangeStart.getTime());
+    const clampedStart = Math.max(projectStart.getTime(), rangeStart.getTime());
+    const clampedEnd = Math.min(projectEndExclusive.getTime(), rangeEnd.getTime());
+
+    const leftPercent = ((clampedStart - rangeStart.getTime()) / totalMs) * 100;
+    const widthPercent = Math.max(0, ((clampedEnd - clampedStart) / totalMs) * 100);
 
     return { left: leftPercent, width: widthPercent };
   };

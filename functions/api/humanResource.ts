@@ -13,11 +13,25 @@ export interface HREmployeeListItem {
   status: string;
   assignedHours: number;
   assignments: any[];
+  hireDate?: string;
+  skills?: string[];
+  contractEndDate?: string;
 }
 
 export interface DepartmentLookup {
   id: string;
   name: string;
+}
+
+export interface ProjectLookup {
+  id: string;
+  name: string;
+}
+
+export interface SkillLookup {
+  id: string;
+  name: string;
+  category: string;
 }
 
 interface GetEmployeeListResponse {
@@ -34,6 +48,17 @@ interface GMContractDecision {
   submittedDate: string;
   status: 'pending' | 'executed' | 'clarification-requested';
   details: string;
+}
+
+export type HiringRequestStatus = 'Sourcing' | 'Interviewing' | 'Offering' | 'Completed' | 'Cancelled';
+
+export interface HiringRequestItem {
+  id: string;
+  jobTitle: string;
+  projectName: string;
+  details: string;
+  status: HiringRequestStatus;
+  startedAt: string;
 }
 
 const asString = (value: unknown, fallback: string): string => {
@@ -79,6 +104,9 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       phone: asString(record.phone, "N/A"),
       status: asString(record.status, "Active"),
       assignments: Array.isArray(record.assignments) ? record.assignments : [],
+      hireDate: asString(record.hireDate, ""),
+      skills: Array.isArray(record.skills) ? record.skills as string[] : [],
+      contractEndDate: record.contractEndDate as string | undefined,
     };
   });
 };
@@ -92,6 +120,86 @@ export async function fetchHREmployeeList(): Promise<HREmployeeListItem[]> {
 
   const payload: unknown = await response.json();
   return normalizeEmployees(payload);
+}
+
+interface GetEmployeeAssignmentsResponse {
+  assignments?: unknown;
+  items?: unknown;
+  data?: unknown;
+}
+
+interface EmployeeAssignmentListItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  status: string;
+  projectStatus: string;
+  allocationPercent: number;
+}
+
+const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListItem[] => {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.assignments)
+      ? (payload as GetEmployeeAssignmentsResponse).assignments
+      : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.items)
+        ? (payload as GetEmployeeAssignmentsResponse).items
+        : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.data)
+          ? (payload as GetEmployeeAssignmentsResponse).data
+          : [];
+
+  return (source as any[]).map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id, String(index + 1)),
+      projectId: asString(record.projectId, ""),
+      projectName: asString(record.projectName, "Untitled Project"),
+      status: asString(record.status, "Pending"),
+      projectStatus: asString(record.projectStatus ?? record.project_status, ""),
+      allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
+    };
+  });
+};
+
+/**
+ * Helper to get a mapping of employee IDs to their current project names.
+ */
+export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): Promise<Record<string, string[]>> {
+  const activeStatuses = new Set(["pending", "approved", "accepted", "inprogress", "in-progress"]);
+  const finishedProjectStatuses = new Set(["completed", "cancelled"]);
+
+  const entries = await Promise.all(
+    employeeIds.map(async (employeeId) => {
+      try {
+        const response = await fetch(`${BackendApiUrl.employees}/${employeeId}/assignments?pageNumber=1&pageSize=100`);
+
+        if (!response.ok) {
+          return [employeeId, [] as string[]] as const;
+        }
+
+        const payload: unknown = await response.json();
+        const assignments = normalizeEmployeeAssignments(payload);
+
+        const currentProjects = Array.from(
+          new Set(
+            assignments
+              .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
+              .filter((assignment) => !finishedProjectStatuses.has(assignment.projectStatus.trim().toLowerCase()))
+              .filter((assignment) => assignment.allocationPercent > 0)
+              .map((assignment) => assignment.projectName)
+              .filter((name) => name.trim().length > 0)
+          )
+        );
+
+        return [employeeId, currentProjects] as const;
+      } catch {
+        return [employeeId, [] as string[]] as const;
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
 }
 
 /**
@@ -108,14 +216,23 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     phone: apiItem.phone,
     location: "", // Not in list API
     department: apiItem.department ?? "General",
-    skills: [], // Not in list API yet
-    status: apiItem.status.toLowerCase() === "active" ? "active" : "inactive",
+    skills: apiItem.skills || [],
+    status: apiItem.status.toLowerCase() === "active" ? "active" : apiItem.status.toLowerCase() === "inactive" ? "inactive" : "terminated",
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,
     assignedHours: apiItem.assignedHours,
-    currentProjects: apiItem.assignments.map((a: any) => a.projectName || "Unknown Project"),
-    projectHistory: [],
-    joinedDate: new Date().toISOString(),
+    currentProjects: apiItem.assignments
+      .filter((a: any) => {
+        const s = a.status?.toLowerCase();
+        return s === "approved" || s === "accepted" || s === "inprogress";
+      })
+      .map((a: any) => a.projectName || "Unknown Project"),
+    projectHistory: apiItem.assignments
+      .filter((a: any) => a.status?.toLowerCase() === "completed")
+      .map((a: any) => a.projectName || "Unknown Project"),
+    joinedDate: apiItem.hireDate || new Date().toISOString(),
+    hireDate: apiItem.hireDate || "",
+    contractEndDate: apiItem.contractEndDate,
   };
 };
 
@@ -249,7 +366,7 @@ export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestIt
   }));
 }
 
-export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected'): Promise<boolean> {
+export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected' | 'Accepted'): Promise<boolean> {
   const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -289,12 +406,28 @@ export const mapToUIAssignmentRequest = (item: HRAssignmentRequestItem): any => 
 export interface HRDashboardSummary {
   pendingValidationsCount: number;
   totalEmployeeCount: number;
+  expiringContractsCount: number;
+  activeHiringRequestsCount: number;
+  pendingGmDecisionsCount: number;
+  pendingClarificationsCount: number;
   recentRequests: {
     id: string;
     employeeName: string;
     projectName: string;
     hasConflict: boolean;
     daysWaiting: number;
+  }[];
+  expiringContracts: {
+    employeeId: string;
+    employeeName: string;
+    endDate: string | null;
+  }[];
+  recentGmDecisions: {
+    id: string;
+    type: string;
+    details: string;
+    date: string;
+    status: string;
   }[];
 }
 
@@ -309,12 +442,28 @@ export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
   return {
     pendingValidationsCount: asNumber(payload.pendingValidationsCount, 0),
     totalEmployeeCount: asNumber(payload.totalEmployeeCount, 0),
+    expiringContractsCount: asNumber(payload.expiringContractsCount, 0),
+    activeHiringRequestsCount: asNumber(payload.activeHiringRequestsCount, 0),
+    pendingGmDecisionsCount: asNumber(payload.pendingGmDecisionsCount, 0),
+    pendingClarificationsCount: asNumber(payload.pendingClarificationsCount, 0),
     recentRequests: Array.isArray(payload.recentRequests) ? payload.recentRequests.map((item: any) => ({
       id: asString(item.id, ""),
       employeeName: asString(item.employeeName, "Unknown"),
       projectName: asString(item.projectName, "Untitled Project"),
       hasConflict: Boolean(item.hasConflict),
       daysWaiting: asNumber(item.daysWaiting, 0),
+    })) : [],
+    expiringContracts: Array.isArray(payload.expiringContracts) ? payload.expiringContracts.map((item: any) => ({
+      employeeId: asString(item.employeeId, ""),
+      employeeName: asString(item.employeeName, "Unknown"),
+      endDate: item.endDate,
+    })) : [],
+    recentGmDecisions: Array.isArray(payload.recentGmDecisions) ? payload.recentGmDecisions.map((item: any) => ({
+      id: asString(item.id, ""),
+      type: asString(item.type, "General"),
+      details: asString(item.details, "No details provided"),
+      date: asString(item.date, ""),
+      status: asString(item.status, "Pending"),
     })) : [],
   };
 }
@@ -328,6 +477,32 @@ export async function fetchDepartmentsLookup(): Promise<DepartmentLookup[]> {
   return (payload.departments || []).map((d: any) => ({
     id: d.id,
     name: d.name
+  }));
+}
+
+export async function fetchProjectsLookup(): Promise<ProjectLookup[]> {
+  const response = await fetch(`${BackendApiUrl.projects}/list?pageSize=100`);
+  if (!response.ok) {
+    throw new Error(`Failed to load projects (${response.status})`);
+  }
+  const payload: any = await response.json();
+  return (payload.projects || payload.items || payload.data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name || p.fullName || "Untitled Project"
+  }));
+}
+
+export async function fetchSkillsLookup(): Promise<SkillLookup[]> {
+  const response = await fetch(`${BackendApiUrl.lookups}/skills/list?pageSize=1000`);
+  if (!response.ok) {
+    throw new Error(`Failed to load skills (${response.status})`);
+  }
+  const payload: any = await response.json();
+  const skills = Array.isArray(payload.skills) ? payload.skills : [];
+  return skills.map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    category: s.category
   }));
 }
 
@@ -393,4 +568,110 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; me
   } catch (error) {
     return { success: false, message: "Network error occurred." };
   }
+}
+
+export async function fetchHiringRequests(): Promise<HiringRequestItem[]> {
+  const response = await fetch(`${BackendApiUrl.humanResources}/hiring/list`);
+  if (!response.ok) {
+    throw new Error(`Failed to load hiring requests (${response.status})`);
+  }
+  const payload: any = await response.json();
+  return payload.hiringRequests || [];
+}
+
+export async function updateHiringStage(id: string, status: HiringRequestStatus): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(`${BackendApiUrl.humanResources}/hiring/update-stage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hiringRequestId: id, newStatus: status }),
+    });
+
+    const body = await response.json();
+    return {
+      success: response.ok,
+      message: body.message
+    };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function rehireEmployee(data: {
+  employeeId: string,
+  jobTitle: string,
+  startDate: string,
+  endDate: string,
+  notes?: string
+}): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(`${BackendApiUrl.humanResources}/rehire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const body = await response.json();
+    return {
+      success: response.ok,
+      message: body.message
+    };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function requestClarification(id: string, reason: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(`${BackendApiUrl.humanResources}/decision/${id}/clarify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+
+    const body = await response.json();
+    return {
+      success: response.ok,
+      message: body.message
+    };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function splitAssignmentWorkload(assignmentId: string, primaryAllocation: number): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.assignmentsSplitWorkload, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignmentId, primaryAllocation }),
+  });
+
+  return response.ok;
+}
+
+export async function reassignAssignment(assignmentId: string, targetEmployeeId: string): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.reassignAssignment, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignmentId, targetEmployeeId }),
+  });
+
+  return response.ok;
+}
+
+export interface UpdateAssignmentPayload {
+  assignmentId: string;
+  allocationPercent?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function updateAssignment(payload: UpdateAssignmentPayload): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.updateAssignment, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  return response.ok;
 }

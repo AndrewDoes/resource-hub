@@ -1,10 +1,10 @@
-import { 
-  GMDecision, 
-  ContractAction, 
-  HiringRequest, 
-  EmployeeStatus, 
-  AssignmentRequest, 
-  Employee 
+import {
+  GMDecision,
+  ContractAction,
+  HiringRequest,
+  EmployeeStatus,
+  AssignmentRequest,
+  Employee
 } from './types';
 
 export const mockGMDecisions: GMDecision[] = [

@@ -1,10 +1,10 @@
 /**
  * Helper function to calculate workload percentage from assigned hours
- * @param assignedHours Daily working hours assigned
+ * @param assignedHours Weekly assigned hours (40h baseline)
  * @returns Workload percentage
  */
 export const calculateWorkloadFromHours = (assignedHours: number): number => {
-  return (assignedHours / 8) * 100;
+  return (assignedHours / 40) * 100;
 };
 
 /**
