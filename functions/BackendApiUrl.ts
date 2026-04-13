@@ -2,6 +2,7 @@ const baseUrl = "/api/gateway";
 
 export const BackendApiUrl = {
   projects: `${baseUrl}/api/projects`,
+  projectsUpdateStatus: `${baseUrl}/api/projects/update-status`,
   projectManager: `${baseUrl}/api/project-manager`,
   projectManagerProjectsList: `${baseUrl}/api/project-manager/projects/list`,
   projectManagerProjectOverview: (projectId: string) => `${baseUrl}/api/project-manager/projects/${projectId}/overview`,

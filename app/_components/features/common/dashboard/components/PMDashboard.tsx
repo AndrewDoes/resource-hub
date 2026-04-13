@@ -52,6 +52,10 @@ const toEmployeeStatus = (value: string): Employee['status'] => {
 };
 
 const getProjectStatus = (project: ProjectManagerProjectSummary): TimelineProject['status'] => {
+  if (project.status === 'completed' || project.status === 'cancelled') {
+    return 'completed';
+  }
+
   const progress = Number.isFinite(project.progress) ? project.progress : 0;
   const today = new Date();
   const startDate = new Date(project.startDate);

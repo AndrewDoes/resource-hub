@@ -105,6 +105,11 @@ export interface ProjectManagerCreateChangeRequestResult {
   assignmentId: string;
 }
 
+export interface ProjectManagerUpdateProjectStatusResult {
+  projectId: string;
+  status: string;
+}
+
 export interface PersistSplitWorkloadInput {
   projectId: string;
   fromEmployeeId: string;
@@ -481,6 +486,33 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
 
   const payload: unknown = await response.json();
   return normalizeTimelineTasks(payload);
+}
+
+export async function updateProjectManagerProjectStatus(
+  projectId: string,
+  status: 'Completed' | 'Cancelled'
+): Promise<ProjectManagerUpdateProjectStatusResult> {
+  const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId,
+      status,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update project status (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    projectId: asString(payload.projectId ?? payload.ProjectId, projectId),
+    status: asString(payload.status ?? payload.Status, status),
+  };
 }
 
 export async function createProjectManagerChangeRequest(
