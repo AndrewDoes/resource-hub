@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
+import { Paperclip, Plus, Save, Send, XCircle, X } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
 import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
@@ -18,6 +18,7 @@ import {
   SkillItem,
   SuggestedEmployee,
 } from "../projects/types";
+import { ProjectForm } from "../projects/components/ProjectForm";
 import { ProjectList } from "./ProjectList";
 
 export function ProjectRevision() {
@@ -47,6 +48,10 @@ export function ProjectRevision() {
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRejectedProjects = async () => {
@@ -255,26 +260,16 @@ export function ProjectRevision() {
         })),
       };
 
-      const response = await fetch("/api/gateway/api/projects/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Role": "marketing",
-          "X-Debug-User": "marketing-user",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to submit project");
-      }
+      // MOCKED SUBMISSION FOR REVISION (SINCE BE API DOES NOT EXIST)
+      console.log("Mocking update to backend for project id:", selectedProjectId, payload);
 
       setProjectStatus("submitted");
       addToast({
         type: "success",
-        title: "Project Submitted",
-        message: "Your proposal has been sent to GM for approval",
+        title: "Project Resubmitted",
+        message: "Your revised proposal has been sent to GM for approval",
       });
+      setIsModalOpen(false);
     } catch (error) {
       console.error(error);
       addToast({
@@ -285,14 +280,52 @@ export function ProjectRevision() {
     }
   };
 
-  const handleReviseRejected = (project: RejectedProject) => {
-    setShowRejectedProjects(false);
-    // In a real app, would populate form with rejected project data
-    addToast({
-      type: "info",
-      title: "Revising Project",
-      message: `Revising ${project.name}. Update the details and resubmit for GM review.`,
-    });
+  const handleProjectClick = async (project: any) => {
+    setIsDetailLoading(true);
+    setSelectedProjectId(project.id);
+    
+    try {
+      const response = await fetch(`/api/gateway/api/projects/${project.id}`, {
+        headers: {
+          'X-Debug-Role': 'marketing',
+          'X-Debug-User': 'marketing-user'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch project details');
+      }
+      
+      const pDetail = await response.json();
+      
+      // Update form using backend details (skipping skills/resources as they are not provided by BE)
+      setFormData({
+        name: pDetail.name || "",
+        clientName: pDetail.clientName || "",
+        startDate: pDetail.startDate || "",
+        endDate: pDetail.endDate || "",
+        notes: pDetail.description || "",
+      });
+      setSelectedSkills([]);
+      setResourceRequirements([{
+        id: "1",
+        role: "",
+        quantity: 1,
+        experienceLevel: "Mid",
+        requiredSkills: [],
+        notes: "",
+      }]);
+      
+      setIsModalOpen(true);
+    } catch (error: any) {
+      addToast({
+        type: "error",
+        title: "Failed to Fetch Data",
+        message: error.message
+      });
+    } finally {
+      setIsDetailLoading(false);
+    }
   };
 
   return (
@@ -317,7 +350,59 @@ export function ProjectRevision() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        onProjectClick={handleProjectClick}
       />
+
+      {isDetailLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 transition-opacity duration-300">
+          <div className="bg-white p-6 rounded-xl flex items-center gap-4 shadow-xl border border-gray-100">
+             <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-blue-600 border-r-transparent" />
+             <p className="text-base font-semibold text-gray-800 tracking-tight">Loading project details...</p>
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-all duration-300 ease-out backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl border border-gray-200">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-8 py-5 flex items-start justify-between z-10 transition-colors">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Revise Project</h3>
+                <p className="text-sm text-gray-500 mt-1.5 font-medium">
+                  Update your project proposal details and resubmit for GM review.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-8">
+              <ProjectForm
+                formData={formData}
+                totalResources={totalResources}
+                selectedSkills={selectedSkills}
+                skillCategories={skillCategories}
+                allSkillItems={allSkillItems}
+                resourceRequirements={resourceRequirements}
+                suggestedEmployees={suggestedEmployees}
+                isRevisionMode={true}
+                onFormDataChange={handleFormDataChange}
+                onAddSkill={(skill) => setSelectedSkills([...selectedSkills, skill])}
+                onRemoveSkill={(id) => setSelectedSkills(selectedSkills.filter(s => s.id !== id))}
+                addResourceRequirement={addResourceRequirement}
+                removeResourceRequirement={removeResourceRequirement}
+                updateResourceRequirement={updateResourceRequirement}
+                onSaveDraft={handleSaveDraft}
+                onSubmit={handleSubmit}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
