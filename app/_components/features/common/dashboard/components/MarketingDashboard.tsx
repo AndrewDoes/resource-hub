@@ -3,7 +3,8 @@
 import { 
   FileText, 
   Clock, 
-  XCircle 
+  XCircle,
+  X 
 } from 'lucide-react';
 import Link from 'next/link';
 // import { marketingProjects } from '@/app/_components/features/common/dashboard/data';
@@ -11,10 +12,13 @@ import { ProjectStatus } from '@/app/types';
 import React, { useState, useEffect } from 'react';
 import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
 import { ProjectList } from '@/app/_components/features/marketing/project-revision/ProjectList';
+import { WorkflowVisualizer } from '@/app/_components/system/components/WorkflowVisualizer';
+
 
 
 export function MarketingDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -118,7 +122,34 @@ export function MarketingDashboard() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
+        onProjectClick={setSelectedProject}
       />
+
+      {/* Workflow Visualizer Modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-start justify-between z-10">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Project Workflow</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedProject.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <WorkflowVisualizer currentStatus={selectedProject.status as ProjectStatus} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

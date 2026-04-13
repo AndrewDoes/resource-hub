@@ -10,6 +10,7 @@ interface ProjectListProps {
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
+  onProjectClick?: (project: any) => void;
 }
 
 export function ProjectList({ 
@@ -19,7 +20,8 @@ export function ProjectList({
   title = "My Projects",
   currentPage = 1,
   totalPages = 1,
-  onPageChange 
+  onPageChange,
+  onProjectClick
 }: ProjectListProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -31,7 +33,11 @@ export function ProjectList({
           <p className="text-sm text-gray-500 text-center py-4">No projects found.</p>
         )}
         {projects.map((project) => (
-          <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div 
+            key={project.id} 
+            className={`flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 ${onProjectClick ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''}`}
+            onClick={() => onProjectClick?.(project)}
+          >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="font-semibold text-gray-900">{project.name}</h3>
