@@ -1,6 +1,6 @@
 import { BackendApiUrl } from "../BackendApiUrl";
 
-export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed";
+export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed" | "completed" | "cancelled";
 
 export interface ProjectManagerProjectSummary {
   id: string;
@@ -156,11 +156,16 @@ interface ProjectManagerTimelineTasksResponse {
 }
 
 const fallbackStatus = (value: string | undefined): ProjectManagerProjectStatus => {
-  if (value === "at-risk" || value === "delayed") {
-    return value;
+  switch (value) {
+    case "at-risk":
+    case "delayed":
+    case "on-track":
+    case "completed":
+    case "cancelled":
+      return value;
+    default:
+      return "on-track";
   }
-
-  return "on-track";
 };
 
 const asString = (value: unknown, fallback: string): string => {

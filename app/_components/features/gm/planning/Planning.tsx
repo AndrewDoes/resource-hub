@@ -74,6 +74,21 @@ const toDayStart = (value: string): Date => {
   return date;
 };
 
+const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
+  if (summary.status === 'completed' || summary.status === 'cancelled') {
+    return true;
+  }
+
+  if (summary.progress >= 100) {
+    return true;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return toDayStart(summary.endDate).getTime() < today.getTime();
+};
+
 const toMonthStart = (date: Date): Date => {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 };
@@ -139,8 +154,20 @@ export function Planning() {
       }
 
       if (projectResult.status === 'fulfilled' && projectResult.value.length > 0) {
+        const activeSummaries = projectResult.value.filter(
+          (project) => !isFinishedProject(project)
+        );
+
+        if (activeSummaries.length === 0) {
+          setProjects([]);
+          setSelectedProject(null);
+          setError('No active GM planning projects were returned by the backend.');
+          setIsLoading(false);
+          return;
+        }
+
         const teamResponses = await Promise.all(
-          projectResult.value.map(async (project) => {
+          activeSummaries.map(async (project) => {
             try {
               const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
               return { projectId: project.id, teamMembers: team.map((member) => member.fullName) };
@@ -155,7 +182,7 @@ export function Planning() {
         }
 
         const teamMap = new Map(teamResponses.map((entry) => [entry.projectId, entry.teamMembers]));
-        const liveProjects = projectResult.value.map((summary) =>
+        const liveProjects = activeSummaries.map((summary) =>
           mapSummaryToGanttProject(summary, teamMap.get(summary.id) ?? [])
         );
 

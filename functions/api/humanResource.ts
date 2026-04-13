@@ -199,6 +199,7 @@ interface EmployeeAssignmentListItem {
   projectId: string;
   projectName: string;
   status: string;
+  projectStatus: string;
   allocationPercent: number;
 }
 
@@ -221,6 +222,7 @@ const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListI
       projectId: asString(record.projectId, ""),
       projectName: asString(record.projectName, "Untitled Project"),
       status: asString(record.status, "Pending"),
+      projectStatus: asString(record.projectStatus ?? record.project_status, ""),
       allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
     };
   });
@@ -228,6 +230,7 @@ const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListI
 
 export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): Promise<Record<string, string[]>> {
   const activeStatuses = new Set(["pending", "approved", "accepted", "inprogress", "in-progress"]);
+  const finishedProjectStatuses = new Set(["completed", "cancelled"]);
 
   const entries = await Promise.all(
     employeeIds.map(async (employeeId) => {
@@ -245,6 +248,7 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
           new Set(
             assignments
               .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
+              .filter((assignment) => !finishedProjectStatuses.has(assignment.projectStatus.trim().toLowerCase()))
               .filter((assignment) => assignment.allocationPercent > 0)
               .map((assignment) => assignment.projectName)
               .filter((name) => name.trim().length > 0)

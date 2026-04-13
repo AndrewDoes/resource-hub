@@ -37,13 +37,20 @@ const mapSummaryToProject = (
   teamMembers: string[] = [],
   projectPrediction?: GeneralManagerProjectPrediction | null
 ): ProjectData => {
+  const mappedStatus: ProjectData['status'] =
+    summary.status === 'delayed'
+      ? 'delayed'
+      : summary.status === 'at-risk'
+        ? 'at-risk'
+        : 'on-track';
+
   return {
     id: summary.id,
     name: summary.name,
     startDate: summary.startDate,
     endDate: summary.endDate,
     progress: summary.progress,
-    status: summary.status,
+    status: mappedStatus,
     assignedResources: teamMembers,
     requiredResources: summary.teamSize,
     resourceUtilization: Math.min(150, Math.round(summary.progress + (projectPrediction?.staffingRiskScore ?? 0))),
@@ -58,6 +65,27 @@ const mapSummaryToProject = (
               ? 'medium'
               : 'low',
   };
+};
+
+const toDayStart = (value: string): Date => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
+  if (summary.status === 'completed' || summary.status === 'cancelled') {
+    return true;
+  }
+
+  if (summary.progress >= 100) {
+    return true;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return toDayStart(summary.endDate).getTime() < today.getTime();
 };
 
 const buildRecommendationsFromPrediction = (
@@ -188,8 +216,12 @@ export function DecisionPanel() {
       }
 
       if (projectResult.status === 'fulfilled') {
+        const activeSummaries = projectResult.value.filter(
+          (summary) => !isFinishedProject(summary)
+        );
+
         const teamResults = await Promise.all(
-          projectResult.value.map(async (summary) => {
+          activeSummaries.map(async (summary) => {
             try {
               const team = await fetchProjectManagerProjectTeam(defaultPmUserId, summary.id);
 
@@ -207,7 +239,7 @@ export function DecisionPanel() {
         );
 
         const teamMap = new Map(teamResults.map((entry) => [entry.projectId, entry.teamMembers]));
-        const backendProjects = projectResult.value.map((summary) =>
+        const backendProjects = activeSummaries.map((summary) =>
           mapSummaryToProject(summary, teamMap.get(summary.id) ?? [])
         );
 
