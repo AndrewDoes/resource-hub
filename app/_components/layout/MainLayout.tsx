@@ -52,6 +52,8 @@ const allMenuItems: MenuItem[] = [
   { path: '/employee/employee', label: 'My Profile', icon: User, roles: ['employee'] },
   { path: '/gm/resource-overview', label: 'Resource Overview', icon: Users, roles: ['gm'] },
 
+  { path: '/common/reports', label: 'Reports', icon: BarChart3, roles: ['gm', 'hr'] },
+
   // Settings/Reports could be role-prefixed or shared. Assuming role-prefixed for consistency.
   { path: '/marketing/settings', label: 'Settings', icon: Settings, roles: ['marketing'] },
   { path: '/pm/settings', label: 'Settings', icon: Settings, roles: ['pm'] },

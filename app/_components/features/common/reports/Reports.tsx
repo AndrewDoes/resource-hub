@@ -1,3 +1,5 @@
+'use client';
+
 import { FileText, Download, Calendar, TrendingUp } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
