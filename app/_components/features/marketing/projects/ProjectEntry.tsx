@@ -25,6 +25,7 @@ import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
 
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
+  const marketingUserId = process.env.NEXT_PUBLIC_MARKETING_ID ?? "58032228-86c3-4dce-b591-ca24c1f7a9e1";
 
   const [formData, setFormData] = useState<ProjectFormData>({
     name: "",
@@ -188,8 +189,7 @@ export function ProjectEntry() {
 
     try {
       const payload = {
-        // createdByUserId: "11111111-1111-1111-1111-111111111111", // Placeholder until auth is integrated
-        createdByUserId: "6a974394-53c7-4ab4-8fc5-03e9b3e8f3e0", // Marketing user from DB
+        createdByUserId: marketingUserId,
         name: formData.name,
         clientName: formData.clientName,
         startDate: formData.startDate,
