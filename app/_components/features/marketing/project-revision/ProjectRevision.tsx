@@ -18,6 +18,7 @@ import {
   SkillItem,
   SuggestedEmployee,
 } from "../projects/types";
+import { ProjectList } from "./ProjectList";
 
 export function ProjectRevision() {
   const { addToast } = useFeedbackToast();
@@ -40,6 +41,48 @@ export function ProjectRevision() {
   const [skillCategories, setSkillCategories] = useState<
     Record<string, SkillItem[]>
   >({});
+
+  const [rejectedProjectsList, setRejectedProjectsList] = useState<any[]>([]);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    const fetchRejectedProjects = async () => {
+      setIsProjectsLoading(true);
+      try {
+        const response = await fetch(`/api/gateway/api/projects/list?status=Rejected&pageNumber=${currentPage}&pageSize=5`, {
+          headers: {
+            'X-Debug-Role': 'marketing',
+            'X-Debug-User': 'marketing-user'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch projects');
+        }
+        
+        const data = await response.json();
+        const mappedProjects = (data.projects || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          status: p.status as ProjectStatus,
+          lastModified: p.startDate ? `Started ${p.startDate}` : 'Unknown',
+          feedback: null 
+        }));
+        
+        setRejectedProjectsList(mappedProjects);
+        setTotalPages(data.totalPages || 1);
+      } catch (err: any) {
+        setProjectsError(err.message);
+      } finally {
+        setIsProjectsLoading(false);
+      }
+    };
+
+    fetchRejectedProjects();
+  }, [currentPage]);
 
   const [resourceRequirements, setResourceRequirements] = useState<
     ResourceRequirement[]
@@ -253,162 +296,28 @@ export function ProjectRevision() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6 flex items-start justify-between">
+    <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            Create New Project
+            Project Revision
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Marketing Department - Project Request Form
+            Marketing Department - Revise and resubmit your project proposals
+            based on GM feedback
           </p>
         </div>
-        {rejectedProjects.length > 0 && (
-          <button
-            onClick={() => setShowRejectedProjects(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
-          >
-            <XCircle className="w-4 h-4" />
-            View Rejected Projects ({rejectedProjects.length})
-          </button>
-        )}
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form - 2 columns */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Project Basic Info */}
-              <ProjectBasicInfo
-                totalResources={totalResources}
-                formData={formData}
-                onFormDataChange={handleFormDataChange}
-              />
-
-              {/* Required Skills */}
-              <SkillSelector
-                selectedSkills={selectedSkills}
-                onAddSkill={(skill) =>
-                  setSelectedSkills([...selectedSkills, skill])
-                }
-                onRemoveSkill={(skillId) =>
-                  setSelectedSkills(
-                    selectedSkills.filter((s) => s.id !== skillId),
-                  )
-                }
-                skillCategories={skillCategories}
-              />
-
-              {/* Resource Requirements Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-1">
-                      Resource Requirements{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs text-gray-600">
-                      Define resource roles clearly to improve assignment
-                      accuracy
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addResourceRequirement}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Resource
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {resourceRequirements.map((resource, index) => (
-                    <ResourceRequirementItem
-                      key={resource.id}
-                      resource={resource}
-                      index={index}
-                      onUpdate={updateResourceRequirement}
-                      onRemove={removeResourceRequirement}
-                      showRemove={resourceRequirements.length > 1}
-                      allSkills={allSkillItems}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Suggested Resource Match */}
-              <SuggestedResources suggestedEmployees={suggestedEmployees} />
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Notes
-                </label>
-                <textarea
-                  rows={4}
-                  value={formData.notes}
-                  onChange={(e) =>
-                    handleFormDataChange("notes", e.target.value)
-                  }
-                  placeholder="Additional information about the project..."
-                  className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                ></textarea>
-              </div>
-
-              {/* Attachments */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Attachments
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer">
-                  <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    PDF, DOC, XLS, or images (max 10MB)
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
-                >
-                  <Save className="w-4 h-4" />
-                  Save Draft
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md"
-                >
-                  <Send className="w-4 h-4" />
-                  Submit to GM
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Workflow Sidebar - 1 column */}
-        <div className="lg:col-span-1">
-          <WorkflowVisualizer currentStatus={projectStatus} />
-        </div>
-      </div>
-
-      {/* Rejected Projects Modal */}
-      {showRejectedProjects && (
-        <RejectedProjectsModal
-          rejectedProjects={rejectedProjects}
-          onClose={() => setShowRejectedProjects(false)}
-          onRevise={handleReviseRejected}
-        />
-      )}
+      
+      <ProjectList 
+        projects={rejectedProjectsList} 
+        isLoading={isProjectsLoading} 
+        error={projectsError} 
+        title="Rejected Projects"
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 }
