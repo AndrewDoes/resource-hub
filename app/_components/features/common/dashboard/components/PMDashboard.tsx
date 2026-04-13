@@ -402,6 +402,50 @@ export function PMDashboard() {
   };
 
   const handleApplySuggestion = async (conflict: ResourceConflict, suggestion: SystemSuggestion) => {
+    if (suggestion.type === 'hire') {
+      const targetProjectId = conflict.projectIds[0];
+      const targetProject = allProjects.find((project) => project.id === targetProjectId);
+      const affectedEmployee = employees.find((employee) => employee.id === conflict.employeeId);
+
+      if (!targetProject) {
+        addToast({
+          type: 'error',
+          title: 'Unable To Send Request',
+          message: 'No target project found for this conflict.',
+        });
+        return;
+      }
+
+      const inferredRoleName = affectedEmployee?.skills[0]?.trim() || 'Additional Resource';
+
+      try {
+        await createProjectManagerChangeRequest({
+          projectId: targetProject.id,
+          assignedByUserId: defaultPmUserId,
+          roleName: inferredRoleName,
+          startDate: targetProject.startDate,
+          endDate: targetProject.endDate,
+          allocationPercent: 100,
+          requiredSkills: affectedEmployee?.skills ?? [],
+          additionalNeeds: `System conflict ${conflict.id}: ${conflict.details}`,
+        });
+
+        addToast({
+          type: 'success',
+          title: 'Request Sent To GM',
+          message: `${suggestion.title} created a backend change request for GM review.`,
+        });
+      } catch (submitError) {
+        addToast({
+          type: 'error',
+          title: 'Request Failed',
+          message: submitError instanceof Error ? submitError.message : 'Unable to send hiring request to GM.',
+        });
+      }
+
+      return;
+    }
+
     if (suggestion.type !== 'split-workload') {
       addToast({
         type: 'info',

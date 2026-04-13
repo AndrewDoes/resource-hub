@@ -113,6 +113,7 @@ export function Planning() {
   const searchParams = useSearchParams();
   const highlightProject = searchParams.get('highlight');
 
+  const [hasMounted, setHasMounted] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projects, setProjects] = useState<GanttProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GanttProject | null>(null);
@@ -120,6 +121,10 @@ export function Planning() {
   const [timelineEndMonth, setTimelineEndMonth] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -363,7 +368,7 @@ export function Planning() {
               value={timelineStartMonth ?? ''}
               onChange={(e) => handleTimelineStartMonthChange(e.target.value)}
               className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={availableMonths.length === 0}
+              disabled={hasMounted && availableMonths.length === 0}
             >
               {availableMonths.map((month) => {
                 const key = getMonthKey(month);
@@ -380,7 +385,7 @@ export function Planning() {
               value={timelineEndMonth ?? ''}
               onChange={(e) => handleTimelineEndMonthChange(e.target.value)}
               className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={availableMonths.length === 0}
+              disabled={hasMounted && availableMonths.length === 0}
             >
               {availableMonths.map((month) => {
                 const key = getMonthKey(month);

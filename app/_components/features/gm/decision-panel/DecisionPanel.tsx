@@ -18,6 +18,7 @@ import {
 import {
   fetchProjectManagerProjects,
   fetchProjectManagerProjectTeam,
+  createProjectManagerChangeRequest,
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
 
@@ -29,6 +30,7 @@ import { AIRecommendationSection } from './components/AIRecommendationSection';
 import { ContractDecisionSection } from './components/ContractDecisionSection';
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+const defaultDecisionActorUserId = process.env.NEXT_PUBLIC_GM_USER_ID ?? defaultPmUserId;
 
 const mapSummaryToProject = (
   summary: ProjectManagerProjectSummary,
@@ -96,6 +98,11 @@ const buildRecommendationsFromPrediction = (
       },
       confidence: Math.min(99, Math.max(50, Math.round(topCandidate.fitScore))),
       reasoning: topCandidate.reason,
+      metadata: {
+        employeeId: topCandidate.employeeId,
+        roleName: requirement.roleName,
+        requiredSkills: requirement.requiredSkills,
+      },
     });
   });
 
@@ -316,6 +323,55 @@ export function DecisionPanel() {
     }
 
     try {
+      if (recommendation.type === 'add-resource') {
+        const employeeId = recommendation.metadata?.employeeId;
+        const roleName = recommendation.metadata?.roleName;
+
+        if (!employeeId || !roleName) {
+          addToast({
+            type: 'error',
+            title: 'Assignment Data Missing',
+            message: 'This recommendation does not include enough data for auto-assignment.',
+          });
+          return false;
+        }
+
+        await createProjectManagerChangeRequest({
+          projectId: selectedProject.id,
+          employeeId,
+          assignedByUserId: defaultDecisionActorUserId,
+          roleName,
+          startDate: selectedProject.startDate,
+          endDate: selectedProject.endDate,
+          allocationPercent: 100,
+          requiredSkills: recommendation.metadata?.requiredSkills ?? [],
+          additionalNeeds: 'Auto-assigned from GM recommendation apply action.',
+        });
+
+        const refreshedTeam = await fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id);
+        const refreshedNames = refreshedTeam.map((member) => member.fullName);
+
+        setProjects((prev) =>
+          prev.map((project) =>
+            project.id === selectedProject.id
+              ? {
+                ...project,
+                assignedResources: refreshedNames,
+              }
+              : project
+          )
+        );
+
+        setSelectedProject((prev) =>
+          prev && prev.id === selectedProject.id
+            ? {
+              ...prev,
+              assignedResources: refreshedNames,
+            }
+            : prev
+        );
+      }
+
       await submitGeneralManagerRecommendationResponse({
         projectId: selectedProject.id,
         recommendationId: recommendation.id,
@@ -328,7 +384,10 @@ export function DecisionPanel() {
       addToast({
         type: 'success',
         title: 'Recommendation Applied',
-        message: `${recommendation.title} has been submitted to backend successfully.`,
+        message:
+          recommendation.type === 'add-resource'
+            ? `${recommendation.title} was auto-assigned and submitted to backend successfully.`
+            : `${recommendation.title} has been submitted to backend successfully.`,
       });
 
       return true;

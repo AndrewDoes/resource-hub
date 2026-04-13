@@ -171,6 +171,11 @@ const asNumber = (value: unknown, fallback: number): number => {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 };
 
+const normalizeDateOnlyString = (value: string): string => {
+  const match = value.match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : value;
+};
+
 const withQuery = (path: string, params: Record<string, string | undefined>): string => {
   const searchParams = new URLSearchParams();
 
@@ -486,8 +491,8 @@ export async function createProjectManagerChangeRequest(
       employeeId: input.employeeId ?? '00000000-0000-0000-0000-000000000000',
       assignedByUserId: input.assignedByUserId,
       roleName: input.roleName,
-      startDate: input.startDate,
-      endDate: input.endDate,
+      startDate: normalizeDateOnlyString(input.startDate),
+      endDate: normalizeDateOnlyString(input.endDate),
       allocationPercent: input.allocationPercent,
       requiredSkills: input.requiredSkills,
       additionalNeeds: input.additionalNeeds ?? '',

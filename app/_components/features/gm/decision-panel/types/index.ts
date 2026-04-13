@@ -24,6 +24,11 @@ export interface AIRecommendation {
   };
   confidence: number;
   reasoning: string;
+  metadata?: {
+    employeeId?: string;
+    roleName?: string;
+    requiredSkills?: string[];
+  };
 }
 
 export interface ContractDecision {

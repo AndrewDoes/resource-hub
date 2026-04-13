@@ -1,40 +1,219 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { ProjectData, AIRecommendation } from '../types';
-import { generateRecommendations } from '../utils';
 import { ProjectContext } from './ProjectContext';
 import { AIRecommendationSection } from './AIRecommendationSection';
 import { useFeedbackToast } from '@/app/context/ToastContext';
+import {
+  fetchGeneralManagerProjectPrediction,
+  submitGeneralManagerRecommendationResponse,
+  type GeneralManagerProjectPrediction,
+} from '@/functions/api/generalManager';
+import { createProjectManagerChangeRequest } from '@/functions/api/projectManager';
 
 interface AIDecisionPanelProps {
   selectedProject: ProjectData | null;
 }
 
+const defaultDecisionActorUserId =
+  process.env.NEXT_PUBLIC_GM_USER_ID ??
+  process.env.NEXT_PUBLIC_PM_USER_ID ??
+  '11111111-1111-1111-1111-111111111111';
+
 export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
   const { addToast } = useFeedbackToast();
+  const [prediction, setPrediction] = useState<GeneralManagerProjectPrediction | null>(null);
 
-  const handleApplyRecommendation = async (recommendation: AIRecommendation) => {
-    addToast({
-      type: 'success',
-      title: 'Recommendation Applied',
-      message: `${recommendation.title} has been applied to the project plan`,
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPrediction = async () => {
+      if (!selectedProject) {
+        setPrediction(null);
+        return;
+      }
+
+      try {
+        const result = await fetchGeneralManagerProjectPrediction(selectedProject.id, 5);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setPrediction(result);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setPrediction(null);
+      }
+    };
+
+    void loadPrediction();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedProject?.id]);
+
+  const recommendations = useMemo(() => {
+    if (!prediction) {
+      return [] as AIRecommendation[];
+    }
+
+    const items: AIRecommendation[] = [];
+
+    if (prediction.staffingRiskScore >= 40) {
+      items.push({
+        id: 'risk-review',
+        type: 'adjust-timeline',
+        title: 'Review staffing risk',
+        description: `Overall staffing risk is ${prediction.staffingRiskScore}%, so this project needs closer planning.`,
+        impact: {
+          time: 'Review needed',
+          risk: prediction.staffingRiskScore >= 65 ? 'High to Medium' : 'Medium to Low',
+        },
+        confidence: Math.min(95, Math.max(60, Math.round(prediction.overallCoverageScore))),
+        reasoning: `Backend prediction shows ${prediction.overallCoverageScore}% coverage across ${prediction.requiredResourceCount} required resources.`,
+      });
+    }
+
+    prediction.requirements.forEach((requirement, index) => {
+      const topCandidate = requirement.recommendedCandidates[0];
+
+      if (!topCandidate) {
+        return;
+      }
+
+      items.push({
+        id: `candidate-${requirement.requirementId}-${index}`,
+        type: 'add-resource',
+        title: `Assign ${topCandidate.fullName} to ${requirement.roleName}`,
+        description: `${topCandidate.fullName} is the top fit for ${requirement.roleName} with a ${topCandidate.fitScore}% score.`,
+        impact: {
+          workload: `${Math.max(0, Math.round(topCandidate.capacityScore / 2))}%`,
+          risk: prediction.staffingRiskScore >= 65 ? 'High to Medium' : 'Medium to Low',
+        },
+        confidence: Math.min(99, Math.max(50, Math.round(topCandidate.fitScore))),
+        reasoning: topCandidate.reason,
+        metadata: {
+          employeeId: topCandidate.employeeId,
+          roleName: requirement.roleName,
+          requiredSkills: requirement.requiredSkills,
+        },
+      });
     });
 
-    return true;
+    return items;
+  }, [prediction]);
+
+  const handleApplyRecommendation = async (recommendation: AIRecommendation) => {
+    if (!selectedProject) {
+      addToast({
+        type: 'error',
+        title: 'No Project Selected',
+        message: 'Select a project before applying a recommendation.',
+      });
+      return false;
+    }
+
+    try {
+      if (recommendation.type === 'add-resource') {
+        const employeeId = recommendation.metadata?.employeeId;
+        const roleName = recommendation.metadata?.roleName;
+
+        if (!employeeId || !roleName) {
+          addToast({
+            type: 'error',
+            title: 'Assignment Data Missing',
+            message: 'This recommendation does not include enough data for auto-assignment.',
+          });
+          return false;
+        }
+
+        await createProjectManagerChangeRequest({
+          projectId: selectedProject.id,
+          employeeId,
+          assignedByUserId: defaultDecisionActorUserId,
+          roleName,
+          startDate: selectedProject.startDate,
+          endDate: selectedProject.endDate,
+          allocationPercent: 100,
+          requiredSkills: recommendation.metadata?.requiredSkills ?? [],
+          additionalNeeds: 'Auto-assigned from GM planning recommendation apply action.',
+        });
+      }
+
+      await submitGeneralManagerRecommendationResponse({
+        projectId: selectedProject.id,
+        recommendationId: recommendation.id,
+        recommendationType: recommendation.type,
+        title: recommendation.title,
+        details: recommendation.reasoning,
+        action: 'Applied',
+      });
+
+      addToast({
+        type: 'success',
+        title: 'Recommendation Applied',
+        message:
+          recommendation.type === 'add-resource'
+            ? `${recommendation.title} was auto-assigned and submitted to backend successfully.`
+            : `${recommendation.title} has been submitted to backend successfully.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Apply Failed',
+        message: 'Unable to send apply action to backend. Please try again.',
+      });
+
+      return false;
+    }
   };
 
   const handleRejectRecommendation = async (recommendation: AIRecommendation) => {
-    addToast({
-      type: 'info',
-      title: 'Recommendation Rejected',
-      message: `${recommendation.title} was not applied`,
-    });
+    if (!selectedProject) {
+      addToast({
+        type: 'error',
+        title: 'No Project Selected',
+        message: 'Select a project before rejecting a recommendation.',
+      });
+      return false;
+    }
 
-    return true;
+    try {
+      await submitGeneralManagerRecommendationResponse({
+        projectId: selectedProject.id,
+        recommendationId: recommendation.id,
+        recommendationType: recommendation.type,
+        title: recommendation.title,
+        details: recommendation.reasoning,
+        action: 'Rejected',
+      });
+
+      addToast({
+        type: 'info',
+        title: 'Recommendation Rejected',
+        message: `${recommendation.title} has been submitted as rejected to backend.`,
+      });
+
+      return true;
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Reject Failed',
+        message: 'Unable to send reject action to backend. Please try again.',
+      });
+
+      return false;
+    }
   };
-
-  const recommendations = selectedProject ? generateRecommendations(selectedProject) : [];
 
   if (!selectedProject) {
     return (

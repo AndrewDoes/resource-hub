@@ -459,7 +459,14 @@ export async function fetchGeneralManagerPendingAssignmentRequests(): Promise<Ge
   }
 
   const payload: unknown = await response.json();
-  return normalizeAssignmentRequests(payload);
+  const requests = normalizeAssignmentRequests(payload);
+
+  return requests.filter((request) => {
+    const markerSource = `${request.conflictWarning} ${request.requestedByName}`.toLowerCase();
+
+    // Hide GM auto-assignment artifacts from the PM-focused pending request list.
+    return !markerSource.includes('auto-assigned from gm');
+  });
 }
 
 export async function updateGeneralManagerAssignmentRequestStatus(
