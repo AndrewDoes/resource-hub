@@ -3,25 +3,28 @@
 import { 
   FileText, 
   Clock, 
-  XCircle, 
-  ArrowRight 
+  XCircle 
 } from 'lucide-react';
 import Link from 'next/link';
 // import { marketingProjects } from '@/app/_components/features/common/dashboard/data';
 import { ProjectStatus } from '@/app/types';
 import React, { useState, useEffect } from 'react';
 import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
+import { ProjectList } from '@/app/_components/features/marketing/project-revision/ProjectList';
 
 
 export function MarketingDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchProjects = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch('/api/gateway/api/projects/list', {
+        const response = await fetch(`/api/gateway/api/projects/list?pageNumber=${currentPage}&pageSize=5`, {
           headers: {
             'X-Debug-Role': 'marketing',
             'X-Debug-User': 'marketing-user'
@@ -43,6 +46,7 @@ export function MarketingDashboard() {
         }));
         
         setProjects(mappedProjects);
+        setTotalPages(data.totalPages || 1);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -51,7 +55,7 @@ export function MarketingDashboard() {
     };
 
     fetchProjects();
-  }, []);
+  }, [currentPage]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -106,33 +110,15 @@ export function MarketingDashboard() {
       </div>
 
       {/* My Projects */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">My Projects</h2>
-        </div>
-        <div className="p-6 space-y-3">
-          {!isLoading && projects.length === 0 && !error && (
-            <p className="text-sm text-gray-500 text-center py-4">No projects found.</p>
-          )}
-          {projects.map((project) => (
-            <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="font-semibold text-gray-900">{project.name}</h3>
-                  <StatusBadge status={project.status} />
-                </div>
-                <p className="text-sm text-gray-500">Last modified: {project.lastModified}</p>
-                {project.feedback && (
-                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                    <span className="font-medium">Feedback:</span> {project.feedback}
-                  </div>
-                )}
-              </div>
-              <ArrowRight className="w-5 h-5 text-gray-400" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <ProjectList 
+        projects={projects} 
+        isLoading={isLoading} 
+        error={error} 
+        title="My Projects"
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 }
