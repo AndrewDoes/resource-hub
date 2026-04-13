@@ -4,6 +4,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 export type UserRole = 'marketing' | 'pm' | 'gm' | 'hr' | 'employee';
 
 interface User {
+  id: string;
   name: string;
   role: UserRole;
   avatar: string;
@@ -18,6 +19,7 @@ interface RoleContextType {
 const STORAGE_KEY = 'resource-planning-user';
 
 const DEFAULT_USER: User = {
+  id: 'gm-1',
   name: 'John Doe',
   role: 'gm',
   avatar: 'JD',

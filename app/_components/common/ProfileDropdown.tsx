@@ -25,35 +25,41 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
 
   const roleUserData = {
     marketing: {
+      id: "58032228-86c3-4dce-b591-ca24c1f7a9e1",
       name: "Sarah Martinez",
       email: "sarah.martinez@company.com",
       avatar: "SM",
     },
     pm: {
-      name: "Alex Johnson",
-      email: "alex.johnson@company.com",
-      avatar: "AJ",
+      id: "11111111-1111-1111-1111-111111111111",
+      name: "Peter PM",
+      email: "pm.demo@accelist.local",
+      avatar: "PP",
     },
     gm: {
+      id: "gm-1",
       name: "John Doe",
       email: "john.doe@company.com",
       avatar: "JD",
     },
     hr: {
+      id: "hr-1",
       name: "Emily Chen",
       email: "emily.chen@company.com",
       avatar: "EC",
     },
     employee: {
-      name: "David Lee",
-      email: "david.lee@company.com",
-      avatar: "DL",
+      id: "91da3fc8-1f9b-4b19-92f9-ba35d6d64a9b",
+      name: "Diana Design",
+      email: "designer.demo@accelist.local",
+      avatar: "DD",
     },
   };
 
   const handleRoleSwitch = (role: UserRole) => {
     const userData = roleUserData[role];
     setCurrentUser({
+      id: userData.id,
       name: userData.name,
       role,
       avatar: userData.avatar,
@@ -111,19 +117,17 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
                 <button
                   key={role}
                   onClick={() => handleRoleSwitch(role)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${
-                    isActive
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${isActive
                       ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
                       : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        isActive
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isActive
                           ? "bg-white/20 backdrop-blur"
                           : `bg-linear-to-br ${roleConfig[role].color}`
-                      }`}
+                        }`}
                     >
                       <span
                         className={`text-xs font-medium ${isActive ? "text-white" : "text-white"}`}

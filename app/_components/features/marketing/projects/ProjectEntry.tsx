@@ -40,7 +40,7 @@ export function ProjectEntry() {
   const [showRejectedProjects, setShowRejectedProjects] = useState(false);
   const [allSkillItems, setAllSkillItems] = useState<SkillItem[]>([]);
   const [skillCategories, setSkillCategories] = useState<Record<string, SkillItem[]>>({});
-  
+
   const [resourceRequirements, setResourceRequirements] = useState<
     ResourceRequirement[]
   >([
@@ -97,22 +97,22 @@ export function ProjectEntry() {
   const suggestedEmployees: SuggestedEmployee[] =
     selectedSkills.length > 0
       ? [
-          {
-            name: "Agus Pratama",
-            skills: ["Critical Thinking", "Leadership", "Project Management"],
-            match: 85,
-          },
-          {
-            name: "Budi Santoso",
-            skills: ["Node.js", "API Development", "Backend"],
-            match: 92,
-          },
-          {
-            name: "Sarah Chen",
-            skills: ["React", "UI/UX Design", "Frontend"],
-            match: 88,
-          },
-        ]
+        {
+          name: "Agus Pratama",
+          skills: ["Critical Thinking", "Leadership", "Project Management"],
+          match: 85,
+        },
+        {
+          name: "Budi Santoso",
+          skills: ["Node.js", "API Development", "Backend"],
+          match: 92,
+        },
+        {
+          name: "Sarah Chen",
+          skills: ["React", "UI/UX Design", "Frontend"],
+          match: 88,
+        },
+      ]
       : [];
 
   useEffect(() => {
@@ -274,10 +274,10 @@ export function ProjectEntry() {
           <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Project Basic Info */}
-              <ProjectBasicInfo 
-                totalResources={totalResources} 
-                formData={formData} 
-                onFormDataChange={handleFormDataChange} 
+              <ProjectBasicInfo
+                totalResources={totalResources}
+                formData={formData}
+                onFormDataChange={handleFormDataChange}
               />
 
               {/* Required Skills */}

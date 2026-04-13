@@ -28,6 +28,7 @@ export const BackendApiUrl = {
   updateAssignment: `${baseUrl}/api/Assignments/update`,
   reassignAssignment: `${baseUrl}/api/Assignments/reassign`,
   updateAssignmentStatus: `${baseUrl}/api/Assignments/update-status`,
+  employeeDashboard: (employeeId: string) => `${baseUrl}/api/Assignments/employee-dashboard/${employeeId}`,
   hrDashboardSummary: `${baseUrl}/api/human-resource/dashboard-summary`,
   executeDecision: `${baseUrl}/api/human-resource/execute-decision`,
   executeContract: `${baseUrl}/api/human-resource/execute-contract`,

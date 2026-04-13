@@ -48,7 +48,6 @@ const allMenuItems: MenuItem[] = [
   { path: '/hr/hiring', label: 'Hiring Management', icon: Briefcase, roles: ['hr'] },
   { path: '/hr/employee-management', label: 'Employee Management', icon: Users, roles: ['hr'] },
   { path: '/employee/my-projects', label: 'My Projects', icon: Briefcase, roles: ['employee'] },
-  { path: '/employee/employee', label: 'My Profile', icon: User, roles: ['employee'] },
   { path: '/gm/resource-overview', label: 'Resource Overview', icon: Users, roles: ['gm'] },
 
   { path: '/common/reports', label: 'Reports', icon: BarChart3, roles: ['gm', 'hr'] },
@@ -138,7 +137,7 @@ const initialNotifications: Notification[] = [
     id: '4',
     type: 'alert',
     title: 'Resource Overload',
-    message: 'David Lee is allocated at 110% - immediate action required',
+    message: 'Diana Design is allocated at 110% - immediate action required',
     timestamp: '3 hours ago',
     read: true,
     navigationTarget: '/gm/planning',
