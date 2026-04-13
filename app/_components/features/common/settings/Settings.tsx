@@ -10,12 +10,13 @@ import { PreferencesSection } from "./components/PreferencesSection";
 import { AccessControlSection } from "./components/AccessControlSection";
 
 import { useRole } from "@/app/context/RoleContext";
-import { useRouter } from "next/navigation";
-import { UserRole } from "@/app/types";
+// OLD: No longer needed after removing role switching from Settings.
+// import { useRouter } from "next/navigation";
+// import { UserRole } from "@/app/types";
 
 export function Settings() {
   const { currentUser, setCurrentUser } = useRole();
-  const router = useRouter();
+  // const router = useRouter(); // OLD: removed with role switching
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [systemAlerts, setSystemAlerts] = useState(true);
@@ -41,13 +42,14 @@ export function Settings() {
     "idle",
   );
 
-  const roleDefaultPages: Record<UserRole, string> = {
-    marketing: "/marketing/projects",
-    pm: "/pm/project-overview",
-    gm: "/gm/planning",
-    hr: "/hr/hr-validation",
-    employee: "/employee/my-projects",
-  };
+  // OLD: Only used by handleRoleSwitch, which has been removed.
+  // const roleDefaultPages: Record<UserRole, string> = {
+  //   marketing: "/marketing/projects",
+  //   pm: "/pm/project-overview",
+  //   gm: "/gm/planning",
+  //   hr: "/hr/hr-validation",
+  //   employee: "/employee/my-projects",
+  // };
 
   // Previous mock data (does not match seeded DB data)
   // const roleUserData = {
@@ -146,18 +148,19 @@ export function Settings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only fetch once on mount
 
-  const handleRoleSwitch = (role: string) => {
-    const userRole = role as UserRole;
-    const userData = roleUserData[userRole];
-    setCurrentUser({
-      name: userData.name,
-      role: userRole,
-      avatar: userData.avatar,
-      email: userData.email,
-    });
-    // Instantly take them to their main functionality
-    router.push(roleDefaultPages[userRole]);
-  };
+  // OLD: Role switching from Settings has been removed.
+  // const handleRoleSwitch = (role: string) => {
+  //   const userRole = role as UserRole;
+  //   const userData = roleUserData[userRole];
+  //   setCurrentUser({
+  //     name: userData.name,
+  //     role: userRole,
+  //     avatar: userData.avatar,
+  //     email: userData.email,
+  //   });
+  //   // Instantly take them to their main functionality
+  //   router.push(roleDefaultPages[userRole]);
+  // };
 
   const handleSave = async () => {
     console.log("Current user name: ", currentUser.name);
@@ -265,17 +268,17 @@ export function Settings() {
       />
 
       {/* System Preferences */}
-      <PreferencesSection
+      {/* <PreferencesSection
         theme={theme}
         setTheme={setTheme}
         language={language}
         setLanguage={setLanguage}
-      />
+      /> */}
 
       {/* Access Control */}
       <AccessControlSection
         selectedRole={currentUser.role}
-        setSelectedRole={handleRoleSwitch}
+        // setSelectedRole={handleRoleSwitch} // OLD: removed
       />
 
       {/* Sticky Save Button - Mobile */}
