@@ -91,7 +91,7 @@ export function ResourceStats({ stats }: ResourceStatsProps) {
                 Resource Overload Warning
               </h3>
               <p className="text-sm text-red-700">
-                {stats.overloaded} resource(s) are over-allocated (workload &gt; 100%). Consider
+                {stats.overloaded}{' '}resource(s) are over-allocated (workload &gt; 100%). Consider
                 adjusting project timelines or reallocating resources. Contact HR for resource
                 reallocation.
               </p>

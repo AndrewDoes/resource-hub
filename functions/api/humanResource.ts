@@ -7,6 +7,7 @@ export interface HREmployeeListItem {
   email: string;
   jobTitle: string;
   department: string | null;
+  skills: string[];
   availabilityPercent: number;
   workloadPercent: number;
   phone: string;
@@ -22,6 +23,12 @@ export interface DepartmentLookup {
 
 interface GetEmployeeListResponse {
   employees?: unknown;
+  items?: unknown;
+  data?: unknown;
+}
+
+interface GetEmployeeAssignmentsResponse {
+  assignments?: unknown;
   items?: unknown;
   data?: unknown;
 }
@@ -66,6 +73,13 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
 
   return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
+    const skillSource =
+      record.skills ??
+      record.Skills ??
+      record.skillNames ??
+      record.SkillNames ??
+      record.employeeSkills ??
+      record.EmployeeSkills;
 
     return {
       id: asString(record.id, String(index + 1)),
@@ -73,6 +87,7 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       email: asString(record.email, "N/A"),
       jobTitle: asString(record.jobTitle ?? record.job_title, "Unknown Role"),
       department: typeof record.department === "string" ? record.department : null,
+      skills: Array.isArray(skillSource) ? skillSource.map((skill) => String(skill)).filter((skill) => skill.trim().length > 0) : [],
       availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 100),
       workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
       assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
@@ -108,7 +123,7 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     phone: apiItem.phone,
     location: "", // Not in list API
     department: apiItem.department ?? "General",
-    skills: [], // Not in list API yet
+    skills: apiItem.skills,
     status: apiItem.status.toLowerCase() === "active" ? "active" : "inactive",
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,
@@ -223,8 +238,79 @@ export interface HRAssignmentRequestItem {
   requestedByName: string;
 }
 
+interface EmployeeAssignmentListItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  status: string;
+  projectStatus: string;
+  allocationPercent: number;
+}
+
+const normalizeEmployeeAssignments = (payload: unknown): EmployeeAssignmentListItem[] => {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.assignments)
+      ? (payload as GetEmployeeAssignmentsResponse).assignments
+      : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.items)
+        ? (payload as GetEmployeeAssignmentsResponse).items
+        : Array.isArray((payload as GetEmployeeAssignmentsResponse | null)?.data)
+          ? (payload as GetEmployeeAssignmentsResponse).data
+          : [];
+
+  return (source as any[]).map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id, String(index + 1)),
+      projectId: asString(record.projectId, ""),
+      projectName: asString(record.projectName, "Untitled Project"),
+      status: asString(record.status, "Pending"),
+      projectStatus: asString(record.projectStatus ?? record.project_status, ""),
+      allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
+    };
+  });
+};
+
+export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): Promise<Record<string, string[]>> {
+  const activeStatuses = new Set(["pending", "approved", "accepted", "inprogress", "in-progress"]);
+  const finishedProjectStatuses = new Set(["completed", "cancelled"]);
+
+  const entries = await Promise.all(
+    employeeIds.map(async (employeeId) => {
+      try {
+        const response = await fetch(`${BackendApiUrl.employees}/${employeeId}/assignments?pageNumber=1&pageSize=100`);
+
+        if (!response.ok) {
+          return [employeeId, [] as string[]] as const;
+        }
+
+        const payload: unknown = await response.json();
+        const assignments = normalizeEmployeeAssignments(payload);
+
+        const currentProjects = Array.from(
+          new Set(
+            assignments
+              .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
+              .filter((assignment) => !finishedProjectStatuses.has(assignment.projectStatus.trim().toLowerCase()))
+              .filter((assignment) => assignment.allocationPercent > 0)
+              .map((assignment) => assignment.projectName)
+              .filter((name) => name.trim().length > 0)
+          )
+        );
+
+        return [employeeId, currentProjects] as const;
+      } catch {
+        return [employeeId, [] as string[]] as const;
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
+}
+
 export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestItem[]> {
-  const url = `${BackendApiUrl.assignmentsList}?status=Pending`;
+  const url = `${BackendApiUrl.assignmentsList}?status=Approved`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -249,7 +335,7 @@ export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestIt
   }));
 }
 
-export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected'): Promise<boolean> {
+export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected' | 'Accepted'): Promise<boolean> {
   const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

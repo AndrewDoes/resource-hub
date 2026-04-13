@@ -5,8 +5,8 @@ import { ResourceConflict, SystemSuggestion } from '../types';
 
 interface SystemAlertProps {
   conflict: ResourceConflict;
-  onViewDetails: () => void;
-  onApplySuggestion: (suggestion: SystemSuggestion) => void;
+  onViewDetails: (conflict: ResourceConflict) => void;
+  onApplySuggestion: (conflict: ResourceConflict, suggestion: SystemSuggestion) => void;
 }
 
 export function SystemAlert({ conflict, onViewDetails, onApplySuggestion }: SystemAlertProps) {
@@ -81,7 +81,7 @@ export function SystemAlert({ conflict, onViewDetails, onApplySuggestion }: Syst
                       )}
                     </div>
                     <button
-                      onClick={() => onApplySuggestion(suggestion)}
+                      onClick={() => onApplySuggestion(conflict, suggestion)}
                       className="ml-3 px-3 py-1.5 bg-white/90 hover:bg-white rounded-lg text-xs font-medium transition-colors"
                     >
                       Apply
@@ -93,7 +93,7 @@ export function SystemAlert({ conflict, onViewDetails, onApplySuggestion }: Syst
           )}
 
           <button
-            onClick={onViewDetails}
+            onClick={() => onViewDetails(conflict)}
             className="mt-3 text-xs font-medium underline hover:no-underline"
           >
             View Full Details

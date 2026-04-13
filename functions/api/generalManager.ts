@@ -88,6 +88,36 @@ export interface GeneralManagerDecision {
   status: string;
 }
 
+export interface GeneralManagerRecommendationResponseRequest {
+  projectId: string;
+  recommendationId: string;
+  recommendationType: string;
+  title: string;
+  details: string;
+  action: "Applied" | "Rejected";
+}
+
+export interface GeneralManagerRecommendationResponse {
+  decisionId: string;
+  status: string;
+  action: string;
+}
+
+export interface GeneralManagerAssignmentRequest {
+  id: string;
+  projectId: string;
+  projectName: string;
+  employeeId: string;
+  employeeName: string;
+  roleName: string;
+  status: string;
+  allocationPercent: number;
+  startDate: string;
+  endDate: string;
+  requestedByName: string;
+  conflictWarning: string;
+}
+
 interface GeneralManagerWorkforceSummaryResponse {
   totalEmployeeCount?: unknown;
   activeEmployeeCount?: unknown;
@@ -96,6 +126,7 @@ interface GeneralManagerWorkforceSummaryResponse {
   overloadedEmployeeCount?: unknown;
   topSkills?: unknown;
   data?: unknown;
+  Data?: unknown;
 }
 
 interface GeneralManagerProjectPredictionResponse {
@@ -111,6 +142,16 @@ interface GeneralManagerProjectPredictionResponse {
 
 interface GeneralManagerContractDecisionResponse {
   decisions?: unknown;
+  Decisions?: unknown;
+  data?: unknown;
+  Data?: unknown;
+}
+
+interface GeneralManagerAssignmentListResponse {
+  assignments?: unknown;
+  Assignments?: unknown;
+  data?: unknown;
+  Data?: unknown;
 }
 
 const asNumber = (value: unknown, fallback: number): number => {
@@ -143,26 +184,29 @@ const normalizeTopSkills = (value: unknown): GeneralManagerWorkforceSummary["top
     const record = item as Record<string, unknown>;
 
     return {
-      skillId: asString(record.skillId ?? record.skill_id, String(index + 1)),
-      skillName: asString(record.skillName ?? record.skill_name, "Unknown skill"),
-      category: asString(record.category, "General"),
-      employeeCount: asNumber(record.employeeCount ?? record.employee_count, 0),
-      coveragePercent: asNumber(record.coveragePercent ?? record.coverage_percent, 0),
+      skillId: asString(record.skillId ?? record.SkillId ?? record.skill_id, String(index + 1)),
+      skillName: asString(record.skillName ?? record.SkillName ?? record.skill_name, "Unknown skill"),
+      category: asString(record.category ?? record.Category, "General"),
+      employeeCount: asNumber(record.employeeCount ?? record.EmployeeCount ?? record.employee_count, 0),
+      coveragePercent: asNumber(record.coveragePercent ?? record.CoveragePercent ?? record.coverage_percent, 0),
     };
   });
 };
 
 const normalizeWorkforceSummary = (payload: unknown): GeneralManagerWorkforceSummary => {
-  const source = (payload as GeneralManagerWorkforceSummaryResponse | null)?.data ?? payload;
+  const source =
+    (payload as GeneralManagerWorkforceSummaryResponse | null)?.data ??
+    (payload as GeneralManagerWorkforceSummaryResponse | null)?.Data ??
+    payload;
   const record = source as Record<string, unknown>;
 
   return {
-    totalEmployeeCount: asNumber(record.totalEmployeeCount, 0),
-    activeEmployeeCount: asNumber(record.activeEmployeeCount, 0),
-    averageAvailabilityPercent: asNumber(record.averageAvailabilityPercent, 0),
-    averageWorkloadPercent: asNumber(record.averageWorkloadPercent, 0),
-    overloadedEmployeeCount: asNumber(record.overloadedEmployeeCount, 0),
-    topSkills: normalizeTopSkills(record.topSkills),
+    totalEmployeeCount: asNumber(record.totalEmployeeCount ?? record.TotalEmployeeCount, 0),
+    activeEmployeeCount: asNumber(record.activeEmployeeCount ?? record.ActiveEmployeeCount, 0),
+    averageAvailabilityPercent: asNumber(record.averageAvailabilityPercent ?? record.AverageAvailabilityPercent, 0),
+    averageWorkloadPercent: asNumber(record.averageWorkloadPercent ?? record.AverageWorkloadPercent, 0),
+    overloadedEmployeeCount: asNumber(record.overloadedEmployeeCount ?? record.OverloadedEmployeeCount, 0),
+    topSkills: normalizeTopSkills(record.topSkills ?? record.TopSkills),
   };
 };
 
@@ -232,30 +276,71 @@ const normalizeProjectPrediction = (payload: unknown): GeneralManagerProjectPred
 };
 
 const normalizeContractDecisions = (payload: unknown): GeneralManagerContractDecision[] => {
-  const source = (payload as GeneralManagerContractDecisionResponse | null)?.data ?? payload;
+  const source =
+    (payload as GeneralManagerContractDecisionResponse | null)?.data ??
+    (payload as GeneralManagerContractDecisionResponse | null)?.Data ??
+    payload;
   const record = source as Record<string, unknown>;
-  const decisions = Array.isArray(record.decisions) ? record.decisions : [];
+  const decisions = Array.isArray(record.decisions)
+    ? record.decisions
+    : Array.isArray(record.Decisions)
+      ? record.Decisions
+      : [];
 
   return decisions.map((item, index) => {
     const decision = item as Record<string, unknown>;
 
     return {
-      rowId: `${asString(decision.decisionId ?? decision.decision_id, String(index + 1))}-${asString(decision.employeeId ?? decision.employee_id, String(index + 1))}`,
-      decisionId: asString(decision.decisionId ?? decision.decision_id, String(index + 1)),
-      employeeId: asString(decision.employeeId ?? decision.employee_id, String(index + 1)),
-      employeeName: asString(decision.employeeName ?? decision.employee_name, "Unknown Employee"),
-      employeeAvatar: asString(decision.employeeAvatar ?? decision.employee_avatar, "U"),
-      jobTitle: asString(decision.jobTitle ?? decision.job_title, "Unknown role"),
+      rowId: `${asString(decision.decisionId ?? decision.DecisionId ?? decision.decision_id, String(index + 1))}-${asString(decision.employeeId ?? decision.EmployeeId ?? decision.employee_id, String(index + 1))}`,
+      decisionId: asString(decision.decisionId ?? decision.DecisionId ?? decision.decision_id, String(index + 1)),
+      employeeId: asString(decision.employeeId ?? decision.EmployeeId ?? decision.employee_id, String(index + 1)),
+      employeeName: asString(decision.employeeName ?? decision.EmployeeName ?? decision.employee_name, "Unknown Employee"),
+      employeeAvatar: asString(decision.employeeAvatar ?? decision.EmployeeAvatar ?? decision.employee_avatar, "U"),
+      jobTitle: asString(decision.jobTitle ?? decision.JobTitle ?? decision.job_title, "Unknown role"),
       contractEndDate: typeof decision.contractEndDate === "string"
         ? decision.contractEndDate
-        : typeof decision.contract_end_date === "string"
-          ? decision.contract_end_date
-          : null,
-      availabilityPercent: asNumber(decision.availabilityPercent ?? decision.availability_percent, 0),
-      workloadPercent: asNumber(decision.workloadPercent ?? decision.workload_percent, 0),
-      activeAssignmentCount: asNumber(decision.activeAssignmentCount ?? decision.active_assignment_count, 0),
-      decisionType: asString(decision.decisionType ?? decision.decision_type, "Unknown"),
-      decisionStatus: asString(decision.decisionStatus ?? decision.decision_status, "Pending"),
+        : typeof decision.ContractEndDate === "string"
+          ? decision.ContractEndDate
+          : typeof decision.contract_end_date === "string"
+            ? decision.contract_end_date
+            : null,
+      availabilityPercent: asNumber(decision.availabilityPercent ?? decision.AvailabilityPercent ?? decision.availability_percent, 0),
+      workloadPercent: asNumber(decision.workloadPercent ?? decision.WorkloadPercent ?? decision.workload_percent, 0),
+      activeAssignmentCount: asNumber(decision.activeAssignmentCount ?? decision.ActiveAssignmentCount ?? decision.active_assignment_count, 0),
+      decisionType: asString(decision.decisionType ?? decision.DecisionType ?? decision.decision_type, "Unknown"),
+      decisionStatus: asString(decision.decisionStatus ?? decision.DecisionStatus ?? decision.decision_status, "Pending"),
+    };
+  });
+};
+
+const normalizeAssignmentRequests = (payload: unknown): GeneralManagerAssignmentRequest[] => {
+  const source =
+    (payload as GeneralManagerAssignmentListResponse | null)?.assignments ??
+    (payload as GeneralManagerAssignmentListResponse | null)?.Assignments ??
+    (payload as GeneralManagerAssignmentListResponse | null)?.data ??
+    (payload as GeneralManagerAssignmentListResponse | null)?.Data ??
+    [];
+
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source.map((item, index) => {
+    const record = item as Record<string, unknown>;
+
+    return {
+      id: asString(record.id ?? record.Id, String(index + 1)),
+      projectId: asString(record.projectId ?? record.ProjectId, ''),
+      projectName: asString(record.projectName ?? record.ProjectName, 'Untitled Project'),
+      employeeId: asString(record.employeeId ?? record.EmployeeId, ''),
+      employeeName: asString(record.employeeName ?? record.EmployeeName, 'Unassigned'),
+      roleName: asString(record.roleName ?? record.RoleName, 'Resource'),
+      status: asString(record.status ?? record.Status, 'Pending'),
+      allocationPercent: asNumber(record.allocationPercent ?? record.AllocationPercent, 0),
+      startDate: asString(record.startDate ?? record.StartDate, ''),
+      endDate: asString(record.endDate ?? record.EndDate, ''),
+      requestedByName: asString(record.requestedByName ?? record.RequestedByName, 'Project Manager'),
+      conflictWarning: asString(record.conflictWarning ?? record.ConflictWarning, ''),
     };
   });
 };
@@ -301,24 +386,29 @@ export async function fetchGeneralManagerContractDecisions(): Promise<GeneralMan
  * Normalizes the raw API response for general decisions into the frontend interface.
  */
 const normalizeDecisions = (payload: unknown): GeneralManagerDecision[] => {
-  const source = (payload as { decisions?: unknown } | null)?.decisions ?? payload;
+  const wrapper = payload as { decisions?: unknown; Decisions?: unknown; data?: unknown; Data?: unknown } | null;
+  const source = wrapper?.decisions ?? wrapper?.Decisions ?? wrapper?.data ?? wrapper?.Data ?? payload;
   const decisions = Array.isArray(source) ? source : [];
 
   return decisions.map((item, index) => {
     const record = item as Record<string, unknown>;
 
     return {
-      id: asString(record.id, String(index + 1)),
-      type: asString(record.type, "Unknown"),
-      title: asString(record.title, "Untitled Decision"),
-      details: asString(record.details, ""),
-      projectName: asString(record.projectName ?? record.project_name, "General"),
-      affectedEmployees: Array.isArray(record.affectedEmployees ?? record.affected_employees)
-        ? (record.affectedEmployees ?? record.affected_employees) as string[]
+      id: asString(record.id ?? record.Id, String(index + 1)),
+      type: asString(record.type ?? record.Type, "Unknown"),
+      title: asString(record.title ?? record.Title, "Untitled Decision"),
+      details: asString(record.details ?? record.Details, ""),
+      projectName: asString(record.projectName ?? record.ProjectName ?? record.project_name, "General"),
+      affectedEmployees: Array.isArray(record.affectedEmployees ?? record.AffectedEmployees ?? record.affected_employees)
+        ? (record.affectedEmployees ?? record.AffectedEmployees ?? record.affected_employees) as string[]
         : [],
-      deadline: typeof record.deadline === "string" ? record.deadline : null,
-      submittedAt: asString(record.submittedAt ?? record.submitted_at, new Date().toISOString()),
-      status: asString(record.status, "Pending"),
+      deadline: typeof record.deadline === "string"
+        ? record.deadline
+        : typeof record.Deadline === "string"
+          ? record.Deadline
+          : null,
+      submittedAt: asString(record.submittedAt ?? record.SubmittedAt ?? record.submitted_at, new Date().toISOString()),
+      status: asString(record.status ?? record.Status, "Pending"),
     };
   });
 };
@@ -335,6 +425,63 @@ export async function fetchGeneralManagerDecisions(): Promise<GeneralManagerDeci
 
   const payload: unknown = await response.json();
   return normalizeDecisions(payload);
+}
+
+export async function submitGeneralManagerRecommendationResponse(
+  request: GeneralManagerRecommendationResponseRequest
+): Promise<GeneralManagerRecommendationResponse> {
+  const response = await fetch(BackendApiUrl.generalManagerRecommendationResponse, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update recommendation response (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    decisionId: asString(payload.decisionId ?? payload.DecisionId, ""),
+    status: asString(payload.status ?? payload.Status, ""),
+    action: asString(payload.action ?? payload.Action, ""),
+  };
+}
+
+export async function fetchGeneralManagerPendingAssignmentRequests(): Promise<GeneralManagerAssignmentRequest[]> {
+  const response = await fetch(`${BackendApiUrl.assignmentsList}?status=Pending`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load pending assignment requests (${response.status})`);
+  }
+
+  const payload: unknown = await response.json();
+  const requests = normalizeAssignmentRequests(payload);
+
+  return requests.filter((request) => {
+    const markerSource = `${request.conflictWarning} ${request.requestedByName}`.toLowerCase();
+
+    // Hide GM auto-assignment artifacts from the PM-focused pending request list.
+    return !markerSource.includes('auto-assigned from gm');
+  });
+}
+
+export async function updateGeneralManagerAssignmentRequestStatus(
+  assignmentId: string,
+  status: 'Approved' | 'Rejected'
+): Promise<boolean> {
+  const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ assignmentId, status }),
+  });
+
+  return response.ok;
 }
 
 export const generalManagerFallbackSummary: GeneralManagerWorkforceSummary = {
