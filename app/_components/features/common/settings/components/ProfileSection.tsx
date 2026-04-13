@@ -11,9 +11,55 @@ interface ProfileData {
 interface ProfileSectionProps {
   profileData: ProfileData;
   onUpdateProfile: (data: Partial<ProfileData>) => void;
+  isLoading?: boolean;
 }
 
-export function ProfileSection({ profileData, onUpdateProfile }: ProfileSectionProps) {
+export function ProfileSection({ profileData, onUpdateProfile, isLoading = false }: ProfileSectionProps) {
+  // Generate initials dynamically from the user's name
+  const initials = profileData.name
+    ? profileData.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '??';
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <User className="w-5 h-5" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">Profile Settings</h2>
+        </div>
+        <div className="space-y-6">
+          <div className="flex items-start gap-6">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-24 h-24 bg-gray-200 rounded-full animate-pulse" />
+              <div className="w-24 h-7 bg-gray-200 rounded-lg animate-pulse" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <div className="w-20 h-4 bg-gray-200 rounded animate-pulse mb-2" />
+                <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse" />
+              </div>
+              <div>
+                <div className="w-24 h-4 bg-gray-200 rounded animate-pulse mb-2" />
+                <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse" />
+              </div>
+              <div>
+                <div className="w-12 h-4 bg-gray-200 rounded animate-pulse mb-2" />
+                <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
       <div className="flex items-center gap-3 mb-6">
@@ -27,7 +73,8 @@ export function ProfileSection({ profileData, onUpdateProfile }: ProfileSectionP
         <div className="flex items-start gap-6">
           <div className="flex flex-col items-center gap-3">
             <div className="w-24 h-24 bg-linear-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl font-medium">JD</span>
+              {/* Previously hardcoded as "JD"; now dynamically generated from profileData.name */}
+              <span className="text-white text-2xl font-medium">{initials}</span>
             </div>
             <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
               <Upload className="w-3.5 h-3.5" />
