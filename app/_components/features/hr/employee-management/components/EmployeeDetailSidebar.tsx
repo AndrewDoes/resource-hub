@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  X, Mail, Phone, MapPin, Calendar, Award, Briefcase, Edit2, Trash2
+  X, Mail, Phone, MapPin, Calendar, Award, Briefcase, Edit2, Trash2, ShieldCheck, Fingerprint, History, Clock
 } from 'lucide-react';
 import { Employee } from '../types';
 
@@ -10,13 +10,15 @@ interface EmployeeDetailSidebarProps {
   onClose: () => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
+  onRehire?: (employee: Employee) => void;
 }
 
 export function EmployeeDetailSidebar({
   employee,
   onClose,
   onEdit,
-  onDelete
+  onDelete,
+  onRehire
 }: EmployeeDetailSidebarProps) {
   if (!employee) return null;
 
@@ -68,8 +70,51 @@ export function EmployeeDetailSidebar({
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Calendar className="w-4 h-4 text-gray-400" />
-                Joined {new Date(employee.joinedDate).toLocaleDateString()}
+                Joined {new Date(employee.hireDate || employee.joinedDate).toLocaleDateString()}
               </div>
+              {(() => {
+                const isNearingEnd = employee.contractEndDate &&
+                  (new Date(employee.contractEndDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24) <= 30;
+
+                return (
+                  <div className={`flex items-center gap-3 text-sm transition-colors ${isNearingEnd ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                    <Clock className={`w-4 h-4 shrink-0 ${isNearingEnd ? 'text-red-500' : 'text-gray-400'}`} />
+                    <p>Contract ends: {employee.contractEndDate ? new Date(employee.contractEndDate).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Identity Management Placeholder */}
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-500" />
+              Identity Management
+            </h4>
+            <div className="p-3 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+              <div className="space-y-2 opacity-30 select-none">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2">
+                    <Fingerprint className="w-3 h-3" />
+                    MFA Status
+                  </span>
+                  <span className="font-medium text-green-600 uppercase">Enabled</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-gray-500">
+                    Last Login
+                  </span>
+                  <span className="font-medium">Yesterday, 14:20</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-gray-500">
+                    Account Security
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">VERIFIED</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 text-center mt-2 italic">Module coming soon</p>
             </div>
           </div>
 
@@ -121,9 +166,9 @@ export function EmployeeDetailSidebar({
                 {employee.currentProjects.map((project, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100"
                   >
-                    <Briefcase className="w-4 h-4 text-blue-600" />
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                     <span className="text-sm font-medium text-gray-900">{project}</span>
                   </div>
                 ))}
@@ -135,35 +180,52 @@ export function EmployeeDetailSidebar({
 
           {/* Project History */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-900 uppercase">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase flex items-center gap-2">
+              <History className="w-4 h-4 text-blue-500" />
               Project History
             </h4>
             <div className="space-y-2">
-              {employee.projectHistory.map((project, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm text-gray-700">{project}</span>
-                </div>
-              ))}
+              {employee.projectHistory && employee.projectHistory.length > 0 ? (
+                employee.projectHistory.map((project, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">{project}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic px-1">No historical projects recorded</p>
+              )}
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              onClick={() => onEdit(employee)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit Employee
-            </button>
-            <button
-              onClick={() => onDelete(employee)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Remove
-            </button>
+          <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+            {employee.status.toLowerCase() === 'terminated' || employee.status.toLowerCase() === 'resigned' ? (
+              <button
+                onClick={() => onRehire && onRehire(employee)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-md transition-all active:scale-[0.98]"
+              >
+                <Award className="w-4 h-4" />
+                Rehire Employee
+              </button>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => onEdit(employee)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Edit Employee
+                </button>
+                <button
+                  onClick={() => onDelete(employee)}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remove
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

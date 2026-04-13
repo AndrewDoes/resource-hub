@@ -32,5 +32,6 @@ export const BackendApiUrl = {
   executeDecision: `${baseUrl}/api/human-resource/execute-decision`,
   executeContract: `${baseUrl}/api/human-resource/execute-contract`,
   startHiring: `${baseUrl}/api/human-resource/start-hiring`,
+  humanResources: `${baseUrl}/api/human-resource`,
   lookups: `${baseUrl}/api/lookups`,
 } as const;
