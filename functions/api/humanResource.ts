@@ -7,6 +7,7 @@ export interface HREmployeeListItem {
   email: string;
   jobTitle: string;
   department: string | null;
+  skills: string[];
   availabilityPercent: number;
   workloadPercent: number;
   status: string;
@@ -65,6 +66,13 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
 
   return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
+    const skillSource =
+      record.skills ??
+      record.Skills ??
+      record.skillNames ??
+      record.SkillNames ??
+      record.employeeSkills ??
+      record.EmployeeSkills;
 
     return {
       id: asString(record.id, String(index + 1)),
@@ -72,6 +80,7 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       email: asString(record.email, "N/A"),
       jobTitle: asString(record.jobTitle ?? record.job_title, "Unknown Role"),
       department: typeof record.department === "string" ? record.department : null,
+      skills: Array.isArray(skillSource) ? skillSource.map((skill) => String(skill)).filter((skill) => skill.trim().length > 0) : [],
       availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 100),
       workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
       assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
@@ -105,7 +114,7 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     phone: "", // Not in list API
     location: "", // Not in list API
     department: apiItem.department ?? "General",
-    skills: [], // Not in list API yet
+    skills: apiItem.skills,
     status: apiItem.status.toLowerCase() === "active" ? "active" : "inactive",
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,

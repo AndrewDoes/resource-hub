@@ -102,7 +102,7 @@ export function ResourceOverview() {
             avatar: initials || 'U',
             role: employee.jobTitle,
             department: employee.department ?? 'General',
-            skills: [],
+            skills: employee.skills,
             availability: Math.max(0, Math.min(100, Math.round(employee.availabilityPercent))),
             workload,
             assignedHours: Math.max(0, Math.round(employee.assignedHours * 10) / 10),
@@ -123,7 +123,7 @@ export function ResourceOverview() {
       const hasError = summaryResult.status === 'rejected' || employeesResult.status === 'rejected';
       setError(
         hasError
-          ? 'Some GM resource data failed to load from backend. Showing fallback values for unavailable sections.'
+            ? 'Some GM resource data failed to load from backend. Showing backend-returned fields only.'
           : null
       );
       setIsLoading(false);
@@ -155,10 +155,9 @@ export function ResourceOverview() {
   // Calculate stats
   const stats = useMemo(() => ({
     total: uniqueResources.length,
-    available: uniqueResources.filter((r) => r.availability >= 80).length,
-    moderate: uniqueResources.filter((r) => r.availability >= 50 && r.availability < 80)
-      .length,
-    busy: uniqueResources.filter((r) => r.availability > 0 && r.availability < 50).length,
+    available: uniqueResources.filter((r) => r.workload <= 40).length,
+    moderate: uniqueResources.filter((r) => r.workload > 40 && r.workload <= 70).length,
+    busy: uniqueResources.filter((r) => r.workload > 70 && r.workload <= 100).length,
     overloaded: uniqueResources.filter((r) => r.workload > 100).length,
     avgUtilization: Math.round(
       uniqueResources.length === 0 ? 0 : uniqueResources.reduce((acc, r) => acc + r.workload, 0) / uniqueResources.length
@@ -179,7 +178,7 @@ export function ResourceOverview() {
           </span>
         </div>
         <p className="text-sm text-gray-500">
-          Monitor resource allocation and availability across all projects
+          Monitor live backend resource allocation and availability across all projects
         </p>
         {error && (
           <p className="mt-2 text-sm text-amber-700">
@@ -216,7 +215,7 @@ export function ResourceOverview() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {summary.topSkills.slice(0, 3).length === 0 ? (
             <div className="md:col-span-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-              No workforce summary skills returned by backend.
+              No workforce summary skills were returned by the backend.
             </div>
           ) : (
             summary.topSkills.slice(0, 3).map((skill, index) => (
