@@ -7,7 +7,7 @@ import { useFeedbackToast } from '@/app/context/ToastContext';
 import { GMDecision, ContractAction, AssignmentRequest, HiringRequest, EmployeeStatus } from './types';
 import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockHiringRequests, mockEmployeeStatus } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring } from '@/functions/api/humanResource';
+import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring, requestClarification } from '@/functions/api/humanResource';
 import { fetchGeneralManagerContractDecisions, fetchGeneralManagerDecisions } from '@/functions/api/generalManager';
 
 // Sub-components
@@ -18,6 +18,7 @@ import { HiringActionPanel } from './components/HiringActionPanel';
 import { EmployeeStatusControl } from './components/EmployeeStatusControl';
 import { WorkloadStatusIndicator } from './components/WorkloadStatusIndicator';
 import { WorkloadKPIs } from './components/WorkloadKPIs';
+import { ClarificationModal } from './components/ClarificationModal';
 
 export function HRValidation() {
   const [gmDecisions, setGmDecisions] = useState<GMDecision[]>(mockGMDecisions);
@@ -28,6 +29,11 @@ export function HRValidation() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addToast } = useFeedbackToast();
+
+  // Modal State
+  const [isClarifyModalOpen, setIsClarifyModalOpen] = useState(false);
+  const [selectedDecision, setSelectedDecision] = useState<GMDecision | null>(null);
+  const [isSubmitLoading, setIsSubmitLoading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -167,12 +173,39 @@ export function HRValidation() {
   };
 
   const handleClarifyDecision = (id: string) => {
-    markDecisionExecuted(id, 'clarification-requested');
-    addToast({
-      type: 'info',
-      title: 'Clarification Requested',
-      message: 'A clarification has been requested to the GM.',
-    });
+    const decision = gmDecisions.find(d => d.id === id);
+    if (!decision) return;
+    
+    setSelectedDecision(decision);
+    setIsClarifyModalOpen(true);
+  };
+
+  const handleConfirmClarification = async (reason: string) => {
+    if (!selectedDecision) return;
+
+    try {
+      setIsSubmitLoading(true);
+      const success = await requestClarification(selectedDecision.id, reason);
+      
+      if (success) {
+        markDecisionExecuted(selectedDecision.id, 'clarification-requested');
+        setIsClarifyModalOpen(false);
+        setSelectedDecision(null);
+        addToast({
+          type: 'info',
+          title: 'Clarification Requested',
+          message: 'Your feedback has been sent to the GM.',
+        });
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Request Failed',
+        message: 'Could not send the clarification request.',
+      });
+    } finally {
+      setIsSubmitLoading(false);
+    }
   };
 
   const handleExecuteContract = async (id: string) => {
@@ -339,6 +372,14 @@ export function HRValidation() {
           />
         </div>
       </div>
+
+      <ClarificationModal
+        isOpen={isClarifyModalOpen}
+        onClose={() => setIsClarifyModalOpen(false)}
+        onConfirm={handleConfirmClarification}
+        decisionTitle={selectedDecision?.details || 'Selected Decision'}
+        isLoading={isSubmitLoading}
+      />
     </div>
   );
 }

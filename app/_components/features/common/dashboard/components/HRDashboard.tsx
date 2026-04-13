@@ -36,9 +36,57 @@ export function HRDashboard() {
     loadSummary();
   }, []);
 
-  const pendingValidationsCount = summary?.pendingValidationsCount ?? 0;
-  const recentRequests = summary?.recentRequests ?? [];
-  const conflictsCount = recentRequests.filter(r => r.hasConflict).length;
+  // Compute combined totals for the original UI slots
+  const pendingAssignments = summary?.pendingValidationsCount ?? 0;
+  const pendingDirectives = summary?.pendingGmDecisionsCount ?? 0;
+  const pendingClarifications = summary?.pendingClarificationsCount ?? 0;
+
+  // The "Validations" slot now covers everything needing HR attention
+  const combinedValidationCount = pendingAssignments + pendingDirectives + pendingClarifications;
+
+  const recentAssignments = summary?.recentRequests ?? [];
+  const recentDecisions = summary?.recentGmDecisions ?? [];
+
+  // Combine all activity into the single existing list with descriptive labels
+  const allRecentActivity = [
+    ...recentAssignments.map(r => ({
+      ...r,
+      label: 'Assignment',
+      badgeColor: 'bg-green-100 text-green-700'
+    })),
+    ...recentDecisions.map(d => {
+      let actionLabel = 'Directive';
+      let title = d.details;
+      let badgeColor = 'bg-gray-100 text-gray-700';
+
+      // Map technical types to human-readable ones with distinct colors
+      if (d.type.includes('Extend')) {
+        actionLabel = 'Extension';
+        badgeColor = 'bg-purple-100 text-purple-700';
+      } else if (d.type.includes('Terminate')) {
+        actionLabel = 'Termination';
+        badgeColor = 'bg-red-100 text-red-700 border border-red-200';
+      } else if (d.type.includes('Hire')) {
+        actionLabel = 'Recruitment';
+        badgeColor = 'bg-blue-100 text-blue-700';
+      } else if (d.type.includes('Assignment')) {
+        actionLabel = 'Executive Assignment';
+        badgeColor = 'bg-teal-100 text-teal-700';
+      }
+
+      return {
+        id: d.id,
+        employeeName: title,
+        projectName: d.status.toUpperCase(), // Show status for directives
+        hasConflict: false,
+        daysWaiting: 0,
+        label: actionLabel,
+        badgeColor: badgeColor
+      };
+    })
+  ].sort((a, b) => (b.daysWaiting || 0) - (a.daysWaiting || 0)).slice(0, 5);
+
+  const conflictsCount = recentAssignments.filter(r => r.hasConflict).length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -57,7 +105,7 @@ export function HRDashboard() {
               <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
             ) : (
               <p className="text-green-50 text-sm mb-2">
-                {pendingValidationsCount} assignments awaiting your approval
+                {combinedValidationCount} {combinedValidationCount === 1 ? 'task' : 'tasks'} awaiting your attention
               </p>
             )}
             {!isLoading && conflictsCount > 0 && (
@@ -69,7 +117,7 @@ export function HRDashboard() {
         </div>
       </div>
 
-      {/* 4 KPI Grid */}
+      {/* 4 KPI Grid (Original Layout) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Validation Queue */}
         <Link href="/hr/hr-validation" className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
@@ -80,7 +128,7 @@ export function HRDashboard() {
           {isLoading ? (
             <div className="h-9 w-12 bg-gray-100 rounded animate-pulse" />
           ) : (
-            <p className="text-3xl font-semibold text-gray-900 mb-1">{pendingValidationsCount}</p>
+            <p className="text-3xl font-semibold text-gray-900 mb-1">{combinedValidationCount}</p>
           )}
           <p className="text-sm text-gray-500">Awaiting review</p>
         </Link>
@@ -100,7 +148,7 @@ export function HRDashboard() {
         </Link>
 
         {/* Active Hiring */}
-        <Link 
+        <Link
           href="/hr/hiring"
           className="text-left bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all group"
         >
@@ -178,7 +226,7 @@ export function HRDashboard() {
         </div>
       )}
 
-      {/* Recent Activity */}
+      {/* Recent Activity (Original Layout) */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Recent Validation Requests</h2>
@@ -188,19 +236,24 @@ export function HRDashboard() {
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-16 bg-gray-50 border border-gray-100 rounded-lg animate-pulse" />
             ))
-          ) : recentRequests.length === 0 ? (
+          ) : allRecentActivity.length === 0 ? (
             <p className="text-center py-8 text-gray-500 text-sm italic">No pending requests</p>
           ) : (
-            recentRequests.map((validation) => (
+            allRecentActivity.map((validation, idx) => (
               <div
-                key={validation.id}
+                key={validation.id + idx}
                 className={`flex items-center justify-between p-4 rounded-lg border ${validation.hasConflict
                   ? 'bg-red-50 border-red-200'
                   : 'bg-gray-50 border-gray-200'
                   }`}
               >
                 <div>
-                  <p className="font-semibold text-gray-900">{validation.employeeName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-900 line-clamp-1">{validation.employeeName}</p>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter ${validation.badgeColor || 'bg-gray-200 text-gray-600'}`}>
+                      {validation.label}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-600">{validation.projectName}</p>
                   {validation.hasConflict && (
                     <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-700 font-medium">

@@ -328,6 +328,8 @@ export interface HRDashboardSummary {
   totalEmployeeCount: number;
   expiringContractsCount: number;
   activeHiringRequestsCount: number;
+  pendingGmDecisionsCount: number;
+  pendingClarificationsCount: number;
   recentRequests: {
     id: string;
     employeeName: string;
@@ -339,6 +341,13 @@ export interface HRDashboardSummary {
     employeeId: string;
     employeeName: string;
     endDate: string | null;
+  }[];
+  recentGmDecisions: {
+    id: string;
+    type: string;
+    details: string;
+    date: string;
+    status: string;
   }[];
 }
 
@@ -355,6 +364,8 @@ export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
     totalEmployeeCount: asNumber(payload.totalEmployeeCount, 0),
     expiringContractsCount: asNumber(payload.expiringContractsCount, 0),
     activeHiringRequestsCount: asNumber(payload.activeHiringRequestsCount, 0),
+    pendingGmDecisionsCount: asNumber(payload.pendingGmDecisionsCount, 0),
+    pendingClarificationsCount: asNumber(payload.pendingClarificationsCount, 0),
     recentRequests: Array.isArray(payload.recentRequests) ? payload.recentRequests.map((item: any) => ({
       id: asString(item.id, ""),
       employeeName: asString(item.employeeName, "Unknown"),
@@ -366,6 +377,13 @@ export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
       employeeId: asString(item.employeeId, ""),
       employeeName: asString(item.employeeName, "Unknown"),
       endDate: item.endDate,
+    })) : [],
+    recentGmDecisions: Array.isArray(payload.recentGmDecisions) ? payload.recentGmDecisions.map((item: any) => ({
+      id: asString(item.id, ""),
+      type: asString(item.type, "General"),
+      details: asString(item.details, "No details provided"),
+      date: asString(item.date, ""),
+      status: asString(item.status, "Pending"),
     })) : [],
   };
 }
@@ -511,6 +529,24 @@ export async function rehireEmployee(data: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    });
+
+    const body = await response.json();
+    return {
+      success: response.ok,
+      message: body.message
+    };
+  } catch (error) {
+    return { success: false, message: "Network error occurred." };
+  }
+}
+
+export async function requestClarification(id: string, reason: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await fetch(`${BackendApiUrl.humanResources}/decision/${id}/clarify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
     });
 
     const body = await response.json();
