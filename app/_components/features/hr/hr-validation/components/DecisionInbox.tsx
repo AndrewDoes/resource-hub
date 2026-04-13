@@ -11,7 +11,9 @@ interface DecisionInboxProps {
 }
 
 export function DecisionInbox({ gmDecisions, onExecute, onClarify }: DecisionInboxProps) {
-  const pendingDecisions = gmDecisions.filter((d) => d.status === 'pending');
+  const pendingDecisions = gmDecisions.filter(
+    (d) => d.status === 'pending' || d.status === 'gmapproved'
+  );
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">

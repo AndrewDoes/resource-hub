@@ -108,11 +108,6 @@ export function HRDashboard() {
                 {combinedValidationCount} {combinedValidationCount === 1 ? 'task' : 'tasks'} awaiting your attention
               </p>
             )}
-            {!isLoading && conflictsCount > 0 && (
-              <div className="bg-red-500/30 backdrop-blur rounded-lg p-3 mt-3">
-                <p className="text-sm font-medium">⚠️ {conflictsCount} conflict(s) detected</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -255,12 +250,6 @@ export function HRDashboard() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">{validation.projectName}</p>
-                  {validation.hasConflict && (
-                    <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-700 font-medium">
-                      <AlertTriangle className="w-3 h-3" />
-                      Conflict detected
-                    </span>
-                  )}
                 </div>
                 <span className="text-xs text-gray-500">{validation.daysWaiting}d waiting</span>
               </div>

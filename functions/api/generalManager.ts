@@ -471,7 +471,7 @@ export async function fetchGeneralManagerPendingAssignmentRequests(): Promise<Ge
 
 export async function updateGeneralManagerAssignmentRequestStatus(
   assignmentId: string,
-  status: 'Approved' | 'Rejected'
+  status: 'GmApproved' | 'Rejected'
 ): Promise<boolean> {
   const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',

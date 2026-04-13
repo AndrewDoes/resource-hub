@@ -474,7 +474,7 @@ export function DecisionPanel() {
 
   const handleApproveAssignmentRequest = async (requestId: string) => {
     try {
-      await updateGeneralManagerAssignmentRequestStatus(requestId, 'Approved');
+      await updateGeneralManagerAssignmentRequestStatus(requestId, 'GmApproved');
 
       setPendingAssignmentRequests((prev) => prev.filter((r) => r.id !== requestId));
 

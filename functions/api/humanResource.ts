@@ -11,6 +11,7 @@ export interface HREmployeeListItem {
   workloadPercent: number;
   phone: string;
   status: string;
+  workloadStatus: string;
   assignedHours: number;
   assignments: any[];
   hireDate?: string;
@@ -103,6 +104,7 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
       phone: asString(record.phone, "N/A"),
       status: asString(record.status, "Active"),
+      workloadStatus: asString(record.workloadStatus ?? record.workload_status, ""),
       assignments: Array.isArray(record.assignments) ? record.assignments : [],
       hireDate: asString(record.hireDate, ""),
       skills: Array.isArray(record.skills) ? record.skills as string[] : [],
@@ -218,13 +220,20 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     department: apiItem.department ?? "General",
     skills: apiItem.skills || [],
     status: apiItem.status.toLowerCase() === "active" ? "active" : apiItem.status.toLowerCase() === "inactive" ? "inactive" : "terminated",
+    workloadStatus: apiItem.workloadStatus,
     availability: apiItem.availabilityPercent,
     workload: apiItem.workloadPercent,
     assignedHours: apiItem.assignedHours,
     currentProjects: apiItem.assignments
       .filter((a: any) => {
         const s = a.status?.toLowerCase();
-        return s === "approved" || s === "accepted" || s === "inprogress";
+        return (
+          s === "pending" ||
+          s === "gmapproved" ||
+          s === "approved" ||
+          s === "accepted" ||
+          s === "inprogress"
+        );
       })
       .map((a: any) => a.projectName || "Unknown Project"),
     projectHistory: apiItem.assignments
@@ -244,9 +253,23 @@ export const mapToUIEmployeeStatus = (apiItem: HREmployeeListItem): any => {
     id: apiItem.id,
     name: apiItem.fullName,
     avatar: getInitials(apiItem.fullName),
-    status: apiItem.status.toLowerCase() === "active" ? "available" : "blocked", // UI status mapping logic
-    currentProjects: [], // Not in list API
+    status: apiItem.status.toLowerCase(),
+    workloadStatus: apiItem.workloadStatus,
+    currentProjects: apiItem.assignments
+      .filter((a: any) => {
+        const s = a.status?.toLowerCase();
+        return (
+          s === "pending" ||
+          s === "gmapproved" ||
+          s === "approved" ||
+          s === "accepted" ||
+          s === "inprogress"
+        );
+      })
+      .map((a: any) => a.projectName || "Unknown Project"),
     assignedHours: apiItem.assignedHours,
+    workload: apiItem.workloadPercent,
+    availability: apiItem.availabilityPercent,
   };
 };
 
@@ -291,7 +314,8 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
     deadline: decision.deadline ?? 'No deadline',
     submittedDate: decision.submittedAt.split('T')[0],
     status: decision.status.toLowerCase() === 'pending' ? 'pending' :
-      decision.status.toLowerCase().includes('clarification') ? 'clarification-requested' : 'executed',
+      decision.status.toLowerCase() === 'gmapproved' ? 'gmapproved' :
+        decision.status.toLowerCase().includes('clarification') ? 'clarification-requested' : 'executed',
     details: decision.details,
   };
 };
@@ -341,7 +365,7 @@ export interface HRAssignmentRequestItem {
 }
 
 export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestItem[]> {
-  const url = `${BackendApiUrl.assignmentsList}?status=Pending`;
+  const url = `${BackendApiUrl.assignmentsList}?status=GmApproved`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -399,7 +423,7 @@ export const mapToUIAssignmentRequest = (item: HRAssignmentRequestItem): any => 
     duration: formatDateRange(item.startDate, item.endDate),
     allocation: item.allocationPercent,
     requestedBy: item.requestedByName,
-    status: item.status.toLowerCase() as 'pending' | 'approved' | 'rejected',
+    status: item.status.toLowerCase() as 'pending' | 'gmapproved' | 'approved' | 'rejected',
   };
 };
 

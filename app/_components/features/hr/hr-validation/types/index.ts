@@ -5,7 +5,7 @@ export interface GMDecision {
   affectedEmployees: string[];
   deadline: string;
   submittedDate: string;
-  status: 'pending' | 'executed' | 'clarification-requested';
+  status: 'pending' | 'executed' | 'clarification-requested' | 'gmapproved';
   details: string;
 }
 
@@ -34,9 +34,12 @@ export interface EmployeeStatus {
   id: string;
   name: string;
   avatar: string;
-  status: 'available' | 'assigned' | 'blocked';
+  status: string;
+  workloadStatus: string;
   currentProjects: string[];
   assignedHours: number; // Daily working hours assigned
+  workload: number;
+  availability: number;
 }
 
 export interface AssignmentRequest {
@@ -49,7 +52,7 @@ export interface AssignmentRequest {
   endDate: string;
   allocation: number;
   requestedBy: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'gmapproved' | 'approved' | 'rejected';
   conflictWarning?: string;
 }
 
