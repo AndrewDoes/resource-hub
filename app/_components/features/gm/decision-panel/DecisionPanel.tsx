@@ -17,6 +17,7 @@ import {
 } from '@/functions/api/generalManager';
 import {
   fetchProjectManagerProjects,
+  fetchProjectManagerProjectTeam,
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
 
@@ -31,16 +32,9 @@ const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-111
 
 const mapSummaryToProject = (
   summary: ProjectManagerProjectSummary,
+  teamMembers: string[] = [],
   projectPrediction?: GeneralManagerProjectPrediction | null
 ): ProjectData => {
-  const candidateNames = Array.from(
-    new Set(
-      (projectPrediction?.requirements ?? []).flatMap((requirement) =>
-        requirement.recommendedCandidates.map((candidate) => candidate.fullName)
-      )
-    )
-  );
-
   return {
     id: summary.id,
     name: summary.name,
@@ -48,7 +42,7 @@ const mapSummaryToProject = (
     endDate: summary.endDate,
     progress: summary.progress,
     status: summary.status,
-    assignedResources: candidateNames,
+    assignedResources: teamMembers,
     requiredResources: summary.teamSize,
     resourceUtilization: Math.min(150, Math.round(summary.progress + (projectPrediction?.staffingRiskScore ?? 0))),
     riskLevel:
@@ -187,7 +181,28 @@ export function DecisionPanel() {
       }
 
       if (projectResult.status === 'fulfilled') {
-        const backendProjects = projectResult.value.map((summary) => mapSummaryToProject(summary));
+        const teamResults = await Promise.all(
+          projectResult.value.map(async (summary) => {
+            try {
+              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, summary.id);
+
+              return {
+                projectId: summary.id,
+                teamMembers: team.map((member) => member.fullName),
+              };
+            } catch {
+              return {
+                projectId: summary.id,
+                teamMembers: [] as string[],
+              };
+            }
+          })
+        );
+
+        const teamMap = new Map(teamResults.map((entry) => [entry.projectId, entry.teamMembers]));
+        const backendProjects = projectResult.value.map((summary) =>
+          mapSummaryToProject(summary, teamMap.get(summary.id) ?? [])
+        );
 
         const initialProject = backendProjects[0] ?? null;
 
