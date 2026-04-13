@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { skillCategories } from '../data';
+import { SkillItem } from '../types';
+// import { skillCategories } from '../data';
 
 interface SkillSelectorProps {
-  selectedSkills: string[];
-  onAddSkill: (skill: string) => void;
-  onRemoveSkill: (skill: string) => void;
+  selectedSkills: SkillItem[];
+  onAddSkill: (skill: SkillItem) => void;
+  onRemoveSkill: (skillId: string) => void;
+  skillCategories: Record<string, SkillItem[]>;
 }
 
 export function SkillSelector({
   selectedSkills,
   onAddSkill,
   onRemoveSkill,
+  skillCategories
 }: SkillSelectorProps) {
   const [skillInput, setSkillInput] = useState('');
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
@@ -40,8 +43,8 @@ export function SkillSelector({
             {Object.entries(skillCategories).map(([category, skills]) => {
               const filteredCategorySkills = skills.filter(
                 (skill) =>
-                  skill.toLowerCase().includes(skillInput.toLowerCase()) &&
-                  !selectedSkills.includes(skill)
+                  skill.name.toLowerCase().includes(skillInput.toLowerCase()) &&
+                  !selectedSkills.some(s => s.id === skill.id)
               );
 
               if (filteredCategorySkills.length === 0) return null;
@@ -53,7 +56,7 @@ export function SkillSelector({
                   </div>
                   {filteredCategorySkills.map((skill) => (
                     <button
-                      key={skill}
+                      key={skill.id}
                       type="button"
                       onClick={() => {
                         onAddSkill(skill);
@@ -62,7 +65,7 @@ export function SkillSelector({
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 transition-colors"
                     >
-                      {skill}
+                      {skill.name}
                     </button>
                   ))}
                 </div>
@@ -75,13 +78,13 @@ export function SkillSelector({
         <div className="flex flex-wrap gap-2 mt-3">
           {selectedSkills.map((skill) => (
             <span
-              key={skill}
+              key={skill.id}
               className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm font-medium"
             >
-              {skill}
+              {skill.name}
               <button
                 type="button"
-                onClick={() => onRemoveSkill(skill)}
+                onClick={() => onRemoveSkill(skill.id)}
                 className="hover:bg-blue-100 rounded p-0.5 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />

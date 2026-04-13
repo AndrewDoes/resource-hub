@@ -6,6 +6,8 @@ export const getDecisionTypeLabel = (type: string) => {
       return 'Terminate Contract';
     case 'hire-resource':
       return 'Hire New Resource';
+    case 'project-assignment':
+      return 'Project Assignment';
     default:
       return type;
   }
@@ -19,6 +21,8 @@ export const getDecisionTypeColor = (type: string) => {
       return 'bg-red-100 text-red-700';
     case 'hire-resource':
       return 'bg-blue-100 text-blue-700';
+    case 'project-assignment':
+      return 'bg-amber-100 text-amber-700';
     default:
       return 'bg-gray-100 text-gray-700';
   }
