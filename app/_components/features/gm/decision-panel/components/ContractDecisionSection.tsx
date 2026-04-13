@@ -2,16 +2,15 @@
 
 import { Users, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { ContractDecision } from '../types';
-import { getPerformanceBadge } from '../utils';
 
 interface ContractDecisionSectionProps {
   decisions: ContractDecision[];
-  onDecision: (id: string, action: 'extended' | 'not-extended') => void;
+  onRequestHrReview: (decisionId: string, requestedAction: 'ExtendContract' | 'TerminateContract') => Promise<void>;
 }
 
 export function ContractDecisionSection({
   decisions,
-  onDecision,
+  onRequestHrReview,
 }: ContractDecisionSectionProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -39,16 +38,13 @@ export function ContractDecisionSection({
                       {decision.employeeName}
                     </p>
                     <p className="text-xs text-gray-600 mt-1">
-                      {decision.currentWorkload}
+                      {decision.jobTitle} - {decision.activeAssignmentCount} project{decision.activeAssignmentCount === 1 ? '' : 's'}
                     </p>
                   </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${getPerformanceBadge(
-                      decision.performance
-                    )}`}
-                  >
-                    {decision.performance.toUpperCase()}
-                  </span>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">Availability: {decision.availabilityPercent}%</p>
+                    <p className="text-xs text-gray-600">Workload: {decision.workloadPercent}%</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
                   <Calendar className="w-3.5 h-3.5" />
@@ -57,41 +53,31 @@ export function ContractDecisionSection({
               </div>
             </div>
 
-            {decision.status === 'pending' ? (
+            {decision.decisionStatus.toLowerCase() === 'pending' ? (
               <div className="flex gap-2">
                 <button
-                  onClick={() => onDecision(decision.id, 'extended')}
+                  onClick={() => void onRequestHrReview(decision.id, 'ExtendContract')}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Extend Contract
+                  Request HR: Extend
                 </button>
                 <button
-                  onClick={() => onDecision(decision.id, 'not-extended')}
+                  onClick={() => void onRequestHrReview(decision.id, 'TerminateContract')}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                 >
                   <XCircle className="w-4 h-4" />
-                  Do Not Extend
+                  Request HR: Terminate
                 </button>
               </div>
             ) : (
-              <div
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg w-full ${decision.status === 'extended'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
-                  }`}
-              >
-                {decision.status === 'extended' ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">Contract Extended</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">Contract Not Extended</span>
-                  </>
-                )}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                  {decision.decisionType}
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 font-medium uppercase">
+                  {decision.decisionStatus}
+                </span>
               </div>
             )}
           </div>

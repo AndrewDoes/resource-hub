@@ -36,9 +36,20 @@ export class ResourcePlanningSystem {
 
   // Calculate total workload for an employee
   static calculateEmployeeWorkload(employee: Employee, projects: Project[]): number {
+    const allocationByProject =
+      employee.projectAllocations && typeof employee.projectAllocations === 'object'
+        ? (employee.projectAllocations as Record<string, number>)
+        : null;
+
     return projects
       .filter((p) => p.assignedEmployees.includes(employee.id))
-      .reduce((total, project) => total + project.workload, 0);
+      .reduce((total, project) => {
+        if (allocationByProject && typeof allocationByProject[project.id] === 'number') {
+          return total + Math.max(0, Math.min(100, allocationByProject[project.id]));
+        }
+
+        return total + project.workload;
+      }, 0);
   }
 
   // Find projects with overlapping timelines

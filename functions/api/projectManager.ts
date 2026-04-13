@@ -1,6 +1,6 @@
 import { BackendApiUrl } from "../BackendApiUrl";
 
-export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed";
+export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed" | "completed" | "cancelled";
 
 export interface ProjectManagerProjectSummary {
   id: string;
@@ -39,12 +39,28 @@ export interface ProjectManagerProjectOverview {
 }
 
 export interface ProjectManagerProjectTeamMember {
+  assignmentId: string;
   employeeId: string;
   fullName: string;
   jobTitle: string;
   roleName: string;
   allocationPercent: number;
   assignmentStatus: string;
+  availabilityPercent: number;
+  workloadPercent: number;
+  assignedHours: number;
+  employeeStatus: string;
+}
+
+export interface ProjectManagerAssignmentItem {
+  id: string;
+  projectId: string;
+  employeeId: string;
+  roleName: string;
+  allocationPercent: number;
+  startDate: string;
+  endDate: string;
+  status: string;
 }
 
 export interface ProjectManagerProjectActivity {
@@ -71,6 +87,38 @@ export interface ProjectManagerTimelineTask {
   colorTag: string;
   status: string;
   sortOrder: number;
+}
+
+export interface ProjectManagerCreateChangeRequestInput {
+  projectId: string;
+  employeeId?: string;
+  assignedByUserId: string;
+  roleName: string;
+  startDate: string;
+  endDate: string;
+  allocationPercent: number;
+  requiredSkills: string[];
+  additionalNeeds?: string;
+}
+
+export interface ProjectManagerCreateChangeRequestResult {
+  assignmentId: string;
+}
+
+export interface ProjectManagerUpdateProjectStatusResult {
+  projectId: string;
+  status: string;
+}
+
+export interface PersistSplitWorkloadInput {
+  projectId: string;
+  fromEmployeeId: string;
+  toEmployeeId: string;
+  splitAllocationPercent: number;
+  roleName: string;
+  startDate: string;
+  endDate: string;
+  assignedByUserId: string;
 }
 
 interface ProjectManagerOverviewResponse {
@@ -113,11 +161,16 @@ interface ProjectManagerTimelineTasksResponse {
 }
 
 const fallbackStatus = (value: string | undefined): ProjectManagerProjectStatus => {
-  if (value === "at-risk" || value === "delayed") {
-    return value;
+  switch (value) {
+    case "at-risk":
+    case "delayed":
+    case "on-track":
+    case "completed":
+    case "cancelled":
+      return value;
+    default:
+      return "on-track";
   }
-
-  return "on-track";
 };
 
 const asString = (value: unknown, fallback: string): string => {
@@ -126,6 +179,11 @@ const asString = (value: unknown, fallback: string): string => {
 
 const asNumber = (value: unknown, fallback: number): number => {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+const normalizeDateOnlyString = (value: string): string => {
+  const match = value.match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : value;
 };
 
 const withQuery = (path: string, params: Record<string, string | undefined>): string => {
@@ -220,15 +278,55 @@ const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember
     const record = item as Record<string, unknown>;
 
     return {
+      assignmentId: asString(record.assignmentId ?? record.assignment_id ?? record.id ?? record.Id, ''),
       employeeId: asString(record.employeeId ?? record.employee_id, String(index + 1)),
       fullName: asString(record.fullName ?? record.full_name, "Unknown Employee"),
       jobTitle: asString(record.jobTitle ?? record.job_title, "Unknown Role"),
       roleName: asString(record.roleName ?? record.role_name, "Member"),
       allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
       assignmentStatus: asString(record.assignmentStatus ?? record.assignment_status, "Pending"),
+      availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 0),
+      workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
+      assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
+      employeeStatus: asString(record.employeeStatus ?? record.employee_status, "Active"),
     };
   });
 };
+
+export async function persistSplitWorkloadToBackend(input: PersistSplitWorkloadInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.assignmentsSplitWorkload, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId: input.projectId,
+      fromEmployeeId: input.fromEmployeeId,
+      toEmployeeId: input.toEmployeeId,
+      assignedByUserId: input.assignedByUserId,
+      roleName: input.roleName,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      splitAllocationPercent: input.splitAllocationPercent,
+    }),
+  });
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const payload = (await response.json()) as Record<string, unknown>;
+      detail = typeof payload.detail === 'string'
+        ? payload.detail
+        : typeof payload.message === 'string'
+          ? payload.message
+          : '';
+    } catch {
+      detail = '';
+    }
+
+    throw new Error(detail || `Failed to persist split workload (${response.status})`);
+  }
+}
 
 const normalizeActivities = (payload: unknown): ProjectManagerProjectActivity[] => {
   const source = Array.isArray(payload)
@@ -388,6 +486,65 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
 
   const payload: unknown = await response.json();
   return normalizeTimelineTasks(payload);
+}
+
+export async function updateProjectManagerProjectStatus(
+  projectId: string,
+  status: 'Completed' | 'Cancelled'
+): Promise<ProjectManagerUpdateProjectStatusResult> {
+  const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId,
+      status,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update project status (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    projectId: asString(payload.projectId ?? payload.ProjectId, projectId),
+    status: asString(payload.status ?? payload.Status, status),
+  };
+}
+
+export async function createProjectManagerChangeRequest(
+  input: ProjectManagerCreateChangeRequestInput
+): Promise<ProjectManagerCreateChangeRequestResult> {
+  const response = await fetch(BackendApiUrl.assignmentsCreate, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId: input.projectId,
+      employeeId: input.employeeId ?? '00000000-0000-0000-0000-000000000000',
+      assignedByUserId: input.assignedByUserId,
+      roleName: input.roleName,
+      startDate: normalizeDateOnlyString(input.startDate),
+      endDate: normalizeDateOnlyString(input.endDate),
+      allocationPercent: input.allocationPercent,
+      requiredSkills: input.requiredSkills,
+      additionalNeeds: input.additionalNeeds ?? '',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create change request (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    assignmentId: asString(payload.assignmentId ?? payload.AssignmentId, ''),
+  };
 }
 
 export const projectManagerFallbackProjects: ProjectManagerProjectSummary[] = [
