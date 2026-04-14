@@ -103,6 +103,7 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
           employeeId: topCandidate.employeeId,
           roleName: requirement.roleName,
           requiredSkills: requirement.requiredSkills,
+          allocationPercent: Math.max(10, Math.min(50, Math.round(topCandidate.availabilityPercent))),
         },
       });
     });
@@ -124,6 +125,10 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
       if (recommendation.type === 'add-resource') {
         const employeeId = recommendation.metadata?.employeeId;
         const roleName = recommendation.metadata?.roleName;
+        const allocationPercent = Math.max(
+          10,
+          Math.min(100, recommendation.metadata?.allocationPercent ?? 50)
+        );
 
         if (!employeeId || !roleName) {
           addToast({
@@ -141,7 +146,7 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
           roleName,
           startDate: selectedProject.startDate,
           endDate: selectedProject.endDate,
-          allocationPercent: 100,
+          allocationPercent,
           requiredSkills: recommendation.metadata?.requiredSkills ?? [],
           additionalNeeds: 'Auto-assigned from GM planning recommendation apply action.',
         });

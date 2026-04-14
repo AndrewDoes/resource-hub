@@ -28,6 +28,7 @@ export interface AIRecommendation {
     employeeId?: string;
     roleName?: string;
     requiredSkills?: string[];
+    allocationPercent?: number;
   };
 }
 

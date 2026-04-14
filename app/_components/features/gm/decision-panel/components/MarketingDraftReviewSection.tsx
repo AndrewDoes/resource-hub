@@ -19,6 +19,7 @@ interface RecommendationInfo {
   loading: boolean;
   pmOwnerUserId: string | null;
   pmOwnerName: string | null;
+  pmRequirementAlreadyFull: boolean;
   error: string | null;
 }
 
@@ -62,17 +63,20 @@ export function MarketingDraftReviewSection({
             loading: true,
             pmOwnerUserId: null,
             pmOwnerName: null,
+            pmRequirementAlreadyFull: false,
             error: null,
           };
 
           try {
             const prediction = await fetchGeneralManagerProjectPrediction(project.id, 5);
             const recommendation = pickRecommendedPm(prediction);
+            const pmRequirementAlreadyFull = isPmRequirementAlreadyFull(prediction);
 
             nextState[project.id] = {
               loading: false,
               pmOwnerUserId: recommendation?.employeeId ?? null,
               pmOwnerName: recommendation?.fullName ?? null,
+              pmRequirementAlreadyFull,
               error: null,
             };
           } catch (error) {
@@ -80,6 +84,7 @@ export function MarketingDraftReviewSection({
               loading: false,
               pmOwnerUserId: null,
               pmOwnerName: null,
+              pmRequirementAlreadyFull: false,
               error: error instanceof Error ? error.message : 'Unable to load PM recommendation',
             };
           }
@@ -124,6 +129,16 @@ export function MarketingDraftReviewSection({
     const allCandidates = prediction.requirements.flatMap((requirement) => requirement.recommendedCandidates);
 
     return allCandidates.sort((left, right) => right.fitScore - left.fitScore)[0] ?? null;
+  };
+
+  const isPmRequirementAlreadyFull = (prediction: GeneralManagerProjectPrediction) => {
+    const pmRequirement = prediction.requirements.find((requirement) => /project manager|\bpm\b/i.test(requirement.roleName));
+
+    if (!pmRequirement) {
+      return false;
+    }
+
+    return pmRequirement.coverageScore >= 100 && pmRequirement.recommendedCandidates.length === 0;
   };
 
   return (
@@ -175,6 +190,8 @@ export function MarketingDraftReviewSection({
                 <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
                   {recommendation?.loading
                     ? 'Loading recommended PM from system...'
+                    : recommendation?.pmRequirementAlreadyFull
+                      ? 'No recommendation needed: PM requirement is already full.'
                     : recommendation?.pmOwnerName
                       ? `Recommended PM: ${recommendation.pmOwnerName}`
                       : 'No PM recommendation available yet.'}
