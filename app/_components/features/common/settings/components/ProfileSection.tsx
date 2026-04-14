@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import { User, Upload } from 'lucide-react';
+import { User, Upload } from "lucide-react";
+import { getInitials } from "@/utils/stringUtils";
 
 interface ProfileData {
   name: string;
@@ -14,16 +15,13 @@ interface ProfileSectionProps {
   isLoading?: boolean;
 }
 
-export function ProfileSection({ profileData, onUpdateProfile, isLoading = false }: ProfileSectionProps) {
+export function ProfileSection({
+  profileData,
+  onUpdateProfile,
+  isLoading = false,
+}: ProfileSectionProps) {
   // Generate initials dynamically from the user's name
-  const initials = profileData.name
-    ? profileData.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : '??';
+  const initials = getInitials(profileData.name) || "??"; // Fallback to "??" if name is empty or initials cannot be generated
 
   if (isLoading) {
     return (
@@ -32,7 +30,9 @@ export function ProfileSection({ profileData, onUpdateProfile, isLoading = false
           <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
             <User className="w-5 h-5" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">Profile Settings</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Profile Settings
+          </h2>
         </div>
         <div className="space-y-6">
           <div className="flex items-start gap-6">
@@ -66,7 +66,9 @@ export function ProfileSection({ profileData, onUpdateProfile, isLoading = false
         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
           <User className="w-5 h-5" />
         </div>
-        <h2 className="text-lg font-semibold text-gray-900">Profile Settings</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          Profile Settings
+        </h2>
       </div>
 
       <div className="space-y-6">
@@ -74,7 +76,9 @@ export function ProfileSection({ profileData, onUpdateProfile, isLoading = false
           <div className="flex flex-col items-center gap-3">
             <div className="w-24 h-24 bg-linear-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center">
               {/* Previously hardcoded as "JD"; now dynamically generated from profileData.name */}
-              <span className="text-white text-2xl font-medium">{initials}</span>
+              <span className="text-white text-2xl font-medium">
+                {initials}
+              </span>
             </div>
             <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
               <Upload className="w-3.5 h-3.5" />

@@ -10,6 +10,7 @@ import { PreferencesSection } from "./components/PreferencesSection";
 import { AccessControlSection } from "./components/AccessControlSection";
 
 import { useRole } from "@/app/context/RoleContext";
+import { getInitials } from "@/utils/stringUtils";
 // OLD: No longer needed after removing role switching from Settings.
 // import { useRouter } from "next/navigation";
 // import { UserRole } from "@/app/types";
@@ -195,12 +196,7 @@ export function Settings() {
       const data = await response.json();
 
       // Update the RoleContext so sidebar/header reflects the new name
-      const initials = data.fullName
-        .split(" ")
-        .map((n: string) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
+      const initials = getInitials(data.fullName);
 
       setCurrentUser({
         ...currentUser,
