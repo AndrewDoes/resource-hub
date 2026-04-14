@@ -5,7 +5,7 @@ import {
   EmployeeStatus,
   AssignmentRequest,
   Employee
-} from './types';
+} from '../types';
 
 export const mockGMDecisions: GMDecision[] = [
   {
@@ -142,6 +142,7 @@ export const mockAssignmentRequests: AssignmentRequest[] = [
 export const mockEmployees: Employee[] = [
   {
     id: '1',
+    employeeCode: 'EMP-001',
     name: 'Sarah Johnson',
     avatar: 'SJ',
     role: 'Senior Developer',
@@ -153,12 +154,15 @@ export const mockEmployees: Employee[] = [
     status: 'active',
     availability: 100,
     workload: 0,
+    assignedHours: 0,
     currentProjects: [],
     projectHistory: ['Customer Portal v2', 'API Integration'],
     joinedDate: '2024-01-15',
+    hireDate: '2024-01-15',
   },
   {
     id: '2',
+    employeeCode: 'EMP-002',
     name: 'David Lee',
     avatar: 'DL',
     role: 'Frontend Developer',
@@ -170,12 +174,15 @@ export const mockEmployees: Employee[] = [
     status: 'active',
     availability: 30,
     workload: 70,
+    assignedHours: 5.6,
     currentProjects: ['Website Redesign', 'Mobile App'],
     projectHistory: ['Dashboard Redesign'],
     joinedDate: '2023-06-20',
+    hireDate: '2023-06-20',
   },
   {
     id: '3',
+    employeeCode: 'EMP-003',
     name: 'Emily Chen',
     avatar: 'EC',
     role: 'Product Manager',
@@ -187,12 +194,15 @@ export const mockEmployees: Employee[] = [
     status: 'active',
     availability: 80,
     workload: 20,
+    assignedHours: 1.6,
     currentProjects: ['Q2 Marketing Campaign'],
     projectHistory: ['Product Launch Q1'],
     joinedDate: '2023-03-10',
+    hireDate: '2023-03-10',
   },
   {
     id: '4',
+    employeeCode: 'EMP-004',
     name: 'Michael Brown',
     avatar: 'MB',
     role: 'Backend Developer',
@@ -204,12 +214,15 @@ export const mockEmployees: Employee[] = [
     status: 'active',
     availability: 0,
     workload: 110,
+    assignedHours: 8.8,
     currentProjects: ['Mobile App', 'Database Migration', 'API Gateway'],
     projectHistory: ['Legacy System Upgrade'],
     joinedDate: '2022-11-05',
+    hireDate: '2022-11-05',
   },
   {
     id: '5',
+    employeeCode: 'EMP-005',
     name: 'Lisa Anderson',
     avatar: 'LA',
     role: 'UI/UX Designer',
@@ -221,8 +234,10 @@ export const mockEmployees: Employee[] = [
     status: 'inactive',
     availability: 0,
     workload: 0,
+    assignedHours: 0,
     currentProjects: [],
     projectHistory: ['Brand Refresh', 'Mobile App UI'],
     joinedDate: '2023-08-12',
+    hireDate: '2023-08-12',
   },
 ];

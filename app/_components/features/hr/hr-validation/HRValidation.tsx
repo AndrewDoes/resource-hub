@@ -80,7 +80,7 @@ export function HRValidation() {
             const role = roleMatch ? roleMatch[1].trim() : "New Resource";
 
             const skillsMatch = details.match(/Skills: (.*)/i);
-            const skills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()) : [];
+            const skills = skillsMatch ? skillsMatch[1].split(',').map((s: string) => s.trim()) : [];
 
             return {
               id: d.id,
