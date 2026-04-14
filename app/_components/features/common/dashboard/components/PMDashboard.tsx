@@ -294,7 +294,6 @@ export function PMDashboard() {
     projectId: '',
     roleName: '',
     requiredSkills: '',
-    allocationPercent: 50,
     startDate: '',
     endDate: '',
     additionalNeeds: '',
@@ -429,7 +428,7 @@ export function PMDashboard() {
           roleName: inferredRoleName,
           startDate: targetProject.startDate,
           endDate: targetProject.endDate,
-          allocationPercent: 50,
+          allocationPercent: 0,
           requiredSkills: affectedEmployee?.skills ?? [],
           additionalNeeds: `System conflict ${conflict.id}: ${conflict.details}`,
         });
@@ -708,7 +707,7 @@ export function PMDashboard() {
         roleName: changeRequestForm.roleName.trim(),
         startDate: changeRequestForm.startDate,
         endDate: changeRequestForm.endDate,
-        allocationPercent: changeRequestForm.allocationPercent,
+        allocationPercent: 0,
         requiredSkills,
         additionalNeeds: changeRequestForm.additionalNeeds.trim(),
       });
@@ -913,29 +912,12 @@ export function PMDashboard() {
                 </select>
               </label>
 
-              <label className="space-y-1">
+              <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Needed Role</span>
                 <input
                   value={changeRequestForm.roleName}
                   onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, roleName: event.target.value }))}
                   placeholder="QA Engineer"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </label>
-
-              <label className="space-y-1">
-                <span className="text-xs font-medium text-gray-600">Allocation %</span>
-                <input
-                  type="number"
-                  min={10}
-                  max={100}
-                  value={changeRequestForm.allocationPercent}
-                  onChange={(event) =>
-                    setChangeRequestForm((prev) => ({
-                      ...prev,
-                      allocationPercent: Math.max(10, Math.min(100, Number(event.target.value) || 10)),
-                    }))
-                  }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </label>
