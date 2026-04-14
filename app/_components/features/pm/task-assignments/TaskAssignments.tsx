@@ -24,6 +24,7 @@ import {
 } from "@/functions/api/projectManager";
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? "11111111-1111-1111-1111-111111111111";
+const WEEKLY_CAPACITY_HOURS = 40;
 
 interface TaskAssignmentsProps {
   pmUserId?: string;
@@ -93,6 +94,7 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
     taskName: "",
     description: "",
     priority: "medium" as TaskPriority,
+    workloadHours: 30,
     dueDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0],
   });
 
@@ -171,17 +173,21 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const newTask = await createTaskAssignment({
+      await createTaskAssignment({
         ...formData,
         assignedByUserId: pmUserId,
       });
-      setTasks([...tasks, newTask]);
+
+      const latestTasks = await fetchAllTaskAssignments(pmUserId);
+      setTasks(latestTasks);
+
       setFormData({
         projectId: "",
         employeeId: "",
         taskName: "",
         description: "",
         priority: "medium",
+        workloadHours: 30,
         dueDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0],
       });
       setTeamMembers([]);
@@ -193,11 +199,13 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
 
   const handleUpdateTaskStatus = async (taskId: string, newStatus: "pending" | "in-progress" | "completed") => {
     try {
-      const updatedTask = await updateTaskAssignment({
+      await updateTaskAssignment({
         taskId,
         status: newStatus,
       });
-      setTasks(tasks.map((t) => (t.taskId === taskId ? updatedTask : t)));
+
+      const latestTasks = await fetchAllTaskAssignments(pmUserId);
+      setTasks(latestTasks);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task");
     }
@@ -365,15 +373,39 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
                     setFormData({
                       ...formData,
                       priority: e.target.value as TaskPriority,
+                      workloadHours: WORKLOAD_CONFIG[e.target.value as TaskPriority]?.hours ?? 30,
                     })
                   }
                   required
                   className="w-full"
                 >
-                  <option value="low">Low (20%)</option>
-                  <option value="medium">Medium (30%)</option>
-                  <option value="high">High (50%)</option>
+                  <option value="low">Low (default 20h)</option>
+                  <option value="medium">Medium (default 30h)</option>
+                  <option value="high">High (default 50h)</option>
                 </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Workload Hours *
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={80}
+                  value={formData.workloadHours}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      workloadHours: Math.max(1, Math.min(80, Number(e.target.value) || 1)),
+                    })
+                  }
+                  required
+                  className="w-full"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {Math.round((formData.workloadHours / WEEKLY_CAPACITY_HOURS) * 100)}% of a {WEEKLY_CAPACITY_HOURS}h week
+                </p>
               </div>
 
               <div>
@@ -501,7 +533,7 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
                   <div>
                     <p className="text-xs text-gray-500">Workload</p>
                     <Badge className={getPriorityColor(task.priority)}>
-                      {task.workloadHours}%
+                      {task.workloadHours}h ({Math.round((task.workloadHours / WEEKLY_CAPACITY_HOURS) * 100)}%)
                     </Badge>
                   </div>
                   <div>
@@ -574,7 +606,10 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
             <div>
               <p className="text-sm text-gray-600">Total Workload</p>
               <p className="text-2xl font-bold text-gray-900">
-                {filteredTasks.reduce((sum, t) => sum + t.workloadHours, 0)}%
+                {filteredTasks.reduce((sum, t) => sum + t.workloadHours, 0)}h
+              </p>
+              <p className="text-xs text-gray-500">
+                {Math.round((filteredTasks.reduce((sum, t) => sum + t.workloadHours, 0) / WEEKLY_CAPACITY_HOURS) * 100)}% of weekly baseline
               </p>
             </div>
             <div>

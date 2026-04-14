@@ -22,6 +22,7 @@ export const BackendApiUrl = {
   generalManagerRecommendationResponse: `${baseUrl}/api/general-manager/predictions/decisions/recommendation-response`,
   employees: `${baseUrl}/api/Employees`,
   employeesList: `${baseUrl}/api/Employees/list`,
+  employeesRecalculateWorkloads: `${baseUrl}/api/Employees/recalculate-workloads`,
   employeeCreate: `${baseUrl}/api/Employees/create`,
   employeeUpdate: (id: string) => `${baseUrl}/api/Employees/update/${id}`,
   employeeDelete: (id: string) => `${baseUrl}/api/Employees/${id}`,

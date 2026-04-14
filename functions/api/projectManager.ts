@@ -223,6 +223,47 @@ const withQuery = (path: string, params: Record<string, string | undefined>): st
   return query.length > 0 ? `${path}?${query}` : path;
 };
 
+const readErrorMessage = async (response: Response, fallbackMessage: string): Promise<string> => {
+  try {
+    const payload = (await response.json()) as Record<string, unknown>;
+
+    const directMessage = asString(payload.message ?? payload.error ?? payload.detail, "");
+    if (directMessage) {
+      return directMessage;
+    }
+
+    const titleMessage = asString(payload.title, "");
+    if (titleMessage) {
+      return titleMessage;
+    }
+
+    const errors = payload.errors;
+    if (errors && typeof errors === "object") {
+      const firstError = Object.values(errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .find((value) => value.length > 0);
+
+      if (firstError) {
+        return firstError;
+      }
+    }
+  } catch {
+    // fall back to plain text handling below
+  }
+
+  try {
+    const text = (await response.text()).trim();
+    if (text.length > 0) {
+      return text;
+    }
+  } catch {
+    // keep fallback message
+  }
+
+  return fallbackMessage;
+};
+
 const normalizeProjects = (payload: unknown): ProjectManagerProjectSummary[] => {
   const record = (payload ?? {}) as Record<string, unknown>;
   const dataRecord = (record.data ?? record.Data ?? null) as Record<string, unknown> | null;
@@ -561,7 +602,9 @@ export async function createProjectManagerChangeRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create change request (${response.status})`);
+    const fallbackMessage = `Failed to create change request (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
@@ -642,6 +685,7 @@ export interface TaskAssignmentCreateInput {
   taskName: string;
   description: string;
   priority: TaskPriority;
+  workloadHours: number;
   dueDate: string;
   assignedByUserId: string;
 }
@@ -650,6 +694,7 @@ export interface TaskAssignmentUpdateInput {
   taskId: string;
   status: "pending" | "in-progress" | "completed";
   priority?: TaskPriority;
+  workloadHours?: number;
   dueDate?: string;
 }
 
@@ -665,7 +710,7 @@ const normalizeTaskAssignments = (payload: unknown): ProjectTaskAssignment[] => 
   return source.map((item, index) => {
     const record = item as Record<string, unknown>;
     const priority = normalizeTaskPriority(record.priority ?? record.Priority ?? "low");
-    const workloadHours = WORKLOAD_CONFIG[priority]?.hours ?? 20;
+    const workloadHours = asNumber(record.workloadHours ?? record.WorkloadHours, WORKLOAD_CONFIG[priority]?.hours ?? 20);
 
     return {
       taskId: asString(record.taskId ?? record.task_id ?? record.id, String(index + 1)),
@@ -731,6 +776,7 @@ export async function createTaskAssignment(input: TaskAssignmentCreateInput): Pr
       taskName: input.taskName,
       description: input.description,
       priority: input.priority,
+      workloadHours: input.workloadHours,
       dueDate: normalizeDateOnlyString(input.dueDate),
       assignedByUserId: input.assignedByUserId,
     }),
@@ -765,6 +811,7 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
       taskId: input.taskId,
       status,
       priority,
+      workloadHours: input.workloadHours,
       dueDate: input.dueDate ? normalizeDateOnlyString(input.dueDate) : undefined,
     }),
   });
