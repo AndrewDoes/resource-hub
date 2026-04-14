@@ -117,7 +117,11 @@ export function Settings() {
       try {
         const response = await fetch("/api/gateway/api/User/get-profile", {
           headers: {
-            "X-Debug-User": currentUser.name,
+            // Harusnya pake yg di bawah ini, tapi karena belum ada auth, gw bikin biar test change profilenya pke Marketing User aja
+            // "X-Debug-User": currentUser.name,
+
+            "X-Debug-User":
+              process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
           },
         });
 
@@ -171,7 +175,11 @@ export function Settings() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "X-Debug-User": currentUser.name,
+
+          // Hrsnya pke yg bawah ini, cmn krn buat testing doang, gw set ke Marketing User biar bisa liat perubahan nama di DB
+          // "X-Debug-User": currentUser.name,
+          "X-Debug-User":
+            process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
         },
         body: JSON.stringify({
           fullName: profileData.name,
