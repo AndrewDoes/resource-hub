@@ -1,4 +1,4 @@
-import { RejectedProject } from './types';
+import { RejectedProject } from '../types';
 
 // Structured skill categories
 export const skillCategories = {
