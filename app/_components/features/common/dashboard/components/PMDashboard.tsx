@@ -429,7 +429,7 @@ export function PMDashboard() {
           roleName: inferredRoleName,
           startDate: targetProject.startDate,
           endDate: targetProject.endDate,
-          allocationPercent: 100,
+          allocationPercent: 50,
           requiredSkills: affectedEmployee?.skills ?? [],
           additionalNeeds: `System conflict ${conflict.id}: ${conflict.details}`,
         });

@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   Folder,
   Gavel,
+  CheckSquare,
 } from 'lucide-react';
 import { UserRole } from '@/app/types';
 import { roleConfig } from '@/app/context/RoleContext';
@@ -35,6 +36,7 @@ export const allMenuItems: MenuItem[] = [
   { path: '/marketing/projects', label: 'Create Project', icon: FileText, roles: ['marketing'] },
   { path: '/pm/project-overview', label: 'Project Overview', icon: Folder, roles: ['pm'] },
   { path: '/pm/project-manager', label: 'Project Manager', icon: Briefcase, roles: ['pm'] },
+  { path: '/pm/task-assignments', label: 'Task Assignments', icon: CheckSquare, roles: ['pm'] },
   { path: '/gm/planning', label: 'Planning', icon: CalendarCheck, roles: ['gm'] },
   { path: '/gm/decision-panel', label: 'Decision Panel', icon: Gavel, roles: ['gm'] },
   { path: '/hr/hr-validation', label: 'HR Validation', icon: ClipboardCheck, roles: ['hr'] },

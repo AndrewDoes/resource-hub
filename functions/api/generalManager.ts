@@ -103,6 +103,11 @@ export interface GeneralManagerRecommendationResponse {
   action: string;
 }
 
+export interface RecalculateEmployeeWorkloadsResult {
+  totalEmployeesRecalculated: number;
+  overloadedEmployeeCount: number;
+}
+
 export interface GeneralManagerAssignmentRequest {
   id: string;
   projectId: string;
@@ -400,6 +405,29 @@ export async function fetchGeneralManagerWorkforceSummary(): Promise<GeneralMana
 
   const payload: unknown = await response.json();
   return normalizeWorkforceSummary(payload);
+}
+
+export async function recalculateEmployeeWorkloads(): Promise<RecalculateEmployeeWorkloadsResult> {
+  const response = await fetch(BackendApiUrl.employeesRecalculateWorkloads, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to recalculate workloads (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+
+  return {
+    totalEmployeesRecalculated: asNumber(
+      payload.totalEmployeesRecalculated ?? payload.TotalEmployeesRecalculated,
+      0
+    ),
+    overloadedEmployeeCount: asNumber(
+      payload.overloadedEmployeeCount ?? payload.OverloadedEmployeeCount,
+      0
+    ),
+  };
 }
 
 export async function fetchGeneralManagerProjectPrediction(projectId: string, candidateLimit?: number): Promise<GeneralManagerProjectPrediction> {

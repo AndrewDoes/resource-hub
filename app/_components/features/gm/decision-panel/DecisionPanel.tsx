@@ -134,6 +134,7 @@ const buildRecommendationsFromPrediction = (
         employeeId: topCandidate.employeeId,
         roleName: requirement.roleName,
         requiredSkills: requirement.requiredSkills,
+        allocationPercent: Math.max(10, Math.min(0, Math.round(topCandidate.availabilityPercent))),
       },
     });
   });
@@ -400,6 +401,10 @@ export function DecisionPanel() {
       if (recommendation.type === 'add-resource') {
         const employeeId = recommendation.metadata?.employeeId;
         const roleName = recommendation.metadata?.roleName;
+        const allocationPercent = Math.max(
+          10,
+          Math.min(100, recommendation.metadata?.allocationPercent ?? 50)
+        );
 
         if (!employeeId || !roleName) {
           addToast({

@@ -188,7 +188,6 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
             assignments
               .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
               .filter((assignment) => !finishedProjectStatuses.has(assignment.projectStatus.trim().toLowerCase()))
-              .filter((assignment) => assignment.allocationPercent > 0)
               .map((assignment) => assignment.projectName)
               .filter((name) => name.trim().length > 0)
           )
