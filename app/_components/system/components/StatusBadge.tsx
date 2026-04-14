@@ -10,7 +10,7 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, showLabel = true }: StatusBadgeProps) {
   const getStatusConfig = () => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'draft':
         return { icon: Clock, bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' };
       case 'submitted':
