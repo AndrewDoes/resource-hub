@@ -186,6 +186,30 @@ const normalizeDateOnlyString = (value: string): string => {
   return match ? match[0] : value;
 };
 
+const normalizeTaskPriority = (value: unknown): TaskPriority => {
+  const raw = typeof value === "string" ? value.toLowerCase() : "";
+  if (raw === "high") {
+    return "high";
+  }
+  if (raw === "medium") {
+    return "medium";
+  }
+
+  return "low";
+};
+
+const normalizeTaskStatus = (value: unknown): "pending" | "in-progress" | "completed" => {
+  const raw = typeof value === "string" ? value.toLowerCase().replace("_", "-") : "";
+  if (raw === "completed") {
+    return "completed";
+  }
+  if (raw === "inprogress" || raw === "in-progress") {
+    return "in-progress";
+  }
+
+  return "pending";
+};
+
 const withQuery = (path: string, params: Record<string, string | undefined>): string => {
   const searchParams = new URLSearchParams();
 
@@ -579,3 +603,177 @@ export const projectManagerFallbackProjects: ProjectManagerProjectSummary[] = [
     description: "Comprehensive marketing campaign for Q3 product launch",
   },
 ];
+
+// Task Assignment Types and Functions
+export type TaskPriority = "low" | "medium" | "high";
+
+export interface TaskAssignmentWorkloadConfig {
+  priority: TaskPriority;
+  hours: number;
+  label: string;
+  color: string;
+}
+
+export const WORKLOAD_CONFIG: Record<TaskPriority, TaskAssignmentWorkloadConfig> = {
+  low: { priority: "low", hours: 20, label: "Low (20%)", color: "bg-blue-100 text-blue-700" },
+  medium: { priority: "medium", hours: 30, label: "Medium (30%)", color: "bg-yellow-100 text-yellow-700" },
+  high: { priority: "high", hours: 50, label: "High (50%)", color: "bg-red-100 text-red-700" },
+};
+
+export interface ProjectTaskAssignment {
+  taskId: string;
+  projectId: string;
+  projectName: string;
+  employeeId: string;
+  employeeName: string;
+  taskName: string;
+  description: string;
+  priority: TaskPriority;
+  workloadHours: number;
+  assignedDate: string;
+  dueDate: string;
+  status: "pending" | "in-progress" | "completed";
+  createdAt: string;
+}
+
+export interface TaskAssignmentCreateInput {
+  projectId: string;
+  employeeId: string;
+  taskName: string;
+  description: string;
+  priority: TaskPriority;
+  dueDate: string;
+  assignedByUserId: string;
+}
+
+export interface TaskAssignmentUpdateInput {
+  taskId: string;
+  status: "pending" | "in-progress" | "completed";
+  priority?: TaskPriority;
+  dueDate?: string;
+}
+
+const normalizeTaskAssignments = (payload: unknown): ProjectTaskAssignment[] => {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as Record<string, unknown>)?.tasks)
+      ? (payload as Record<string, unknown>).tasks
+      : Array.isArray((payload as Record<string, unknown>)?.data)
+        ? (payload as Record<string, unknown>).data
+        : [];
+
+  return source.map((item, index) => {
+    const record = item as Record<string, unknown>;
+    const priority = normalizeTaskPriority(record.priority ?? record.Priority ?? "low");
+    const workloadHours = WORKLOAD_CONFIG[priority]?.hours ?? 20;
+
+    return {
+      taskId: asString(record.taskId ?? record.task_id ?? record.id, String(index + 1)),
+      projectId: asString(record.projectId ?? record.project_id, ""),
+      projectName: asString(record.projectName ?? record.project_name, "Unknown Project"),
+      employeeId: asString(record.employeeId ?? record.employee_id, ""),
+      employeeName: asString(record.employeeName ?? record.employee_name ?? record.fullName ?? record.full_name, "Unknown Employee"),
+      taskName: asString(record.taskName ?? record.task_name ?? record.name, "Untitled Task"),
+      description: asString(record.description ?? record.Description, ""),
+      priority,
+      workloadHours,
+      assignedDate: asString(record.assignedDate ?? record.assigned_date, new Date().toISOString()),
+      dueDate: asString(record.dueDate ?? record.due_date, new Date(Date.now() + 86400000 * 7).toISOString()),
+      status: normalizeTaskStatus(record.status ?? record.Status ?? "pending"),
+      createdAt: asString(record.createdAt ?? record.created_at, new Date().toISOString()),
+    };
+  });
+};
+
+export async function fetchTaskAssignmentsForProject(pmUserId: string, projectId: string): Promise<ProjectTaskAssignment[]> {
+  const url = withQuery(`${BackendApiUrl.taskAssignmentsForProject(projectId)}`, {
+    pmUserId,
+  });
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load task assignments (${response.status})`);
+    }
+    const payload = await response.json();
+    return normalizeTaskAssignments(payload);
+  } catch {
+    // Return empty array on error to allow fallback to create new tasks
+    return [];
+  }
+}
+
+export async function fetchAllTaskAssignments(pmUserId: string): Promise<ProjectTaskAssignment[]> {
+  try {
+    const url = withQuery(`${BackendApiUrl.taskAssignmentsList}`, {
+      pmUserId,
+    });
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load all task assignments (${response.status})`);
+    }
+    const payload = await response.json();
+    return normalizeTaskAssignments(payload);
+  } catch {
+    return [];
+  }
+}
+
+export async function createTaskAssignment(input: TaskAssignmentCreateInput): Promise<ProjectTaskAssignment> {
+  const response = await fetch(BackendApiUrl.taskAssignmentsCreate, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      projectId: input.projectId,
+      employeeId: input.employeeId,
+      taskName: input.taskName,
+      description: input.description,
+      priority: input.priority,
+      dueDate: normalizeDateOnlyString(input.dueDate),
+      assignedByUserId: input.assignedByUserId,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create task assignment (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  const normalized = normalizeTaskAssignments([payload]);
+  return normalized[0] || { taskId: '', projectId: '', projectName: '', employeeId: '', employeeName: '', taskName: '', description: '', priority: 'low', workloadHours: 20, assignedDate: new Date().toISOString(), dueDate: new Date().toISOString(), status: 'pending', createdAt: new Date().toISOString() };
+}
+
+export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Promise<ProjectTaskAssignment> {
+  const status = input.status === 'in-progress'
+    ? 'InProgress'
+    : input.status === 'completed'
+      ? 'Completed'
+      : 'Pending';
+
+  const priority = input.priority
+    ? input.priority.charAt(0).toUpperCase() + input.priority.slice(1)
+    : undefined;
+
+  const response = await fetch(BackendApiUrl.taskAssignmentsUpdate, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      taskId: input.taskId,
+      status,
+      priority,
+      dueDate: input.dueDate ? normalizeDateOnlyString(input.dueDate) : undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update task assignment (${response.status})`);
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  const normalized = normalizeTaskAssignments([payload]);
+  return normalized[0] || { taskId: '', projectId: '', projectName: '', employeeId: '', employeeName: '', taskName: '', description: '', priority: 'low', workloadHours: 20, assignedDate: new Date().toISOString(), dueDate: new Date().toISOString(), status: 'pending', createdAt: new Date().toISOString() };
+}
