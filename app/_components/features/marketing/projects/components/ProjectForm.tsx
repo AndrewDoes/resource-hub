@@ -222,109 +222,113 @@ export function ProjectForm({
       </div>
 
       {/* Attachments */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Attachments
-        </label>
+      {!isRevisionMode && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Attachments
+          </label>
 
-        <input
-          type="file"
-          multiple
-          className="hidden"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
-        />
-
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-            isDragging
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-300 hover:border-blue-500"
-          }`}
-        >
-          <Paperclip
-            className={`w-8 h-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-gray-400"}`}
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
           />
-          <p className="text-sm text-gray-600">
-            Click to upload or drag and drop
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            PDF, DOC, XLS, or images (max 10MB)
-          </p>
-        </div>
 
-        {fileError && (
-          <p className="mt-2 text-sm text-red-600 font-medium">{fileError}</p>
-        )}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+              isDragging
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-blue-500"
+            }`}
+          >
+            <Paperclip
+              className={`w-8 h-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-gray-400"}`}
+            />
+            <p className="text-sm text-gray-600">
+              Click to upload or drag and drop
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              PDF, DOC, XLS, or images (max 10MB)
+            </p>
+          </div>
 
-        {uploadErrors && uploadErrors.length > 0 && (
-          <div className="mt-2">
-            <p className="text-sm text-red-600 font-medium">Upload Errors:</p>
-            <ul className="list-disc list-inside text-sm text-red-600">
-              {uploadErrors.map((error, idx) => (
-                <li key={idx}>{error}</li>
+          {fileError && (
+            <p className="mt-2 text-sm text-red-600 font-medium">{fileError}</p>
+          )}
+
+          {uploadErrors && uploadErrors.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-red-600 font-medium">Upload Errors:</p>
+              <ul className="list-disc list-inside text-sm text-red-600">
+                {uploadErrors.map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* File Previews */}
+          {formData.attachments && formData.attachments.length > 0 && (
+            <ul className="mt-4 space-y-2">
+              {formData.attachments.map((file, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg group"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <Paperclip className="w-5 h-5 text-gray-400 shrink-0" />
+                    <span className="text-sm font-medium text-gray-700 truncate">
+                      {file.name}
+                    </span>
+                    <span className="text-xs text-gray-500 shrink-0">
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(idx);
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </li>
               ))}
             </ul>
-          </div>
-        )}
-
-        {/* File Previews */}
-        {formData.attachments && formData.attachments.length > 0 && (
-          <ul className="mt-4 space-y-2">
-            {formData.attachments.map((file, idx) => (
-              <li
-                key={idx}
-                className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg group"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <Paperclip className="w-5 h-5 text-gray-400 shrink-0" />
-                  <span className="text-sm font-medium text-gray-700 truncate">
-                    {file.name}
-                  </span>
-                  <span className="text-xs text-gray-500 shrink-0">
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(idx);
-                  }}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
         {!isRevisionMode && (
-          <button
-            type="button"
-            onClick={() => onCancel?.()}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
-          >
-            Cancel
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onCancel?.()}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
+            >
+              <Save className="w-4 h-4" />
+              Save Draft
+            </button>
+          </>
         )}
-        <button
-          type="button"
-          onClick={onSaveDraft}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
-        >
-          <Save className="w-4 h-4" />
-          Save Draft
-        </button>
         <button
           type="submit"
           disabled={isSubmitting}
