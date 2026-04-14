@@ -80,7 +80,7 @@ export function HRValidation() {
             const role = roleMatch ? roleMatch[1].trim() : "New Resource";
 
             const skillsMatch = details.match(/Skills: (.*)/i);
-            const skills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()) : [];
+            const skills = skillsMatch ? skillsMatch[1].split(',').map((s: string) => s.trim()) : [];
 
             return {
               id: d.id,
@@ -175,7 +175,7 @@ export function HRValidation() {
   const handleClarifyDecision = (id: string) => {
     const decision = gmDecisions.find(d => d.id === id);
     if (!decision) return;
-    
+
     setSelectedDecision(decision);
     setIsClarifyModalOpen(true);
   };
@@ -186,7 +186,7 @@ export function HRValidation() {
     try {
       setIsSubmitLoading(true);
       const success = await requestClarification(selectedDecision.id, reason);
-      
+
       if (success) {
         markDecisionExecuted(selectedDecision.id, 'clarification-requested');
         setIsClarifyModalOpen(false);

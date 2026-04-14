@@ -200,6 +200,7 @@ export function Settings() {
 
       setCurrentUser({
         ...currentUser,
+        id: currentUser.id,
         name: data.fullName,
         email: data.email,
         avatar: initials,

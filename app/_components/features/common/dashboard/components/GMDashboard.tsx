@@ -88,11 +88,16 @@ const mapContractDecisionToConflict = (decision: GeneralManagerContractDecision)
 
 
 export function GMDashboard() {
+  const [hasMounted, setHasMounted] = useState(false);
   const [pendingActions, setPendingActions] = useState<GMAction[]>([]);
   const [resourceConflicts, setResourceConflicts] = useState<ResourceConflict[]>([]);
   const [summary, setSummary] = useState<GeneralManagerWorkforceSummary>(emptySummary);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -302,15 +307,23 @@ export function GMDashboard() {
       {/* Utilization Chart */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Workforce Metrics</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="metric" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="utilization" stroke="#3B82F6" strokeWidth={2} name="Utilization %" />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="h-[200px] w-full">
+          {hasMounted ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="metric" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Line type="monotone" dataKey="utilization" stroke="#3B82F6" strokeWidth={2} name="Utilization %" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full bg-gray-50 rounded flex items-center justify-center text-xs text-gray-400">
+              Loading chart...
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

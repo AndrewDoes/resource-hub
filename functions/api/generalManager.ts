@@ -146,6 +146,8 @@ interface GeneralManagerProjectPredictionResponse {
   candidatePoolSize?: unknown;
   candidateLimit?: unknown;
   requirements?: unknown;
+  data?: unknown;
+  Data?: unknown;
 }
 
 interface GeneralManagerContractDecisionResponse {

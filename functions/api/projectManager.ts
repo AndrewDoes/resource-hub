@@ -274,7 +274,7 @@ const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember
         ? (payload as ProjectManagerTeamResponse).data
         : [];
 
-  return source.map((item, index) => {
+  return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
 
     return {
@@ -337,7 +337,7 @@ const normalizeActivities = (payload: unknown): ProjectManagerProjectActivity[] 
         ? (payload as ProjectManagerActivityResponse).data
         : [];
 
-  return source.map((item, index) => {
+  return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
 
     return {
@@ -356,7 +356,7 @@ const normalizeMilestones = (payload: unknown): ProjectManagerMilestone[] => {
         ? (payload as ProjectManagerMilestonesResponse).data
         : [];
 
-  return source.map((item, index) => {
+  return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
 
     return {
@@ -379,7 +379,7 @@ const normalizeTimelineTasks = (payload: unknown): ProjectManagerTimelineTask[] 
         ? (payload as ProjectManagerTimelineTasksResponse).data
         : [];
 
-  return source.map((item, index) => {
+  return (source as any[]).map((item, index) => {
     const record = item as Record<string, unknown>;
 
     return {
