@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Paperclip, Plus, Save, Send } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Paperclip, Plus, Save, Send, X } from "lucide-react";
 import { ProjectBasicInfo } from "./ProjectBasicInfo";
 import { SkillSelector } from "./SkillSelector";
 import { ResourceRequirementItem } from "./ResourceRequirementItem";
@@ -24,7 +24,7 @@ export interface ProjectFormProps {
   suggestedEmployees: SuggestedEmployee[];
   isRevisionMode?: boolean;
 
-  onFormDataChange: (field: keyof ProjectFormData, value: string) => void;
+  onFormDataChange: (field: keyof ProjectFormData, value: any) => void;
   onAddSkill: (skill: SkillItem) => void;
   onRemoveSkill: (skillId: string) => void;
   addResourceRequirement: () => void;
@@ -56,6 +56,82 @@ export function ProjectForm({
   onSaveDraft,
   onSubmit,
 }: ProjectFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  ];
+
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_SIZE) {
+      return `File ${file.name} exceeds the 10MB limit.`;
+    }
+    if (!file.type.startsWith("image/") && !ALLOWED_TYPES.includes(file.type)) {
+      return `File ${file.name} has an unsupported format.`;
+    }
+    return null;
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const processFiles = (files: File[]) => {
+    let errorMsg = null;
+    const validFiles: File[] = [];
+
+    files.forEach((file) => {
+      const error = validateFile(file);
+      if (error) {
+        errorMsg = error;
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    setFileError(errorMsg);
+
+    if (validFiles.length > 0) {
+      const currentFiles = formData.attachments || [];
+      onFormDataChange("attachments", [...currentFiles, ...validFiles]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(Array.from(e.target.files));
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    const newFiles = (formData.attachments || []).filter((_, index) => index !== indexToRemove);
+    onFormDataChange("attachments", newFiles);
+  };
+
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       {/* Project Basic Info */}
@@ -132,8 +208,26 @@ export function ProjectForm({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Attachments
         </label>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer">
-          <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+        
+        <input 
+          type="file" 
+          multiple 
+          className="hidden" 
+          ref={fileInputRef} 
+          onChange={handleFileSelect}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
+        />
+
+        <div 
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+            isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-500"
+          }`}
+        >
+          <Paperclip className={`w-8 h-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-gray-400"}`} />
           <p className="text-sm text-gray-600">
             Click to upload or drag and drop
           </p>
@@ -141,6 +235,36 @@ export function ProjectForm({
             PDF, DOC, XLS, or images (max 10MB)
           </p>
         </div>
+        
+        {fileError && (
+          <p className="mt-2 text-sm text-red-600 font-medium">
+            {fileError}
+          </p>
+        )}
+
+        {/* File Previews */}
+        {formData.attachments && formData.attachments.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {formData.attachments.map((file, idx) => (
+               <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg group">
+                 <div className="flex items-center gap-3 overflow-hidden">
+                   <Paperclip className="w-5 h-5 text-gray-400 shrink-0" />
+                   <span className="text-sm font-medium text-gray-700 truncate">{file.name}</span>
+                   <span className="text-xs text-gray-500 shrink-0">
+                     {(file.size / (1024 * 1024)).toFixed(2)} MB
+                   </span>
+                 </div>
+                 <button 
+                   type="button" 
+                   onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                   className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                 >
+                   <X className="w-4 h-4" />
+                 </button>
+               </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Action Buttons */}

@@ -288,8 +288,14 @@ export function ProjectEntry() {
               resourceRequirements={resourceRequirements}
               suggestedEmployees={suggestedEmployees}
               onFormDataChange={handleFormDataChange}
-              onAddSkill={(skill) => setSelectedSkills([...selectedSkills, skill])}
-              onRemoveSkill={(skillId) => setSelectedSkills(selectedSkills.filter((s) => s.id !== skillId))}
+              onAddSkill={(skill) =>
+                setSelectedSkills([...selectedSkills, skill])
+              }
+              onRemoveSkill={(skillId) =>
+                setSelectedSkills(
+                  selectedSkills.filter((s) => s.id !== skillId),
+                )
+              }
               addResourceRequirement={addResourceRequirement}
               removeResourceRequirement={removeResourceRequirement}
               updateResourceRequirement={updateResourceRequirement}
