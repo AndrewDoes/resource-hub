@@ -208,10 +208,20 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
  * This can be used in the component to bridge the API and the UI types.
  */
 export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
+  const workload = Math.max(0, Math.round(apiItem.workloadPercent));
+  const workloadStatus =
+    workload > 100
+      ? 'overloaded'
+      : workload > 70
+        ? 'busy'
+        : workload > 40
+          ? 'moderate'
+          : 'available';
+
   return {
     id: apiItem.id,
     name: apiItem.fullName,
-    avatar: getInitials(apiItem.fullName),
+    avatar: getInitials(apiItem.fullName) || 'U',
     role: apiItem.jobTitle,
     email: apiItem.email,
     phone: apiItem.phone,
@@ -219,10 +229,10 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     department: apiItem.department ?? "General",
     skills: apiItem.skills || [],
     status: apiItem.status.toLowerCase() === "active" ? "active" : apiItem.status.toLowerCase() === "inactive" ? "inactive" : "terminated",
-    workloadStatus: apiItem.workloadStatus,
-    availability: apiItem.availabilityPercent,
-    workload: apiItem.workloadPercent,
-    assignedHours: apiItem.assignedHours,
+    workloadStatus,
+    availability: Math.max(0, Math.min(100, Math.round(apiItem.availabilityPercent))),
+    workload,
+    assignedHours: Math.max(0, Math.round(apiItem.assignedHours * 10) / 10),
     currentProjects: apiItem.assignments
       .filter((a: any) => {
         const s = a.status?.toLowerCase();
@@ -248,12 +258,22 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
  * Maps the backend HREmployeeListItem to the EmployeeStatus type used by Validation components.
  */
 export const mapToUIEmployeeStatus = (apiItem: HREmployeeListItem): any => {
+  const workload = Math.max(0, Math.round(apiItem.workloadPercent));
+  const workloadStatus =
+    workload > 100
+      ? 'overloaded'
+      : workload > 70
+        ? 'busy'
+        : workload > 40
+          ? 'moderate'
+          : 'available';
+
   return {
     id: apiItem.id,
     name: apiItem.fullName,
-    avatar: getInitials(apiItem.fullName),
+    avatar: getInitials(apiItem.fullName) || 'U',
     status: apiItem.status.toLowerCase(),
-    workloadStatus: apiItem.workloadStatus,
+    workloadStatus,
     currentProjects: apiItem.assignments
       .filter((a: any) => {
         const s = a.status?.toLowerCase();
@@ -266,9 +286,9 @@ export const mapToUIEmployeeStatus = (apiItem: HREmployeeListItem): any => {
         );
       })
       .map((a: any) => a.projectName || "Unknown Project"),
-    assignedHours: apiItem.assignedHours,
-    workload: apiItem.workloadPercent,
-    availability: apiItem.availabilityPercent,
+    assignedHours: Math.max(0, Math.round(apiItem.assignedHours * 10) / 10),
+    workload,
+    availability: Math.max(0, Math.min(100, Math.round(apiItem.availabilityPercent))),
   };
 };
 
