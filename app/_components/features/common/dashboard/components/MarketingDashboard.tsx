@@ -1,16 +1,17 @@
 'use client';
 
-import { 
-  FileText, 
-  Clock, 
-  XCircle, 
-  ArrowRight 
+import {
+  FileText,
+  Clock,
+  XCircle,
+  ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
 // import { marketingProjects } from '@/app/_components/features/common/dashboard/data';
 import { ProjectStatus } from '@/app/types';
-import React, { useState, useEffect } from 'react';
-import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
+import { authorizedFetch } from '@/functions/api/authorizedFetch';
+import { useEffect, useState } from 'react';
+import { StatusBadge } from '@/app/_components/system/WorkflowSystem';
 
 
 export function MarketingDashboard() {
@@ -21,17 +22,12 @@ export function MarketingDashboard() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await fetch('/api/gateway/api/projects/list', {
-          headers: {
-            'X-Debug-Role': 'marketing',
-            'X-Debug-User': 'marketing-user'
-          }
-        });
-        
+        const response = await authorizedFetch('/api/gateway/api/projects/list');
+
         if (!response.ok) {
           throw new Error('Failed to fetch projects');
         }
-        
+
         const data = await response.json();
         // Fallback for mapping the API fields to the fields expected by the UI.
         const mappedProjects = (data.projects || []).map((p: any) => ({
@@ -41,7 +37,7 @@ export function MarketingDashboard() {
           lastModified: p.startDate ? `Started ${p.startDate}` : 'Unknown', // Fallback since API lacks lastModified
           feedback: null // Fallback since API lacks feedback field for now
         }));
-        
+
         setProjects(mappedProjects);
       } catch (err: any) {
         setError(err.message);

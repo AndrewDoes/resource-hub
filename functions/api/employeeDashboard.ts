@@ -1,6 +1,6 @@
-// API utility for Employee Dashboard
 import { BackendApiUrl } from "../BackendApiUrl";
 import { updateAssignmentStatus } from "./humanResource";
+import { authorizedFetch } from "./authorizedFetch";
 
 export interface EmployeeDashboardAssignment {
   id: string;
@@ -21,17 +21,17 @@ export interface EmployeeDashboardData {
 }
 
 export async function fetchEmployeeDashboard(employeeId: string): Promise<EmployeeDashboardData> {
-  const response = await fetch(BackendApiUrl.employeeDashboard(employeeId));
+  const response = await authorizedFetch(BackendApiUrl.employeeDashboard(employeeId));
 
   if (!response.ok) {
     throw new Error(`Failed to load employee dashboard (${response.status})`);
   }
 
   const payload = await response.json();
-  
+
   // The backend might return camelCase or PascalCase depending on JSON serializer settings
   // Normalizing to lowercase/standard names here if necessary.
-  
+
   return {
     pendingAssignmentsCount: payload.pendingAssignmentsCount ?? payload.PendingAssignmentsCount ?? 0,
     activeProjectsCount: payload.activeProjectsCount ?? payload.ActiveProjectsCount ?? 0,

@@ -1,4 +1,5 @@
 import { BackendApiUrl } from "../BackendApiUrl";
+import { authorizedFetch } from "./authorizedFetch";
 
 export type GeneralManagerResourceStatus = "available" | "moderate" | "busy" | "overloaded";
 
@@ -397,7 +398,7 @@ const normalizeMarketingDraftProjects = (payload: unknown): GeneralManagerMarket
 };
 
 export async function fetchGeneralManagerWorkforceSummary(): Promise<GeneralManagerWorkforceSummary> {
-  const response = await fetch(BackendApiUrl.generalManagerWorkforceSummary);
+  const response = await authorizedFetch(BackendApiUrl.generalManagerWorkforceSummary);
 
   if (!response.ok) {
     throw new Error(`Failed to load workforce summary (${response.status})`);
@@ -408,7 +409,7 @@ export async function fetchGeneralManagerWorkforceSummary(): Promise<GeneralMana
 }
 
 export async function recalculateEmployeeWorkloads(): Promise<RecalculateEmployeeWorkloadsResult> {
-  const response = await fetch(BackendApiUrl.employeesRecalculateWorkloads, {
+  const response = await authorizedFetch(BackendApiUrl.employeesRecalculateWorkloads, {
     method: "POST",
   });
 
@@ -435,7 +436,7 @@ export async function fetchGeneralManagerProjectPrediction(projectId: string, ca
     candidateLimit: typeof candidateLimit === "number" ? String(candidateLimit) : undefined,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project prediction (${response.status})`);
@@ -446,7 +447,7 @@ export async function fetchGeneralManagerProjectPrediction(projectId: string, ca
 }
 
 export async function fetchGeneralManagerContractDecisions(): Promise<GeneralManagerContractDecision[]> {
-  const response = await fetch(BackendApiUrl.generalManagerContractDecisions);
+  const response = await authorizedFetch(BackendApiUrl.generalManagerContractDecisions);
 
   if (!response.ok) {
     throw new Error(`Failed to load contract decisions (${response.status})`);
@@ -491,7 +492,7 @@ const normalizeDecisions = (payload: unknown): GeneralManagerDecision[] => {
  * Fetches the list of all high-level decisions made by the General Manager.
  */
 export async function fetchGeneralManagerDecisions(): Promise<GeneralManagerDecision[]> {
-  const response = await fetch(BackendApiUrl.generalManagerDecisions);
+  const response = await authorizedFetch(BackendApiUrl.generalManagerDecisions);
 
   if (!response.ok) {
     throw new Error(`Failed to load decisions (${response.status})`);
@@ -504,11 +505,8 @@ export async function fetchGeneralManagerDecisions(): Promise<GeneralManagerDeci
 export async function submitGeneralManagerRecommendationResponse(
   request: GeneralManagerRecommendationResponseRequest
 ): Promise<GeneralManagerRecommendationResponse> {
-  const response = await fetch(BackendApiUrl.generalManagerRecommendationResponse, {
+  const response = await authorizedFetch(BackendApiUrl.generalManagerRecommendationResponse, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(request),
   });
 
@@ -526,7 +524,7 @@ export async function submitGeneralManagerRecommendationResponse(
 }
 
 export async function fetchGeneralManagerPendingAssignmentRequests(): Promise<GeneralManagerAssignmentRequest[]> {
-  const response = await fetch(`${BackendApiUrl.assignmentsList}?status=Pending`);
+  const response = await authorizedFetch(`${BackendApiUrl.assignmentsList}?status=Pending`);
 
   if (!response.ok) {
     throw new Error(`Failed to load pending assignment requests (${response.status})`);
@@ -547,11 +545,8 @@ export async function updateGeneralManagerAssignmentRequestStatus(
   assignmentId: string,
   status: 'GmApproved' | 'Rejected'
 ): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
+  const response = await authorizedFetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({ assignmentId, status }),
   });
 
@@ -559,7 +554,7 @@ export async function updateGeneralManagerAssignmentRequestStatus(
 }
 
 export async function fetchGeneralManagerMarketingDraftProjects(): Promise<GeneralManagerMarketingDraftProject[]> {
-  const response = await fetch(`${BackendApiUrl.projects}/list?pageNumber=1&pageSize=100`);
+  const response = await authorizedFetch(`${BackendApiUrl.projects}/list?pageNumber=1&pageSize=100`);
 
   if (!response.ok) {
     throw new Error(`Failed to load marketing projects (${response.status})`);
@@ -580,11 +575,8 @@ export async function reviewGeneralManagerMarketingDraftProject(
   rejectionReason?: string,
   pmOwnerUserId?: string
 ): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
+  const response = await authorizedFetch(BackendApiUrl.projectsUpdateStatus, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       projectId,
       status: action,

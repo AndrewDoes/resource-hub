@@ -23,6 +23,7 @@ import {
   fetchProjectManagerProjectTeam,
   createProjectManagerChangeRequest,
   type ProjectManagerProjectSummary,
+  type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
 
 // Sub-components
@@ -224,17 +225,17 @@ export function DecisionPanel() {
 
       if (projectResult.status === 'fulfilled') {
         const activeSummaries = projectResult.value.filter(
-          (summary) => !isFinishedProject(summary)
+          (summary: ProjectManagerProjectSummary) => !isFinishedProject(summary)
         );
 
         const teamResults = await Promise.all(
-          activeSummaries.map(async (summary) => {
+          activeSummaries.map(async (summary: ProjectManagerProjectSummary) => {
             try {
               const team = await fetchProjectManagerProjectTeam(defaultPmUserId, summary.id);
 
               return {
                 projectId: summary.id,
-                teamMembers: team.map((member) => member.fullName),
+                teamMembers: team.map((member: ProjectManagerProjectTeamMember) => member.fullName),
               };
             } catch {
               return {
@@ -245,9 +246,9 @@ export function DecisionPanel() {
           })
         );
 
-        const teamMap = new Map(teamResults.map((entry) => [entry.projectId, entry.teamMembers]));
-        const backendProjects = activeSummaries.map((summary) =>
-          mapSummaryToProject(summary, teamMap.get(summary.id) ?? [])
+        const teamMap = new Map<string, string[]>(teamResults.map((entry: { projectId: string; teamMembers: string[] }) => [entry.projectId, entry.teamMembers]));
+        const backendProjects = activeSummaries.map((summary: ProjectManagerProjectSummary) =>
+          mapSummaryToProject(summary, teamMap.get(summary.id) ?? ([] as string[]))
         );
 
         const initialProject = backendProjects[0] ?? null;

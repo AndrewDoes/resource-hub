@@ -1,30 +1,21 @@
 'use client';
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { UserProfile, getProfile } from '@/functions/api/auth';
 
 export type UserRole = 'marketing' | 'pm' | 'gm' | 'hr' | 'employee';
 
-interface User {
-  id: string;
-  name: string;
-  role: UserRole;
-  avatar: string;
-  email: string;
-}
-
 interface RoleContextType {
-  currentUser: User;
-  setCurrentUser: (user: User) => void;
+  currentUser: UserProfile | null;
+  setCurrentUser: (user: UserProfile | null) => void;
+  token: string | null;
+  setToken: (token: string | null) => void;
+  isLoading: boolean;
+  logout: () => void;
 }
 
-const STORAGE_KEY = 'resource-planning-user';
-
-const DEFAULT_USER: User = {
-  id: 'gm-1',
-  name: 'John Doe',
-  role: 'gm',
-  avatar: 'JD',
-  email: 'john.doe@company.com',
-};
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'user_profile';
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
@@ -41,37 +32,94 @@ interface RoleProviderProps {
 }
 
 export function RoleProvider({ children }: RoleProviderProps) {
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    setToken(null);
+    setCurrentUser(null);
+    router.push('/login');
+  }, [router]);
 
   // Load from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to parse saved user', e);
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const savedUser = localStorage.getItem(USER_KEY);
+
+    if (savedToken) {
+      setToken(savedToken);
+        if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          if (user && user.role) {
+            user.role = user.role.toLowerCase();
+          }
+          setCurrentUser(user);
+        } catch (e) {
+          console.error('Failed to parse saved user', e);
+        }
       }
     }
-    setIsLoaded(true);
+    setIsLoading(false);
   }, []);
 
-  // Save to localStorage whenever user changes
+  // Verify token on mount or when it changes
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
-    }
-  }, [currentUser, isLoaded]);
+    const verifyToken = async () => {
+      if (token && !currentUser) {
+        try {
+          const profile = await getProfile();
+          if (profile && profile.role) {
+            profile.role = profile.role.toLowerCase();
+          }
+          setCurrentUser(profile);
+          localStorage.setItem(USER_KEY, JSON.stringify(profile));
+        } catch (error) {
+          console.error('Session verification failed', error);
+          logout();
+        }
+      }
+    };
 
-  return (
-    <RoleContext.Provider value={{ currentUser, setCurrentUser }}>
-      {children}
-    </RoleContext.Provider>
-  );
+    if (token) {
+      verifyToken();
+    }
+  }, [token, currentUser, logout]);
+
+  // Handle redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !token && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+      router.push('/login');
+    }
+  }, [isLoading, token, pathname, router]);
+
+    const setNormalizedUser = useCallback((user: UserProfile | null) => {
+      if (user && user.role) {
+        user.role = user.role.toLowerCase() as UserRole;
+      }
+      setCurrentUser(user);
+    }, []);
+
+    return (
+      <RoleContext.Provider value={{
+        currentUser,
+        setCurrentUser: setNormalizedUser,
+        token,
+        setToken,
+        isLoading,
+        logout
+      }}>
+        {children}
+      </RoleContext.Provider>
+    );
 }
 
-export const roleConfig = {
+export const roleConfig: Record<string, { label: string; color: string }> = {
   marketing: {
     label: 'Marketing',
     color: 'from-purple-500 to-pink-500',

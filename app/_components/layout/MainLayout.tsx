@@ -74,8 +74,9 @@ const filterNotificationsByRole = (notifications: Notification[], role: UserRole
   };
 
   return notifications.filter((notification) => {
-    // Check if notification type is relevant for this role
-    if (!roleNotificationTypes[role].includes(notification.type)) {
+    // Check if role is valid and has notification types defined
+    const allowedTypes = roleNotificationTypes[role];
+    if (!allowedTypes || !allowedTypes.includes(notification.type)) {
       return false;
     }
 
@@ -149,17 +150,31 @@ const initialNotifications: Notification[] = [
 
 export function Root({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { currentUser } = useRole();
+  const { currentUser, isLoading } = useRole();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
-  const menuItems = allMenuItems.filter((item) => item.roles.includes(currentUser.role));
+  // Don't show the main layout on auth pages or when loading/unauthenticated
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
+  if (isLoading || !currentUser) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="text-gray-500 animate-pulse">Loading ResourceHub...</div>
+      </div>
+    );
+  }
+
+  const menuItems = allMenuItems.filter((item) => item.roles.includes(currentUser.role as UserRole));
 
   // Filter notifications by current role
-  const filteredNotifications = filterNotificationsByRole(notifications, currentUser.role);
+  const filteredNotifications = filterNotificationsByRole(notifications, currentUser.role as UserRole);
   const unreadCount = filteredNotifications.filter((n) => !n.read).length;
-
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return pathname === '/' || pathname === '/dashboard';
@@ -178,108 +193,105 @@ export function Root({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ToastProvider>
-      <div className="flex h-screen bg-gray-50">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-semibold text-gray-900">ResourceHub</h1>
-            <p className="text-sm text-gray-500 mt-1">Planning System</p>
-          </div>
-
-          <nav className="flex-1 p-4 space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.path);
-
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${active
-                    ? 'bg-linear-to-r from-blue-50 to-green-50 text-blue-700 font-semibold shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-sm">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
-                <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
-                <p className="text-xs text-gray-500 truncate">{roleConfig[currentUser.role].label}</p>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Navbar */}
-          <header className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-end">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setNotificationOpen(!notificationOpen)}
-                  className={`relative p-2 rounded-lg transition-all ${notificationOpen
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                >
-                  <Bell className="w-5 h-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">{unreadCount}</span>
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
-                >
-                  <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role].color} rounded-full flex items-center justify-center`}>
-                    <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
-                  </div>
-                  <div className="text-left hidden md:block">
-                    <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
-                    <p className="text-xs text-gray-500">{roleConfig[currentUser.role].label}</p>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-            </div>
-          </header>
-
-          {/* Notification Panel */}
-          <NotificationPanel
-            isOpen={notificationOpen}
-            onClose={() => setNotificationOpen(false)}
-            notifications={filteredNotifications}
-            onNotificationClick={handleNotificationClick}
-            onMarkAllRead={handleMarkAllRead}
-          />
-
-          {/* Profile Dropdown */}
-          <ProfileDropdown
-            isOpen={profileOpen}
-            onClose={() => setProfileOpen(false)}
-          />
-
-          {/* Page Content */}
-          <main className="flex-1 overflow-auto p-6">
-            {children}
-          </main>
+    <div className="flex h-screen bg-white">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <h1 className="text-xl font-semibold text-gray-900">ResourceHub</h1>
+          <p className="text-sm text-gray-500 mt-1">Planning System</p>
         </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${active
+                  ? 'bg-linear-to-r from-blue-50 to-green-50 text-blue-700 font-semibold shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role.toLowerCase()]?.color || 'bg-gray-400'} rounded-full flex items-center justify-center`}>
+              <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
+              <p className="text-xs text-gray-500 truncate">{roleConfig[currentUser.role.toLowerCase()]?.label || 'User'}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Navbar */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-end">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setNotificationOpen(!notificationOpen)}
+                className={`relative p-2 rounded-lg transition-all ${notificationOpen
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">{unreadCount}</span>
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
+              >
+                <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role.toLowerCase()]?.color || 'bg-gray-400'} rounded-full flex items-center justify-center`}>
+                  <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
+                </div>
+                <div className="text-left hidden md:block">
+                  <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
+                  <p className="text-xs text-gray-500">{roleConfig[currentUser.role.toLowerCase()]?.label || 'User'}</p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Notification Panel */}
+        <NotificationPanel
+          isOpen={notificationOpen}
+          onClose={() => setNotificationOpen(false)}
+          notifications={filteredNotifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAllRead={handleMarkAllRead}
+        />
+
+        {/* Profile Dropdown */}
+        <ProfileDropdown
+          isOpen={profileOpen}
+          onClose={() => setProfileOpen(false)}
+        />
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-auto p-6">
+          {children}
+        </main>
       </div>
-    </ToastProvider>
+    </div>
   );
 }

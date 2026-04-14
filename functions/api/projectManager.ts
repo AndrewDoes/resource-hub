@@ -1,4 +1,5 @@
 import { BackendApiUrl } from "../BackendApiUrl";
+import { authorizedFetch } from "./authorizedFetch";
 
 export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed" | "completed" | "cancelled";
 
@@ -359,11 +360,8 @@ const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember
 };
 
 export async function persistSplitWorkloadToBackend(input: PersistSplitWorkloadInput): Promise<void> {
-  const response = await fetch(BackendApiUrl.assignmentsSplitWorkload, {
+  const response = await authorizedFetch(BackendApiUrl.assignmentsSplitWorkload, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       projectId: input.projectId,
       fromEmployeeId: input.fromEmployeeId,
@@ -377,19 +375,7 @@ export async function persistSplitWorkloadToBackend(input: PersistSplitWorkloadI
   });
 
   if (!response.ok) {
-    let detail = '';
-    try {
-      const payload = (await response.json()) as Record<string, unknown>;
-      detail = typeof payload.detail === 'string'
-        ? payload.detail
-        : typeof payload.message === 'string'
-          ? payload.message
-          : '';
-    } catch {
-      detail = '';
-    }
-
-    throw new Error(detail || `Failed to persist split workload (${response.status})`);
+    throw new Error(await readErrorMessage(response, `Failed to persist split workload (${response.status})`));
   }
 }
 
@@ -468,7 +454,7 @@ export async function fetchProjectManagerProjects(pmUserId: string): Promise<Pro
     pageSize: "10",
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project manager projects (${response.status})`);
@@ -483,7 +469,7 @@ export async function fetchProjectManagerProjectOverview(pmUserId: string, proje
     pmUserId,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project overview (${response.status})`);
@@ -498,7 +484,7 @@ export async function fetchProjectManagerProjectTeam(pmUserId: string, projectId
     pmUserId,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project team (${response.status})`);
@@ -513,7 +499,7 @@ export async function fetchProjectManagerProjectActivity(pmUserId: string, proje
     pmUserId,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project activity (${response.status})`);
@@ -528,7 +514,7 @@ export async function fetchProjectManagerMilestones(pmUserId: string, projectId:
     pmUserId,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project milestones (${response.status})`);
@@ -543,7 +529,7 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
     pmUserId,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load project timeline tasks (${response.status})`);
@@ -557,11 +543,8 @@ export async function updateProjectManagerProjectStatus(
   projectId: string,
   status: 'Completed' | 'Cancelled'
 ): Promise<ProjectManagerUpdateProjectStatusResult> {
-  const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
+  const response = await authorizedFetch(BackendApiUrl.projectsUpdateStatus, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       projectId,
       status,
@@ -583,11 +566,8 @@ export async function updateProjectManagerProjectStatus(
 export async function createProjectManagerChangeRequest(
   input: ProjectManagerCreateChangeRequestInput
 ): Promise<ProjectManagerCreateChangeRequestResult> {
-  const response = await fetch(BackendApiUrl.assignmentsCreate, {
+  const response = await authorizedFetch(BackendApiUrl.assignmentsCreate, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       projectId: input.projectId,
       employeeId: input.employeeId ?? '00000000-0000-0000-0000-000000000000',
@@ -699,13 +679,13 @@ export interface TaskAssignmentUpdateInput {
 }
 
 const normalizeTaskAssignments = (payload: unknown): ProjectTaskAssignment[] => {
-  const source = Array.isArray(payload)
+  const source: any[] = (Array.isArray(payload)
     ? payload
     : Array.isArray((payload as Record<string, unknown>)?.tasks)
       ? (payload as Record<string, unknown>).tasks
       : Array.isArray((payload as Record<string, unknown>)?.data)
         ? (payload as Record<string, unknown>).data
-        : [];
+        : []) as any[];
 
   return source.map((item, index) => {
     const record = item as Record<string, unknown>;
@@ -736,7 +716,7 @@ export async function fetchTaskAssignmentsForProject(pmUserId: string, projectId
   });
 
   try {
-    const response = await fetch(url);
+    const response = await authorizedFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load task assignments (${response.status})`);
     }
@@ -753,7 +733,7 @@ export async function fetchAllTaskAssignments(pmUserId: string): Promise<Project
     const url = withQuery(`${BackendApiUrl.taskAssignmentsList}`, {
       pmUserId,
     });
-    const response = await fetch(url);
+    const response = await authorizedFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load all task assignments (${response.status})`);
     }
@@ -765,11 +745,8 @@ export async function fetchAllTaskAssignments(pmUserId: string): Promise<Project
 }
 
 export async function createTaskAssignment(input: TaskAssignmentCreateInput): Promise<ProjectTaskAssignment> {
-  const response = await fetch(BackendApiUrl.taskAssignmentsCreate, {
+  const response = await authorizedFetch(BackendApiUrl.taskAssignmentsCreate, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       projectId: input.projectId,
       employeeId: input.employeeId,
@@ -802,11 +779,8 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
     ? input.priority.charAt(0).toUpperCase() + input.priority.slice(1)
     : undefined;
 
-  const response = await fetch(BackendApiUrl.taskAssignmentsUpdate, {
+  const response = await authorizedFetch(BackendApiUrl.taskAssignmentsUpdate, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       taskId: input.taskId,
       status,

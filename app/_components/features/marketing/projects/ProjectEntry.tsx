@@ -1,32 +1,22 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
-import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
-import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
-
-// Types, Data
-import {
-  ResourceRequirement,
-  RejectedProject,
-  SuggestedEmployee,
-  SkillItem,
-  ProjectFormData,
-} from "./types";
+import { authorizedFetch } from "@/functions/api/authorizedFetch";
+import { useEffect, useState } from "react";
+import { ProjectFormData, RejectedProject, ResourceRequirement, SkillItem, SuggestedEmployee } from "./types";
+import { ProjectStatus } from "@/app/types";
 import { rejectedProjects } from "./data";
-
-// Sub-components
+import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
 import { ProjectBasicInfo } from "./components/ProjectBasicInfo";
 import { SkillSelector } from "./components/SkillSelector";
 import { ResourceRequirementItem } from "./components/ResourceRequirementItem";
 import { SuggestedResources } from "./components/SuggestedResources";
+import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
+
 
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
-  const marketingUserId = process.env.NEXT_PUBLIC_MARKETING_ID ?? "58032228-86c3-4dce-b591-ca24c1f7a9e1";
-
+  // We no longer rely on a hardcoded ID; the backend will resolve the user from the token.
+  // However, we keep the state for form tracking if needed.
   const [formData, setFormData] = useState<ProjectFormData>({
     name: "",
     clientName: "",
@@ -118,12 +108,7 @@ export function ProjectEntry() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch("/api/gateway/api/lookups/skills/list", {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        });
+        const response = await authorizedFetch("/api/gateway/api/lookups/skills/list");
         if (response.ok) {
           const data = await response.json();
           const skills: SkillItem[] = data.skills;
@@ -189,7 +174,6 @@ export function ProjectEntry() {
 
     try {
       const payload = {
-        createdByUserId: marketingUserId,
         name: formData.name,
         clientName: formData.clientName,
         startDate: formData.startDate,
@@ -206,13 +190,8 @@ export function ProjectEntry() {
         })),
       };
 
-      const response = await fetch("/api/gateway/api/projects/create", {
+      const response = await authorizedFetch("/api/gateway/api/projects/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Role": "marketing",
-          "X-Debug-User": "marketing-user",
-        },
         body: JSON.stringify(payload),
       });
 

@@ -40,4 +40,7 @@ export const BackendApiUrl = {
   startHiring: `${baseUrl}/api/human-resource/start-hiring`,
   humanResources: `${baseUrl}/api/human-resource`,
   lookups: `${baseUrl}/api/lookups`,
+  user: `${baseUrl}/api/User`,
+  userLogin: `${baseUrl}/api/User/login`,
+  userProfile: `${baseUrl}/api/User/get-profile`,
 } as const;
