@@ -106,7 +106,7 @@ export function ResourceOverview() {
             avatar: initials || 'U',
             role: employee.jobTitle,
             department: employee.department ?? 'General',
-            skills: employee.skills,
+            skills: employee.skills ?? [],
             availability: Math.max(0, Math.min(100, Math.round(employee.availabilityPercent))),
             workload,
             assignedHours: Math.max(0, Math.round(employee.assignedHours * 10) / 10),

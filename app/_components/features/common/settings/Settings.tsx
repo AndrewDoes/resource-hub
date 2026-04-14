@@ -1,86 +1,219 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Save } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Save, CheckCircle, AlertCircle } from "lucide-react";
 
 // Sub-components
-import { ProfileSection } from './components/ProfileSection';
-import { NotificationSection } from './components/NotificationSection';
-import { PreferencesSection } from './components/PreferencesSection';
-import { AccessControlSection } from './components/AccessControlSection';
+import { ProfileSection } from "./components/ProfileSection";
+import { NotificationSection } from "./components/NotificationSection";
+import { PreferencesSection } from "./components/PreferencesSection";
+import { AccessControlSection } from "./components/AccessControlSection";
 
-
-import { useRole } from '@/app/context/RoleContext';
-import { useRouter } from 'next/navigation';
-import { UserRole } from '@/app/types';
+import { useRole } from "@/app/context/RoleContext";
+import { getInitials } from "@/utils/stringUtils";
+// OLD: No longer needed after removing role switching from Settings.
+// import { useRouter } from "next/navigation";
+// import { UserRole } from "@/app/types";
 
 export function Settings() {
   const { currentUser, setCurrentUser } = useRole();
-  const router = useRouter();
+  // const router = useRouter(); // OLD: removed with role switching
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [systemAlerts, setSystemAlerts] = useState(true);
-  const [theme, setTheme] = useState('light');
-  const [language, setLanguage] = useState('en');
+  const [theme, setTheme] = useState("light");
+  const [language, setLanguage] = useState("en");
 
-  // Use currentUser.role for the profile data rather than static
-  const [profileData, setProfileData] = useState<{ name: string, email: string, role: string }>({
-    name: currentUser.name,
-    email: currentUser.email,
-    role: currentUser.role,
+  // Profile data fetched from the API
+  const [profileData, setProfileData] = useState<{
+    name: string;
+    email: string;
+    role: string;
+  }>({
+    name: "",
+    email: "",
+    role: "",
   });
 
-  const roleDefaultPages: Record<UserRole, string> = {
-    marketing: '/marketing/projects',
-    pm: '/pm/project-overview',
-    gm: '/gm/planning',
-    hr: '/hr/hr-validation',
-    employee: '/employee/my-projects',
-  };
+  // Loading and feedback states
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">(
+    "idle",
+  );
 
+  // OLD: Only used by handleRoleSwitch, which has been removed.
+  // const roleDefaultPages: Record<UserRole, string> = {
+  //   marketing: "/marketing/projects",
+  //   pm: "/pm/project-overview",
+  //   gm: "/gm/planning",
+  //   hr: "/hr/hr-validation",
+  //   employee: "/employee/my-projects",
+  // };
+
+  // Previous mock data (does not match seeded DB data)
+  // const roleUserData = {
+  //   marketing: {
+  //     name: 'Sarah Martinez',
+  //     email: 'sarah.martinez@company.com',
+  //     avatar: 'SM',
+  //   },
+  //   pm: {
+  //     name: 'Alex Johnson',
+  //     email: 'alex.johnson@company.com',
+  //     avatar: 'AJ',
+  //   },
+  //   gm: {
+  //     name: 'John Doe',
+  //     email: 'john.doe@company.com',
+  //     avatar: 'JD',
+  //   },
+  //   hr: {
+  //     name: 'Emily Chen',
+  //     email: 'emily.chen@company.com',
+  //     avatar: 'EC',
+  //   },
+  //   employee: {
+  //     name: 'David Lee',
+  //     email: 'david.lee@company.com',
+  //     avatar: 'DL',
+  //   },
+  // };
+
+  // Updated to match seeded database users for API integration
   const roleUserData = {
     marketing: {
-      name: 'Sarah Martinez',
-      email: 'sarah.martinez@company.com',
-      avatar: 'SM',
+      name: "Maya Marketing",
+      email: "marketing.demo@accelist.local",
+      avatar: "MM",
     },
     pm: {
-      name: 'Alex Johnson',
-      email: 'alex.johnson@company.com',
-      avatar: 'AJ',
+      name: "Peter PM",
+      email: "pm.demo@accelist.local",
+      avatar: "PP",
     },
     gm: {
-      name: 'John Doe',
-      email: 'john.doe@company.com',
-      avatar: 'JD',
+      name: "Grace GM",
+      email: "gm.demo@accelist.local",
+      avatar: "GG",
     },
     hr: {
-      name: 'Emily Chen',
-      email: 'emily.chen@company.com',
-      avatar: 'EC',
+      name: "Helen HR",
+      email: "hr.demo@accelist.local",
+      avatar: "HH",
     },
     employee: {
-      name: 'David Lee',
-      email: 'david.lee@company.com',
-      avatar: 'DL',
+      name: "Ben Backend",
+      email: "backend.demo@accelist.local",
+      avatar: "BB",
     },
   };
 
-  const handleRoleSwitch = (role: string) => {
-    const userRole = role as UserRole;
-    const userData = roleUserData[userRole];
-    setCurrentUser({
-      name: userData.name,
-      role: userRole,
-      avatar: userData.avatar,
-      email: userData.email,
-    });
-    // Instantly take them to their main functionality
-    router.push(roleDefaultPages[userRole]);
-  };
+  // Fetch profile from backend API once on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch("/api/gateway/api/User/get-profile", {
+          headers: {
+            // Harusnya pake yg di bawah ini, tapi karena belum ada auth, gw bikin biar test change profilenya pke Marketing User aja
+            // "X-Debug-User": currentUser.name,
 
-  const handleSave = () => {
-    console.log('Settings saved');
+            "X-Debug-User":
+              process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch profile");
+        }
+
+        const data = await response.json();
+        setProfileData({
+          name: data.fullName,
+          email: data.email,
+          role: data.role,
+        });
+      } catch (err: any) {
+        setError(err.message);
+        // Fallback to currentUser context data if API fails
+        setProfileData({
+          name: currentUser.name,
+          email: currentUser.email,
+          role: currentUser.role,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only fetch once on mount
+
+  // OLD: Role switching from Settings has been removed.
+  // const handleRoleSwitch = (role: string) => {
+  //   const userRole = role as UserRole;
+  //   const userData = roleUserData[userRole];
+  //   setCurrentUser({
+  //     name: userData.name,
+  //     role: userRole,
+  //     avatar: userData.avatar,
+  //     email: userData.email,
+  //   });
+  //   // Instantly take them to their main functionality
+  //   router.push(roleDefaultPages[userRole]);
+  // };
+
+  const handleSave = async () => {
+    console.log("Current user name: ", currentUser.name);
+    setIsSaving(true);
+    setSaveStatus("idle");
+    try {
+      const response = await fetch("/api/gateway/api/User/update-profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+
+          // Hrsnya pke yg bawah ini, cmn krn buat testing doang, gw set ke Marketing User biar bisa liat perubahan nama di DB
+          // "X-Debug-User": currentUser.name,
+          "X-Debug-User":
+            process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
+        },
+        body: JSON.stringify({
+          fullName: profileData.name,
+          email: profileData.email,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.title || "Failed to save profile");
+      }
+
+      const data = await response.json();
+
+      // Update the RoleContext so sidebar/header reflects the new name
+      const initials = getInitials(data.fullName);
+
+      setCurrentUser({
+        ...currentUser,
+        name: data.fullName,
+        email: data.email,
+        avatar: initials,
+      });
+
+      setSaveStatus("success");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch (err: any) {
+      console.error("Failed to save profile:", err);
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -92,19 +225,42 @@ export function Settings() {
             Manage your account settings and preferences
           </p>
         </div>
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Save className="w-4 h-4" />
-          Save Changes
-        </button>
+        <div className="flex items-center gap-3">
+          {saveStatus === "success" && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              Saved successfully
+            </span>
+          )}
+          {saveStatus === "error" && (
+            <span className="flex items-center gap-1.5 text-sm text-red-600">
+              <AlertCircle className="w-4 h-4" />
+              Failed to save
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={isSaving || isLoading}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
+          Error loading profile: {error}
+        </div>
+      )}
 
       {/* Profile Settings */}
       <ProfileSection
         profileData={profileData}
         onUpdateProfile={(data) => setProfileData({ ...profileData, ...data })}
+        isLoading={isLoading}
       />
 
       {/* Notification Settings */}
@@ -116,27 +272,28 @@ export function Settings() {
       />
 
       {/* System Preferences */}
-      <PreferencesSection
+      {/* <PreferencesSection
         theme={theme}
         setTheme={setTheme}
         language={language}
         setLanguage={setLanguage}
-      />
+      /> */}
 
       {/* Access Control */}
       <AccessControlSection
         selectedRole={currentUser.role}
-        setSelectedRole={handleRoleSwitch}
+        // setSelectedRole={handleRoleSwitch} // OLD: removed
       />
 
       {/* Sticky Save Button - Mobile */}
       <div className="md:hidden fixed bottom-4 right-4 z-10">
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+          disabled={isSaving || isLoading}
+          className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Save className="w-4 h-4" />
-          Save Changes
+          {isSaving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>

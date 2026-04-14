@@ -331,12 +331,12 @@ const normalizeOverview = (payload: unknown): ProjectManagerProjectOverview => {
 };
 
 const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember[] => {
-  const source = Array.isArray(payload)
+  const source: unknown[] = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as ProjectManagerTeamResponse | null)?.teamMembers)
-      ? (payload as ProjectManagerTeamResponse).teamMembers
+      ? ((payload as ProjectManagerTeamResponse).teamMembers as unknown[])
       : Array.isArray((payload as ProjectManagerTeamResponse | null)?.data)
-        ? (payload as ProjectManagerTeamResponse).data
+        ? ((payload as ProjectManagerTeamResponse).data as unknown[])
         : [];
 
   return source.map((item, index) => {
@@ -394,12 +394,12 @@ export async function persistSplitWorkloadToBackend(input: PersistSplitWorkloadI
 }
 
 const normalizeActivities = (payload: unknown): ProjectManagerProjectActivity[] => {
-  const source = Array.isArray(payload)
+  const source: unknown[] = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as ProjectManagerActivityResponse | null)?.activities)
-      ? (payload as ProjectManagerActivityResponse).activities
+      ? ((payload as ProjectManagerActivityResponse).activities as unknown[])
       : Array.isArray((payload as ProjectManagerActivityResponse | null)?.data)
-        ? (payload as ProjectManagerActivityResponse).data
+        ? ((payload as ProjectManagerActivityResponse).data as unknown[])
         : [];
 
   return source.map((item, index) => {
@@ -413,12 +413,12 @@ const normalizeActivities = (payload: unknown): ProjectManagerProjectActivity[] 
 };
 
 const normalizeMilestones = (payload: unknown): ProjectManagerMilestone[] => {
-  const source = Array.isArray(payload)
+  const source: unknown[] = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as ProjectManagerMilestonesResponse | null)?.milestones)
-      ? (payload as ProjectManagerMilestonesResponse).milestones
+      ? ((payload as ProjectManagerMilestonesResponse).milestones as unknown[])
       : Array.isArray((payload as ProjectManagerMilestonesResponse | null)?.data)
-        ? (payload as ProjectManagerMilestonesResponse).data
+        ? ((payload as ProjectManagerMilestonesResponse).data as unknown[])
         : [];
 
   return source.map((item, index) => {
@@ -436,12 +436,12 @@ const normalizeMilestones = (payload: unknown): ProjectManagerMilestone[] => {
 };
 
 const normalizeTimelineTasks = (payload: unknown): ProjectManagerTimelineTask[] => {
-  const source = Array.isArray(payload)
+  const source: unknown[] = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as ProjectManagerTimelineTasksResponse | null)?.tasks)
-      ? (payload as ProjectManagerTimelineTasksResponse).tasks
+      ? ((payload as ProjectManagerTimelineTasksResponse).tasks as unknown[])
       : Array.isArray((payload as ProjectManagerTimelineTasksResponse | null)?.data)
-        ? (payload as ProjectManagerTimelineTasksResponse).data
+        ? ((payload as ProjectManagerTimelineTasksResponse).data as unknown[])
         : [];
 
   return source.map((item, index) => {

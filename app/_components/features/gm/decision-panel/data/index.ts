@@ -1,4 +1,4 @@
-import { ProjectData, ContractDecision } from './types';
+import { ProjectData, ContractDecision } from '../types';
 
 export const mockProjects: ProjectData[] = [
   {
@@ -45,17 +45,23 @@ export const mockContractDecisions: ContractDecision[] = [
     employeeName: 'David Lee',
     employeeAvatar: 'DL',
     contractEndDate: '2026-05-15',
-    performance: 'excellent',
-    currentWorkload: 'Backend Lead - 2 projects',
-    status: 'pending',
+    jobTitle: 'Backend Lead',
+    availabilityPercent: 35,
+    workloadPercent: 82,
+    activeAssignmentCount: 2,
+    decisionType: 'Extend Contract',
+    decisionStatus: 'Pending',
   },
   {
     id: 'contract-2',
     employeeName: 'Emily Chen',
     employeeAvatar: 'EC',
     contractEndDate: '2026-06-01',
-    performance: 'good',
-    currentWorkload: 'Frontend Dev - 1 project',
-    status: 'pending',
+    jobTitle: 'Frontend Developer',
+    availabilityPercent: 52,
+    workloadPercent: 61,
+    activeAssignmentCount: 1,
+    decisionType: 'Review Contract',
+    decisionStatus: 'Pending',
   },
 ];
