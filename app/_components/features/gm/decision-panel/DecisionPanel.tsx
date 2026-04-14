@@ -395,6 +395,8 @@ export function DecisionPanel() {
     }
 
     try {
+      let responseDetails = recommendation.reasoning;
+
       if (recommendation.type === 'add-resource') {
         const employeeId = recommendation.metadata?.employeeId;
         const roleName = recommendation.metadata?.roleName;
@@ -408,40 +410,18 @@ export function DecisionPanel() {
           return false;
         }
 
-        await createProjectManagerChangeRequest({
-          projectId: selectedProject.id,
-          employeeId,
-          assignedByUserId: defaultDecisionActorUserId,
-          roleName,
-          startDate: selectedProject.startDate,
-          endDate: selectedProject.endDate,
-          allocationPercent: 100,
-          requiredSkills: recommendation.metadata?.requiredSkills ?? [],
-          additionalNeeds: 'Auto-assigned from GM recommendation apply action.',
+        // pack assignment metadata into JSON string for backend to process after HR execution
+        responseDetails = JSON.stringify({
+          reasoning: recommendation.reasoning,
+          assignment: {
+            employeeId,
+            roleName,
+            startDate: selectedProject.startDate,
+            endDate: selectedProject.endDate,
+            allocationPercent: 100,
+            requiredSkills: recommendation.metadata?.requiredSkills ?? [],
+          },
         });
-
-        const refreshedTeam = await fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id);
-        const refreshedNames = refreshedTeam.map((member) => member.fullName);
-
-        setProjects((prev) =>
-          prev.map((project) =>
-            project.id === selectedProject.id
-              ? {
-                ...project,
-                assignedResources: refreshedNames,
-              }
-              : project
-          )
-        );
-
-        setSelectedProject((prev) =>
-          prev && prev.id === selectedProject.id
-            ? {
-              ...prev,
-              assignedResources: refreshedNames,
-            }
-            : prev
-        );
       }
 
       await submitGeneralManagerRecommendationResponse({
@@ -449,7 +429,7 @@ export function DecisionPanel() {
         recommendationId: recommendation.id,
         recommendationType: recommendation.type,
         title: recommendation.title,
-        details: recommendation.reasoning,
+        details: responseDetails,
         action: 'Applied',
       });
 
@@ -458,7 +438,7 @@ export function DecisionPanel() {
         title: 'Recommendation Applied',
         message:
           recommendation.type === 'add-resource'
-            ? `${recommendation.title} was auto-assigned and submitted to backend successfully.`
+            ? `${recommendation.title} has been submitted for HR validation.`
             : `${recommendation.title} has been submitted to backend successfully.`,
       });
 

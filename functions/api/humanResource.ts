@@ -306,6 +306,17 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
   else if (apiType.includes('hire')) type = 'hire-resource';
   else if (apiType.includes('projectassignment')) type = 'project-assignment';
 
+  // Clean up details for display
+  let cleanDetails = decision.details.replace(/\[recommendation:[^\]]+\]/g, '').trim();
+  try {
+    const parsed = JSON.parse(cleanDetails);
+    if (parsed && typeof parsed === 'object' && 'reasoning' in parsed) {
+      cleanDetails = parsed.reasoning;
+    }
+  } catch (e) {
+    // Not JSON, use as is
+  }
+
   return {
     id: decision.id,
     type,
@@ -316,7 +327,7 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
     status: decision.status.toLowerCase() === 'pending' ? 'pending' :
       decision.status.toLowerCase() === 'gmapproved' ? 'gmapproved' :
         decision.status.toLowerCase().includes('clarification') ? 'clarification-requested' : 'executed',
-    details: decision.details,
+    details: cleanDetails,
   };
 };
 
