@@ -37,6 +37,7 @@ export interface ProjectFormProps {
     value: any,
   ) => void;
   onSaveDraft: () => void;
+  onCancel?: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -58,6 +59,7 @@ export function ProjectForm({
   removeResourceRequirement,
   updateResourceRequirement,
   onSaveDraft,
+  onCancel,
   onSubmit,
 }: ProjectFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +298,15 @@ export function ProjectForm({
 
       {/* Action Buttons */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        {!isRevisionMode && (
+          <button
+            type="button"
+            onClick={() => onCancel?.()}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="button"
           onClick={onSaveDraft}

@@ -173,6 +173,27 @@ export function ProjectEntry() {
     });
   };
 
+  const handleCancel = () => {
+    setFormData({
+      name: "",
+      clientName: "",
+      startDate: "",
+      endDate: "",
+      notes: "",
+    });
+    setSelectedSkills([]);
+    setResourceRequirements([
+      {
+        id: "1",
+        role: "",
+        quantity: 1,
+        experienceLevel: "Mid",
+        requiredSkills: [],
+        notes: "",
+      },
+    ]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -375,6 +396,7 @@ export function ProjectEntry() {
               removeResourceRequirement={removeResourceRequirement}
               updateResourceRequirement={updateResourceRequirement}
               onSaveDraft={handleSaveDraft}
+              onCancel={handleCancel}
               onSubmit={handleSubmit}
             />
           </div>
