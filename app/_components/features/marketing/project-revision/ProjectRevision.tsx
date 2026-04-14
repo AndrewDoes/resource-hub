@@ -226,6 +226,15 @@ export function ProjectRevision() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!selectedProjectId) {
+      addToast({
+        type: "error",
+        title: "No Project Selected",
+        message: "Please select a rejected project before submitting.",
+      });
+      return;
+    }
+
     // Validation
     const hasEmptyRole = resourceRequirements.some((r) => !r.role);
     if (hasEmptyRole) {
@@ -248,6 +257,7 @@ export function ProjectRevision() {
 
     try {
       const payload = {
+        projectId: selectedProjectId,
         createdByUserId: marketingUserId,
         name: formData.name,
         clientName: formData.clientName,
@@ -256,6 +266,12 @@ export function ProjectRevision() {
         notes: formData.notes,
         skillIds: selectedSkills.map((s) => s.id),
         resourceRequirements: resourceRequirements.map((r, index) => ({
+          requirementId:
+            /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+              r.id,
+            )
+              ? r.id
+              : undefined,
           roleName: r.role,
           quantity: r.quantity,
           experienceLevel: r.experienceLevel,
@@ -265,26 +281,39 @@ export function ProjectRevision() {
         })),
       };
 
-      // MOCKED SUBMISSION FOR REVISION (SINCE BE API DOES NOT EXIST)
-      console.log(
-        "Mocking update to backend for project id:",
-        selectedProjectId,
-        payload,
+      const response = await fetch(
+        `/api/gateway/api/projects/${selectedProjectId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Role": "marketing",
+            "X-Debug-User": "marketing-user",
+          },
+          body: JSON.stringify(payload),
+        },
       );
 
-      setProjectStatus("submitted");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update project");
+      }
+
+      setProjectStatus("draft");
       addToast({
         type: "success",
-        title: "Project Resubmitted",
-        message: "Your revised proposal has been sent to GM for approval",
+        title: "Project Updated",
+        message:
+          "Your revised proposal has been saved as draft and sent to GM for approval",
       });
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       addToast({
         type: "error",
         title: "Submission Failed",
-        message: "There was an error submitting your project.",
+        message:
+          error?.message || "There was an error submitting your project.",
       });
     }
   };
