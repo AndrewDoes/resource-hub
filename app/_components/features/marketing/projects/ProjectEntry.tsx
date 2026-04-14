@@ -41,6 +41,8 @@ export function ProjectEntry() {
   const [skillCategories, setSkillCategories] = useState<
     Record<string, SkillItem[]>
   >({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const [resourceRequirements, setResourceRequirements] = useState<
     ResourceRequirement[]
@@ -173,6 +175,8 @@ export function ProjectEntry() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setUploadErrors([]);
 
     // Validation
     const hasEmptyRole = resourceRequirements.some((r) => !r.role);
@@ -182,6 +186,7 @@ export function ProjectEntry() {
         title: "Incomplete Resource Requirements",
         message: "Please specify a role for all resource requirements",
       });
+      setIsSubmitting(false);
       return;
     }
 
@@ -191,6 +196,7 @@ export function ProjectEntry() {
         title: "Skills Required",
         message: "Please select at least one required skill",
       });
+      setIsSubmitting(false);
       return;
     }
 
@@ -227,12 +233,77 @@ export function ProjectEntry() {
         throw new Error("Failed to submit project");
       }
 
+      const data = await response.json();
+      const projectId = data?.projectId ?? data?.ProjectId;
+      if (!projectId) {
+        console.error(
+          "Create project response did not include projectId",
+          data,
+        );
+        throw new Error("Project ID missing from create response");
+      }
+
+      // Upload attachments if any
+      if (formData.attachments && formData.attachments.length > 0) {
+        const uploadPromises = formData.attachments.map(async (file) => {
+          const formDataUpload = new FormData();
+          formDataUpload.append("file", file);
+
+          const uploadResponse = await fetch(
+            `/api/gateway/api/projects/${projectId}/attachments`,
+            {
+              method: "POST",
+              headers: {
+                "X-Debug-Role": "marketing",
+                "X-Debug-User": "marketing-user",
+              },
+              body: formDataUpload,
+            },
+          );
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+
+          return { fileName: file.name, success: true };
+        });
+
+        const uploadResults = await Promise.allSettled(uploadPromises);
+        const errors: string[] = [];
+
+        uploadResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            errors.push(
+              `Failed to upload ${formData.attachments![index].name}: ${result.reason.message}`,
+            );
+          }
+        });
+
+        setUploadErrors(errors);
+
+        if (errors.length > 0) {
+          addToast({
+            type: "warning",
+            title: "Project Submitted with Upload Issues",
+            message: `Project created successfully, but some attachments failed to upload. Check the errors below.`,
+          });
+        } else {
+          addToast({
+            type: "success",
+            title: "Project Submitted",
+            message:
+              "Your proposal and all attachments have been sent to GM for approval",
+          });
+        }
+      } else {
+        addToast({
+          type: "success",
+          title: "Project Submitted",
+          message: "Your proposal has been sent to GM for approval",
+        });
+      }
+
       setProjectStatus("submitted");
-      addToast({
-        type: "success",
-        title: "Project Submitted",
-        message: "Your proposal has been sent to GM for approval",
-      });
     } catch (error) {
       console.error(error);
       addToast({
@@ -240,6 +311,8 @@ export function ProjectEntry() {
         title: "Submission Failed",
         message: "There was an error submitting your project.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -287,6 +360,8 @@ export function ProjectEntry() {
               allSkillItems={allSkillItems}
               resourceRequirements={resourceRequirements}
               suggestedEmployees={suggestedEmployees}
+              isSubmitting={isSubmitting}
+              uploadErrors={uploadErrors}
               onFormDataChange={handleFormDataChange}
               onAddSkill={(skill) =>
                 setSelectedSkills([...selectedSkills, skill])

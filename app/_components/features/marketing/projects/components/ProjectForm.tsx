@@ -23,6 +23,8 @@ export interface ProjectFormProps {
   resourceRequirements: ResourceRequirement[];
   suggestedEmployees: SuggestedEmployee[];
   isRevisionMode?: boolean;
+  isSubmitting?: boolean;
+  uploadErrors?: string[];
 
   onFormDataChange: (field: keyof ProjectFormData, value: any) => void;
   onAddSkill: (skill: SkillItem) => void;
@@ -32,7 +34,7 @@ export interface ProjectFormProps {
   updateResourceRequirement: (
     id: string,
     field: keyof ResourceRequirement,
-    value: any
+    value: any,
   ) => void;
   onSaveDraft: () => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -47,6 +49,8 @@ export function ProjectForm({
   resourceRequirements,
   suggestedEmployees,
   isRevisionMode,
+  isSubmitting,
+  uploadErrors,
   onFormDataChange,
   onAddSkill,
   onRemoveSkill,
@@ -128,7 +132,9 @@ export function ProjectForm({
   };
 
   const removeFile = (indexToRemove: number) => {
-    const newFiles = (formData.attachments || []).filter((_, index) => index !== indexToRemove);
+    const newFiles = (formData.attachments || []).filter(
+      (_, index) => index !== indexToRemove,
+    );
     onFormDataChange("attachments", newFiles);
   };
 
@@ -208,26 +214,30 @@ export function ProjectForm({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Attachments
         </label>
-        
-        <input 
-          type="file" 
-          multiple 
-          className="hidden" 
-          ref={fileInputRef} 
+
+        <input
+          type="file"
+          multiple
+          className="hidden"
+          ref={fileInputRef}
           onChange={handleFileSelect}
           accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
         />
 
-        <div 
+        <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-            isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-500"
+            isDragging
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 hover:border-blue-500"
           }`}
         >
-          <Paperclip className={`w-8 h-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-gray-400"}`} />
+          <Paperclip
+            className={`w-8 h-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-gray-400"}`}
+          />
           <p className="text-sm text-gray-600">
             Click to upload or drag and drop
           </p>
@@ -235,33 +245,50 @@ export function ProjectForm({
             PDF, DOC, XLS, or images (max 10MB)
           </p>
         </div>
-        
+
         {fileError && (
-          <p className="mt-2 text-sm text-red-600 font-medium">
-            {fileError}
-          </p>
+          <p className="mt-2 text-sm text-red-600 font-medium">{fileError}</p>
+        )}
+
+        {uploadErrors && uploadErrors.length > 0 && (
+          <div className="mt-2">
+            <p className="text-sm text-red-600 font-medium">Upload Errors:</p>
+            <ul className="list-disc list-inside text-sm text-red-600">
+              {uploadErrors.map((error, idx) => (
+                <li key={idx}>{error}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* File Previews */}
         {formData.attachments && formData.attachments.length > 0 && (
           <ul className="mt-4 space-y-2">
             {formData.attachments.map((file, idx) => (
-               <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg group">
-                 <div className="flex items-center gap-3 overflow-hidden">
-                   <Paperclip className="w-5 h-5 text-gray-400 shrink-0" />
-                   <span className="text-sm font-medium text-gray-700 truncate">{file.name}</span>
-                   <span className="text-xs text-gray-500 shrink-0">
-                     {(file.size / (1024 * 1024)).toFixed(2)} MB
-                   </span>
-                 </div>
-                 <button 
-                   type="button" 
-                   onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
-                   className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                 >
-                   <X className="w-4 h-4" />
-                 </button>
-               </li>
+              <li
+                key={idx}
+                className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg group"
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Paperclip className="w-5 h-5 text-gray-400 shrink-0" />
+                  <span className="text-sm font-medium text-gray-700 truncate">
+                    {file.name}
+                  </span>
+                  <span className="text-xs text-gray-500 shrink-0">
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(idx);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </li>
             ))}
           </ul>
         )}
@@ -279,10 +306,15 @@ export function ProjectForm({
         </button>
         <button
           type="submit"
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md"
+          disabled={isSubmitting}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-all shadow-sm hover:shadow-md ${
+            isSubmitting
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
+          }`}
         >
           <Send className="w-4 h-4" />
-          Submit to GM
+          {isSubmitting ? "Submitting..." : "Submit to GM"}
         </button>
       </div>
     </form>
