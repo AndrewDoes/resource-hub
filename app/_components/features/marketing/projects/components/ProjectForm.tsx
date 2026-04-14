@@ -142,6 +142,15 @@ export function ProjectForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      {isRevisionMode && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <p className="text-sm font-semibold text-red-700">Rejection Reason</p>
+          <p className="mt-2 text-sm text-gray-700 whitespace-pre-line">
+            {formData.rejectionReason || "No rejection reason was provided."}
+          </p>
+        </div>
+      )}
+
       {/* Project Basic Info */}
       <ProjectBasicInfo
         totalResources={totalResources}
@@ -194,8 +203,9 @@ export function ProjectForm({
         </div>
       </div>
 
+      {/* Commented SuggestedResources since this is hardcoded */}
       {/* Suggested Resource Match */}
-      <SuggestedResources suggestedEmployees={suggestedEmployees} />
+      {/* <SuggestedResources suggestedEmployees={suggestedEmployees} /> */}
 
       {/* Notes */}
       <div>

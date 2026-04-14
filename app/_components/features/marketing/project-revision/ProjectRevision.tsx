@@ -294,38 +294,68 @@ export function ProjectRevision() {
     setSelectedProjectId(project.id);
 
     try {
-      const response = await fetch(`/api/gateway/api/projects/${project.id}`, {
-        headers: {
-          "X-Debug-Role": "marketing",
-          "X-Debug-User": "marketing-user",
+      const response = await fetch(
+        `/api/gateway/api/projects/${project.id}/revision`,
+        {
+          headers: {
+            "X-Debug-Role": "marketing",
+            "X-Debug-User": "marketing-user",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch project details");
+        throw new Error("Failed to fetch project revision details");
       }
 
-      const pDetail = await response.json();
+      const revisionDetail = await response.json();
 
-      // Update form using backend details (skipping skills/resources as they are not provided by BE)
       setFormData({
-        name: pDetail.name || "",
-        clientName: pDetail.clientName || "",
-        startDate: pDetail.startDate || "",
-        endDate: pDetail.endDate || "",
-        notes: pDetail.description || "",
+        name: revisionDetail.name || "",
+        clientName: revisionDetail.clientName || "",
+        startDate: revisionDetail.startDate || "",
+        endDate: revisionDetail.endDate || "",
+        notes: revisionDetail.description || "",
+        rejectionReason: revisionDetail.rejectionReason || "",
       });
-      setSelectedSkills([]);
-      setResourceRequirements([
-        {
-          id: "1",
-          role: "",
-          quantity: 1,
-          experienceLevel: "Mid",
-          requiredSkills: [],
-          notes: "",
-        },
-      ]);
+
+      setSelectedSkills(
+        (revisionDetail.projectSkills || []).map((skill: any) => ({
+          id: skill.skillId,
+          name: skill.skillName,
+          category: "",
+        })),
+      );
+
+      const loadedResourceRequirements = (
+        revisionDetail.resourceRequirements || []
+      ).map((req: any, index: number) => ({
+        id: req.requirementId ? req.requirementId.toString() : `req-${index}`,
+        role: req.roleName || "",
+        quantity: req.quantity ?? 1,
+        experienceLevel: req.experienceLevel || "Mid",
+        requiredSkills: (req.requiredSkills || []).map((skill: any) => ({
+          id: skill.skillId,
+          name: skill.skillName,
+          category: "",
+        })),
+        notes: req.notes || "",
+      }));
+
+      setResourceRequirements(
+        loadedResourceRequirements.length > 0
+          ? loadedResourceRequirements
+          : [
+              {
+                id: "1",
+                role: "",
+                quantity: 1,
+                experienceLevel: "Mid",
+                requiredSkills: [],
+                notes: "",
+              },
+            ],
+      );
 
       setIsModalOpen(true);
     } catch (error: any) {

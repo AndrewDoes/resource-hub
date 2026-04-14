@@ -358,7 +358,9 @@ export function ProjectEntry() {
             Marketing Department - Project Request Form
           </p>
         </div>
-        {rejectedProjects.length > 0 && (
+
+        {/* No longer need any Rejected Projects button here */}
+        {/* {rejectedProjects.length > 0 && (
           <button
             onClick={() => setShowRejectedProjects(true)}
             className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
@@ -366,7 +368,7 @@ export function ProjectEntry() {
             <XCircle className="w-4 h-4" />
             View Rejected Projects ({rejectedProjects.length})
           </button>
-        )}
+        )} */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
