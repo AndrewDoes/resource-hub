@@ -547,7 +547,8 @@ export async function fetchGeneralManagerMarketingDraftProjects(): Promise<Gener
 export async function reviewGeneralManagerMarketingDraftProject(
   projectId: string,
   action: 'Approved' | 'Rejected',
-  rejectionReason?: string
+  rejectionReason?: string,
+  pmOwnerUserId?: string
 ): Promise<boolean> {
   const response = await fetch(BackendApiUrl.projectsUpdateStatus, {
     method: 'POST',
@@ -557,6 +558,7 @@ export async function reviewGeneralManagerMarketingDraftProject(
     body: JSON.stringify({
       projectId,
       status: action,
+      pmOwnerUserId: action === 'Approved' ? pmOwnerUserId : undefined,
       rejectionReason: action === 'Rejected' ? (rejectionReason ?? '') : undefined,
     }),
   });

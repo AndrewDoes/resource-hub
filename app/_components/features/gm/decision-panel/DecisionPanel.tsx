@@ -571,9 +571,12 @@ export function DecisionPanel() {
     }
   };
 
-  const handleApproveMarketingDraftProject = async (project: GeneralManagerMarketingDraftProject) => {
+  const handleApproveMarketingDraftProject = async (
+    project: GeneralManagerMarketingDraftProject,
+    pmOwnerUserId?: string
+  ) => {
     try {
-      const success = await reviewGeneralManagerMarketingDraftProject(project.id, 'Approved');
+      const success = await reviewGeneralManagerMarketingDraftProject(project.id, 'Approved', undefined, pmOwnerUserId);
 
       if (!success) {
         addToast({
