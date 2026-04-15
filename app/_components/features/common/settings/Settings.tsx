@@ -11,6 +11,7 @@ import { AccessControlSection } from "./components/AccessControlSection";
 
 import { useRole } from "@/app/context/RoleContext";
 import { getInitials } from "@/utils/stringUtils";
+import { authorizedFetch } from "@/functions/api/authorizedFetch";
 // OLD: No longer needed after removing role switching from Settings.
 // import { useRouter } from "next/navigation";
 // import { UserRole } from "@/app/types";
@@ -116,15 +117,7 @@ export function Settings() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/gateway/api/User/get-profile", {
-          headers: {
-            // Harusnya pake yg di bawah ini, tapi karena belum ada auth, gw bikin biar test change profilenya pke Marketing User aja
-            // "X-Debug-User": currentUser.name,
-
-            "X-Debug-User":
-              process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
-          },
-        });
+        const response = await authorizedFetch("/api/gateway/api/User/get-profile");
 
         if (!response.ok) {
           throw new Error("Failed to fetch profile");
@@ -140,9 +133,9 @@ export function Settings() {
         setError(err.message);
         // Fallback to currentUser context data if API fails
         setProfileData({
-          name: currentUser.name,
-          email: currentUser.email,
-          role: currentUser.role,
+          name: currentUser?.name || "",
+          email: currentUser?.email || "",
+          role: currentUser?.role || "",
         });
       } finally {
         setIsLoading(false);
@@ -172,16 +165,8 @@ export function Settings() {
     setIsSaving(true);
     setSaveStatus("idle");
     try {
-      const response = await fetch("/api/gateway/api/User/update-profile", {
+      const response = await authorizedFetch("/api/gateway/api/User/update-profile", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-
-          // Hrsnya pke yg bawah ini, cmn krn buat testing doang, gw set ke Marketing User biar bisa liat perubahan nama di DB
-          // "X-Debug-User": currentUser.name,
-          "X-Debug-User":
-            process.env.NEXT_PUBLIC_MARKETING_ID || currentUser.name,
-        },
         body: JSON.stringify({
           fullName: profileData.name,
           email: profileData.email,
@@ -194,17 +179,17 @@ export function Settings() {
       }
 
       const data = await response.json();
-
-      // Update the RoleContext so sidebar/header reflects the new name
       const initials = getInitials(data.fullName);
 
-      setCurrentUser({
-        ...currentUser,
-        id: currentUser.id,
-        name: data.fullName,
-        email: data.email,
-        avatar: initials,
-      });
+      if (currentUser) {
+        setCurrentUser({
+          ...currentUser,
+          name: data.fullName,
+          email: data.email,
+          avatar: initials,
+          role: currentUser.role // Explicitly pass the role to satisfy TypeScript
+        });
+      }
 
       setSaveStatus("success");
       setTimeout(() => setSaveStatus("idle"), 3000);
@@ -283,7 +268,7 @@ export function Settings() {
       {/* Access Control */}
       <AccessControlSection
         selectedRole={currentUser.role}
-        // setSelectedRole={handleRoleSwitch} // OLD: removed
+      // setSelectedRole={handleRoleSwitch} // OLD: removed
       />
 
       {/* Sticky Save Button - Mobile */}

@@ -598,7 +598,7 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
 }
 
 export async function createProjectManagerMilestone(input: ProjectManagerCreateMilestoneInput): Promise<void> {
-  const response = await fetch(BackendApiUrl.projectManagerCreateMilestone, {
+  const response = await authorizedFetch(BackendApiUrl.projectManagerCreateMilestone, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -621,7 +621,7 @@ export async function createProjectManagerMilestone(input: ProjectManagerCreateM
 }
 
 export async function updateProjectManagerMilestoneStatus(input: ProjectManagerUpdateMilestoneStatusInput): Promise<void> {
-  const response = await fetch(BackendApiUrl.projectManagerUpdateMilestoneStatus, {
+  const response = await authorizedFetch(BackendApiUrl.projectManagerUpdateMilestoneStatus, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -642,7 +642,7 @@ export async function updateProjectManagerMilestoneStatus(input: ProjectManagerU
 }
 
 export async function createProjectManagerTimelineTask(input: ProjectManagerCreateTimelineTaskInput): Promise<void> {
-  const response = await fetch(BackendApiUrl.projectManagerCreateTimelineTask, {
+  const response = await authorizedFetch(BackendApiUrl.projectManagerCreateTimelineTask, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -672,7 +672,7 @@ export async function updateProjectManagerTimelineTask(input: ProjectManagerUpda
       ? "Completed"
       : "Pending";
 
-  const response = await fetch(BackendApiUrl.projectManagerUpdateTimelineTask, {
+  const response = await authorizedFetch(BackendApiUrl.projectManagerUpdateTimelineTask, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

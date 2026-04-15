@@ -500,7 +500,7 @@ export async function fetchGeneralManagerProjectPmRecommendation(
     candidateLimit: typeof candidateLimit === "number" ? String(candidateLimit) : undefined,
   });
 
-  const response = await fetch(url);
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load PM recommendation (${response.status})`);
