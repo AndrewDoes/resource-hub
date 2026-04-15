@@ -26,6 +26,7 @@ import { roleConfig, useRole } from "@/app/context/RoleContext";
 import { ToastProvider } from "@/app/context/ToastContext";
 import { NotificationPanel } from "../common/NotificationPanel";
 import { ProfileDropdown } from "../common/ProfileDropdown";
+import { getInitials } from "@/utils/stringUtils";
 
 interface MenuItem {
   path: string;
@@ -223,6 +224,8 @@ export function Root({ children }: { children: ReactNode }) {
 
   const menuItems = allMenuItems.filter((item) => item.roles.includes(currentUser.role as UserRole));
 
+  const initials = getInitials(currentUser.name);
+
   // Filter notifications by current role
   const filteredNotifications = filterNotificationsByRole(notifications, currentUser.role as UserRole);
   const unreadCount = filteredNotifications.filter((n) => !n.read).length;
@@ -275,7 +278,7 @@ export function Root({ children }: { children: ReactNode }) {
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role.toLowerCase()]?.color || 'bg-gray-400'} rounded-full flex items-center justify-center`}>
-              <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
+              <span className="text-white text-sm font-medium">{initials}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
@@ -311,7 +314,7 @@ export function Root({ children }: { children: ReactNode }) {
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all"
               >
                 <div className={`w-8 h-8 bg-linear-to-br ${roleConfig[currentUser.role.toLowerCase()]?.color || 'bg-gray-400'} rounded-full flex items-center justify-center`}>
-                  <span className="text-white text-sm font-medium">{currentUser.avatar}</span>
+                  <span className="text-white text-sm font-medium">{initials}</span>
                 </div>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
