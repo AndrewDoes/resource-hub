@@ -57,4 +57,7 @@ export const BackendApiUrl = {
   userLogin: `${baseUrl}/api/User/login`,
   userProfile: `${baseUrl}/api/User/get-profile`,
   userUpdatePassword: `${baseUrl}/api/User/update-password`,
+  notifications: `${baseUrl}/api/Notification`,
+  notificationsMarkRead: (id: string) => `${baseUrl}/api/Notification/${id}/read`,
+  notificationsMarkAllRead: `${baseUrl}/api/Notification/mark-all-read`,
 } as const;

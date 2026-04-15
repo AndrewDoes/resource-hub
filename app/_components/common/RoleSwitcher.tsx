@@ -1,52 +1,42 @@
 import { useRole, roleConfig } from '@/app/context/RoleContext';
 import { Check } from 'lucide-react';
 import { UserRole } from '@/app/types';
+import { login } from '@/functions/api/auth';
 
 export function RoleSwitcher() {
-  const { currentUser, setCurrentUser } = useRole();
+  const { currentUser, setCurrentUser, setToken } = useRole();
 
   const roles: UserRole[] = ['marketing', 'pm', 'gm', 'hr', 'employee'];
 
-  const handleRoleChange = (role: UserRole) => {
-    const ids = {
-      marketing: '58032228-86c3-4dce-b591-ca24c1f7a9e1',
-      pm: '11111111-1111-1111-1111-111111111111',
-      gm: 'gm-1',
-      hr: 'hr-1',
-      employee: '91da3fc8-1f9b-4b19-92f9-ba35d6d64a9b',
-    };
-
-    const names = {
-      marketing: 'Sarah Martinez',
-      pm: 'Peter PM',
-      gm: 'John Doe',
-      hr: 'Emily Chen',
-      employee: 'Diana Design',
-    };
-
+  const handleRoleChange = async (role: UserRole) => {
     const emails = {
-      marketing: 'sarah.martinez@company.com',
+      marketing: 'marketing.demo@accelist.local',
       pm: 'pm.demo@accelist.local',
-      gm: 'john.doe@company.com',
-      hr: 'emily.chen@company.com',
+      gm: 'gm.demo@accelist.local',
+      hr: 'hr.demo@accelist.local',
       employee: 'designer.demo@accelist.local',
     };
 
-    const avatars = {
-      marketing: 'SM',
-      pm: 'PP',
-      gm: 'JD',
-      hr: 'EC',
-      employee: 'DD',
-    };
+    try {
+      // Perform a real login to get a valid token for the backend
+      const response = await login(emails[role], 'password123');
 
-    setCurrentUser({
-      id: ids[role],
-      name: names[role],
-      role,
-      avatar: avatars[role],
-      email: emails[role],
-    });
+      if (response.success && response.token) {
+        localStorage.setItem('auth_token', response.token);
+        if (response.user) {
+          localStorage.setItem('user_profile', JSON.stringify(response.user));
+          setCurrentUser(response.user);
+        }
+        setToken(response.token);
+
+        // Force a page reload to reset all API caches and start polling with new identity
+        window.location.reload();
+      } else {
+        console.error('Login failed during role switch:', response.message);
+      }
+    } catch (err) {
+      console.error('Role switch error:', err);
+    }
   };
 
   return (
@@ -57,13 +47,13 @@ export function RoleSwitcher() {
           <button
             key={role}
             onClick={() => handleRoleChange(role)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${currentUser.role === role
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${currentUser?.role === role
               ? 'bg-gradient-to-r ' + roleConfig[role].color + ' text-white'
               : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
           >
             <span className="text-sm font-medium">{roleConfig[role].label}</span>
-            {currentUser.role === role && <Check className="w-4 h-4" />}
+            {currentUser?.role === role && <Check className="w-4 h-4" />}
           </button>
         ))}
       </div>
