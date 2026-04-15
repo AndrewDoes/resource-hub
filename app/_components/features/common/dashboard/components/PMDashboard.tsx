@@ -29,10 +29,9 @@ import {
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
+import { calculateDerivedProgressPercent, clampPercent, isCompletedTimelineStatus } from '@/app/_components/features/common/progress/derivedProgress';
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
-
-const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
 const isActiveAssignmentStatus = (value: string): boolean => {
   const normalized = value.trim().toLowerCase();
@@ -190,18 +189,24 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
     const derivedProgressEntries = await Promise.all(
       sourceSummaries.map(async (project) => {
         const projectTasks = allTasks.filter((task) => task.projectId === project.id);
-        const completedTasks = projectTasks.filter((task) => task.status === 'completed').length;
-        const taskRatio = projectTasks.length > 0 ? completedTasks / projectTasks.length : null;
+        const taskStats = projectTasks.length > 0
+          ? {
+              total: projectTasks.length,
+              completed: projectTasks.filter((task) => task.status === 'completed').length,
+            }
+          : null;
 
-        const [milestoneRatio, timelineRatio] = await Promise.all([
+        const [milestoneStats, timelineStats] = await Promise.all([
           (async () => {
             try {
               const milestones = await fetchProjectManagerMilestones(pmUserId, project.id);
               if (milestones.length === 0) {
                 return null;
               }
-              const completedMilestones = milestones.filter((item) => item.isCompleted).length;
-              return completedMilestones / milestones.length;
+              return {
+                total: milestones.length,
+                completed: milestones.filter((item) => item.isCompleted).length,
+              };
             } catch {
               return null;
             }
@@ -212,39 +217,31 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
               if (timelineTasks.length === 0) {
                 return null;
               }
-              const completedTimelineTasks = timelineTasks.filter((item) => {
-                const normalized = item.status.toLowerCase().replace('_', '-');
-                return normalized === 'completed';
-              }).length;
-              return completedTimelineTasks / timelineTasks.length;
+              return {
+                total: timelineTasks.length,
+                completed: timelineTasks.filter((item) => isCompletedTimelineStatus(item.status)).length,
+              };
             } catch {
               return null;
             }
           })(),
         ]);
 
-        const weightedRatios: Array<{ ratio: number; weight: number }> = [];
-        if (taskRatio !== null) {
-          weightedRatios.push({ ratio: taskRatio, weight: 0.7 });
-        }
-        if (milestoneRatio !== null) {
-          weightedRatios.push({ ratio: milestoneRatio, weight: 0.2 });
-        }
-        if (timelineRatio !== null) {
-          weightedRatios.push({ ratio: timelineRatio, weight: 0.1 });
-        }
-
-        if (weightedRatios.length > 0) {
-          const totalWeight = weightedRatios.reduce((sum, item) => sum + item.weight, 0);
-          const weightedProgress = weightedRatios.reduce((sum, item) => sum + item.ratio * item.weight, 0) / totalWeight;
-          return [project.id, clampPercent(weightedProgress * 100)] as const;
-        }
-
         try {
           const overview = await fetchProjectManagerProjectOverview(pmUserId, project.id);
-          return [project.id, clampPercent(overview.progressPercent)] as const;
+          return [project.id, calculateDerivedProgressPercent({
+            tasks: taskStats,
+            milestones: milestoneStats,
+            timeline: timelineStats,
+            fallbackPercent: overview.progressPercent,
+          })] as const;
         } catch {
-          return [project.id, clampPercent(project.progress)] as const;
+          return [project.id, calculateDerivedProgressPercent({
+            tasks: taskStats,
+            milestones: milestoneStats,
+            timeline: timelineStats,
+            fallbackPercent: project.progress,
+          })] as const;
         }
       })
     );
