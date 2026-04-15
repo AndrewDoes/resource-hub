@@ -699,7 +699,7 @@ export async function updateProjectManagerTimelineTask(input: ProjectManagerUpda
 
 export async function updateProjectManagerProjectStatus(
   projectId: string,
-  status: 'Completed' | 'Cancelled'
+  status: 'InProgress' | 'Completed' | 'Cancelled' | 'Assigned'
 ): Promise<ProjectManagerUpdateProjectStatusResult> {
   const response = await authorizedFetch(BackendApiUrl.projectsUpdateStatus, {
     method: 'POST',

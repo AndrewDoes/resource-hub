@@ -24,6 +24,7 @@ import {
   projectManagerFallbackProjects,
 } from '@/functions/api/projectManager';
 import { useRole } from '@/app/context/RoleContext';
+import { calculateDerivedProgressPercent } from '@/app/_components/features/common/progress/derivedProgress';
 
 interface Milestone {
   id: string;
@@ -344,29 +345,22 @@ export function ProjectManager() {
   }, [projectOverview, selectedProject]);
 
   const derivedProgressPercent = useMemo(() => {
-    const weightedRatios: Array<{ ratio: number; weight: number }> = [];
-
-    if (taskProgress && taskProgress.total > 0) {
-      weightedRatios.push({ ratio: taskProgress.completed / taskProgress.total, weight: 0.7 });
-    }
-
-    if (milestones.length > 0) {
-      const completedMilestones = milestones.filter((item) => item.completed).length;
-      weightedRatios.push({ ratio: completedMilestones / milestones.length, weight: 0.2 });
-    }
-
-    if (ganttTasks.length > 0) {
-      const completedTimelineTasks = ganttTasks.filter((item) => item.status === 'completed').length;
-      weightedRatios.push({ ratio: completedTimelineTasks / ganttTasks.length, weight: 0.1 });
-    }
-
-    if (weightedRatios.length > 0) {
-      const totalWeight = weightedRatios.reduce((sum, item) => sum + item.weight, 0);
-      const weightedProgress = weightedRatios.reduce((sum, item) => sum + item.ratio * item.weight, 0) / totalWeight;
-      return Math.max(0, Math.min(100, Math.round(weightedProgress * 100)));
-    }
-
-    return Math.max(0, Math.min(100, Math.round(overview?.progressPercent ?? 0)));
+    return calculateDerivedProgressPercent({
+      tasks: taskProgress,
+      milestones: milestones.length > 0
+        ? {
+          total: milestones.length,
+          completed: milestones.filter((item) => item.completed).length,
+        }
+        : null,
+      timeline: ganttTasks.length > 0
+        ? {
+          total: ganttTasks.length,
+          completed: ganttTasks.filter((item) => item.status === 'completed').length,
+        }
+        : null,
+      fallbackPercent: overview?.progressPercent ?? 0,
+    });
   }, [ganttTasks, milestones, overview?.progressPercent, taskProgress]);
 
   const refreshMilestones = async () => {
@@ -390,6 +384,22 @@ export function ProjectManager() {
   const handleToggleMilestone = async (milestone: Milestone) => {
     if (!selectedProject || isUpdatingMilestoneId) {
       return;
+    }
+
+    // Only confirm when marking as completed
+    if (!milestone.completed) {
+      const confirmed = window.confirm(`Mark milestone "${milestone.title}" as completed?`);
+      if (!confirmed) {
+        return;
+      }
+    } else {
+      // Optional: confirm undo as well? The user asked for undo logic, let's keep it simple or confirm undo too.
+      // Given the user's request for "mark completed to make sure it's not a misclick", 
+      // undoing is usually less critical but good to have if it was also a misclick.
+      const confirmed = window.confirm(`Undo completion for milestone "${milestone.title}"?`);
+      if (!confirmed) {
+        return;
+      }
     }
 
     try {
@@ -456,6 +466,15 @@ export function ProjectManager() {
 
     try {
       setError(null);
+
+      // Add confirmation if setting to completed
+      if (timelineEditDraft.status === 'completed') {
+        const confirmed = window.confirm(`Mark timeline task "${timelineEditDraft.name}" as completed?`);
+        if (!confirmed) {
+          return;
+        }
+      }
+
       setIsSavingTimelineTask(true);
       await updateProjectManagerTimelineTask({
         pmUserId: pmUserId,

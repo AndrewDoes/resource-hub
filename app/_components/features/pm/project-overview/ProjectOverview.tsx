@@ -14,9 +14,8 @@ import {
   updateProjectManagerProjectStatus,
 } from "@/functions/api/projectManager";
 import { useRole } from "@/app/context/RoleContext";
+import { calculateDerivedProgressPercent, clampPercent, isCompletedTimelineStatus } from '@/app/_components/features/common/progress/derivedProgress';
 
-
-const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -44,16 +43,27 @@ export function ProjectOverview() {
   const [error, setError] = useState<string | null>(null);
   const [isUsingFallbackData] = useState(false);
 
-  const handleMarkCompleted = async (projectId: string) => {
+  const handleUpdateStatus = async (projectId: string, status: 'InProgress' | 'Completed' | 'Cancelled') => {
     if (isUsingFallbackData) {
       setError('Cannot update status while using fallback data. Please ensure backend is reachable.');
+      return;
+    }
+
+    const confirmMessage = status === 'Completed'
+      ? "Are you sure you want to mark this project as completed?"
+      : status === 'InProgress'
+        ? "Do you want to undo completion and move this project back to In Progress?"
+        : `Are you sure you want to change project status to ${status}?`;
+
+    const confirmed = window.confirm(confirmMessage);
+    if (!confirmed) {
       return;
     }
 
     setUpdatingProjectIds((prev) => [...prev, projectId]);
 
     try {
-      await updateProjectManagerProjectStatus(projectId, 'Completed');
+      await updateProjectManagerProjectStatus(projectId, status);
 
       const refreshed = await fetchProjectManagerProjects(pmUserId);
       setProjects(refreshed);
@@ -122,58 +132,54 @@ export function ProjectOverview() {
         const progressEntries = await Promise.all(
           projects.map(async (project) => {
             const projectTasks = allTasks.filter((task) => task.projectId === project.id);
-            const completedTasks = projectTasks.filter((task) => task.status === 'completed').length;
-            const taskRatio = projectTasks.length > 0 ? completedTasks / projectTasks.length : null;
+            const taskStats = projectTasks.length > 0
+              ? {
+                  total: projectTasks.length,
+                  completed: projectTasks.filter((task) => task.status === 'completed').length,
+                }
+              : null;
 
-            let milestoneRatio: number | null = null;
+            let milestoneStats: { total: number; completed: number } | null = null;
             try {
               const milestones = await fetchProjectManagerMilestones(pmUserId, project.id);
               if (milestones.length > 0) {
-                const completedMilestones = milestones.filter((item) => item.isCompleted).length;
-                milestoneRatio = completedMilestones / milestones.length;
+                milestoneStats = {
+                  total: milestones.length,
+                  completed: milestones.filter((item) => item.isCompleted).length,
+                };
               }
             } catch {
-              milestoneRatio = null;
+              milestoneStats = null;
             }
 
-            let timelineRatio: number | null = null;
+            let timelineStats: { total: number; completed: number } | null = null;
             try {
               const timelineTasks = await fetchProjectManagerTimelineTasks(pmUserId, project.id);
               if (timelineTasks.length > 0) {
-                const completedTimelineTasks = timelineTasks.filter((item) => {
-                  const normalized = item.status.toLowerCase().replace('_', '-');
-                  return normalized === 'completed';
-                }).length;
-                timelineRatio = completedTimelineTasks / timelineTasks.length;
+                timelineStats = {
+                  total: timelineTasks.length,
+                  completed: timelineTasks.filter((item) => isCompletedTimelineStatus(item.status)).length,
+                };
               }
             } catch {
-              timelineRatio = null;
-            }
-
-            const weightedRatios: Array<{ ratio: number; weight: number }> = [];
-
-            if (taskRatio !== null) {
-              weightedRatios.push({ ratio: taskRatio, weight: 0.7 });
-            }
-            if (milestoneRatio !== null) {
-              weightedRatios.push({ ratio: milestoneRatio, weight: 0.2 });
-            }
-            if (timelineRatio !== null) {
-              weightedRatios.push({ ratio: timelineRatio, weight: 0.1 });
-            }
-
-            if (weightedRatios.length > 0) {
-              const totalWeight = weightedRatios.reduce((sum, entry) => sum + entry.weight, 0);
-              const weightedProgress = weightedRatios.reduce((sum, entry) => sum + entry.ratio * entry.weight, 0) / totalWeight;
-
-              return [project.id, clampPercent(weightedProgress * 100)] as const;
+              timelineStats = null;
             }
 
             try {
               const overview = await fetchProjectManagerProjectOverview(pmUserId, project.id);
-              return [project.id, clampPercent(overview.progressPercent)] as const;
+              return [project.id, calculateDerivedProgressPercent({
+                tasks: taskStats,
+                milestones: milestoneStats,
+                timeline: timelineStats,
+                fallbackPercent: overview.progressPercent,
+              })] as const;
             } catch {
-              return [project.id, clampPercent(project.progress)] as const;
+              return [project.id, calculateDerivedProgressPercent({
+                tasks: taskStats,
+                milestones: milestoneStats,
+                timeline: timelineStats,
+                fallbackPercent: project.progress,
+              })] as const;
             }
           })
         );
@@ -319,14 +325,21 @@ export function ProjectOverview() {
                 </div>
                 <p className="text-sm text-gray-600">{project.description}</p>
               </div>
-              {!isUsingFallbackData && project.status !== 'completed' && project.status !== 'cancelled' && (
+              {!isUsingFallbackData && project.status !== 'cancelled' && (
                 <button
                   type="button"
-                  onClick={() => handleMarkCompleted(project.id)}
+                  onClick={() => handleUpdateStatus(project.id, project.status === 'completed' ? 'InProgress' : 'Completed')}
                   disabled={updatingProjectIds.includes(project.id)}
-                  className="ml-4 shrink-0 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`ml-4 shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${project.status === 'completed'
+                    ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
                 >
-                  {updatingProjectIds.includes(project.id) ? 'Updating...' : 'Mark Completed'}
+                  {updatingProjectIds.includes(project.id)
+                    ? 'Updating...'
+                    : project.status === 'completed'
+                      ? 'Undo Completion'
+                      : 'Mark Completed'}
                 </button>
               )}
             </div>

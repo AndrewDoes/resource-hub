@@ -10,12 +10,16 @@ import {
 import { AIDecisionPanel } from '@/app/_components/features/gm/decision-panel/components/AIDecisionPanel';
 import type { ProjectData } from '@/app/_components/features/gm/decision-panel/types';
 import {
+  fetchAllTaskAssignments,
+  fetchProjectManagerMilestones,
+  fetchProjectManagerProjectOverview,
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
+  fetchProjectManagerTimelineTasks,
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
-
-
+import { calculateDerivedProgressPercent, clampPercent, isCompletedTimelineStatus } from '@/app/_components/features/common/progress/derivedProgress';
+import { useRole } from '@/app/context/RoleContext';
 
 interface GanttProject {
   id: string;
@@ -55,16 +59,20 @@ const riskFromStatus = (status: GanttProject['status']): GanttProject['riskLevel
 
 const mapSummaryToGanttProject = (
   summary: ProjectManagerProjectSummary,
-  teamMembers: string[] = []
+  teamMembers: string[] = [],
+  resolvedProgress?: number
 ): GanttProject => ({
   id: summary.id,
   name: summary.name,
   startDate: summary.startDate,
   endDate: summary.endDate,
-  progress: summary.progress,
+  progress: clampPercent(Number.isFinite(resolvedProgress) ? Number(resolvedProgress) : summary.progress),
   status: statusFromProject(summary),
   assignedResources: teamMembers,
-  resourceUtilization: Math.min(150, Math.round(summary.progress + teamMembers.length * 8)),
+  resourceUtilization: Math.min(
+    150,
+    Math.round((Number.isFinite(resolvedProgress) ? Number(resolvedProgress) : summary.progress) + teamMembers.length * 8)
+  ),
   riskLevel: riskFromStatus(statusFromProject(summary)),
 });
 
@@ -166,6 +174,68 @@ export function Planning() {
           return;
         }
 
+        const allTasks = await fetchAllTaskAssignments("").catch(() => []);
+
+        const progressEntries = await Promise.all(
+          activeSummaries.map(async (summary) => {
+            const projectTasks = allTasks.filter((task) => task.projectId === summary.id);
+            const taskStats = projectTasks.length > 0
+              ? {
+                total: projectTasks.length,
+                completed: projectTasks.filter((task) => task.status === 'completed').length,
+              }
+              : null;
+
+            const [milestoneStats, timelineStats] = await Promise.all([
+              (async () => {
+                try {
+                  const milestones = await fetchProjectManagerMilestones("", summary.id);
+                  if (milestones.length === 0) {
+                    return null;
+                  }
+                  return {
+                    total: milestones.length,
+                    completed: milestones.filter((item) => item.isCompleted).length,
+                  };
+                } catch {
+                  return null;
+                }
+              })(),
+              (async () => {
+                try {
+                  const timelineTasks = await fetchProjectManagerTimelineTasks("", summary.id);
+                  if (timelineTasks.length === 0) {
+                    return null;
+                  }
+                  return {
+                    total: timelineTasks.length,
+                    completed: timelineTasks.filter((item) => isCompletedTimelineStatus(item.status)).length,
+                  };
+                } catch {
+                  return null;
+                }
+              })(),
+            ]);
+
+            try {
+              const overview = await fetchProjectManagerProjectOverview("", summary.id);
+              return [summary.id, calculateDerivedProgressPercent({
+                tasks: taskStats,
+                milestones: milestoneStats,
+                timeline: timelineStats,
+                fallbackPercent: overview.progressPercent,
+              })] as const;
+            } catch {
+              return [summary.id, calculateDerivedProgressPercent({
+                tasks: taskStats,
+                milestones: milestoneStats,
+                timeline: timelineStats,
+                fallbackPercent: summary.progress,
+              })] as const;
+            }
+          })
+        );
+
         const teamResponses = await Promise.all(
           activeSummaries.map(async (project) => {
             try {
@@ -182,8 +252,13 @@ export function Planning() {
         }
 
         const teamMap = new Map(teamResponses.map((entry) => [entry.projectId, entry.teamMembers]));
+        const derivedProgressMap = new Map<string, number>(progressEntries);
         const liveProjects = activeSummaries.map((summary) =>
-          mapSummaryToGanttProject(summary, teamMap.get(summary.id) ?? [])
+          mapSummaryToGanttProject(
+            summary,
+            teamMap.get(summary.id) ?? [],
+            derivedProgressMap.get(summary.id)
+          )
         );
 
         setProjects(liveProjects);

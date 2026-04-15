@@ -661,18 +661,35 @@ export function TaskAssignments() {
                       Start
                     </Button>
                   )}
-                  {task.status !== "completed" && (
+                  {task.status !== "completed" ? (
                     <Button
-                      onClick={() =>
-                        handleUpdateTaskStatus(task.taskId, "completed")
-                      }
+                      onClick={() => {
+                        const confirmed = window.confirm("Mark this task as completed?");
+                        if (confirmed) {
+                          handleUpdateTaskStatus(task.taskId, "completed");
+                        }
+                      }}
                       size="sm"
-                      className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs"
+                      className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold"
                     >
                       Complete
                     </Button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        const confirmed = window.confirm("Undo completion for this task?");
+                        if (confirmed) {
+                          // Reverting to in-progress is logical for undoing completion
+                          handleUpdateTaskStatus(task.taskId, "in-progress");
+                        }
+                      }}
+                      size="sm"
+                      className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold"
+                    >
+                      Undo Completion
+                    </Button>
                   )}
-                  {task.status !== "pending" && (
+                  {task.status !== "pending" && task.status !== "completed" && (
                     <Button
                       onClick={() =>
                         handleUpdateTaskStatus(task.taskId, "pending")
