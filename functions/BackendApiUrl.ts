@@ -2,6 +2,11 @@ const baseUrl = "/api/gateway";
 
 export const BackendApiUrl = {
   projects: `${baseUrl}/api/projects`,
+  projectsList: `${baseUrl}/api/projects/list`,
+  projectCreate: `${baseUrl}/api/projects/create`,
+  projectUpdate: (projectId: string) => `${baseUrl}/api/projects/${projectId}`,
+  projectRevision: (projectId: string) => `${baseUrl}/api/projects/${projectId}/revision`,
+  projectAttachments: (projectId: string) => `${baseUrl}/api/projects/${projectId}/attachments`,
   projectsUpdateStatus: `${baseUrl}/api/projects/update-status`,
   projectManager: `${baseUrl}/api/project-manager`,
   projectManagerProjectsList: `${baseUrl}/api/project-manager/projects/list`,
@@ -34,4 +39,5 @@ export const BackendApiUrl = {
   startHiring: `${baseUrl}/api/human-resource/start-hiring`,
   humanResources: `${baseUrl}/api/human-resource`,
   lookups: `${baseUrl}/api/lookups`,
+  lookupsSkillsList: `${baseUrl}/api/lookups/skills/list`,
 } as const;

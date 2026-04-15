@@ -10,6 +10,7 @@ import { ProjectList } from "@/app/_components/features/marketing/project-revisi
 import { WorkflowVisualizer } from "@/app/_components/system/components/WorkflowVisualizer";
 import { ProjectForm } from "@/app/_components/features/marketing/projects/components/ProjectForm";
 import { useFeedbackToast } from "@/app/context/ToastContext";
+import { BackendApiUrl } from "@/functions/BackendApiUrl";
 import {
   ProjectFormData,
   ResourceRequirement,
@@ -71,7 +72,7 @@ export function MarketingDashboard() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `/api/gateway/api/projects/list?pageNumber=${currentPage}&pageSize=5`,
+        `${BackendApiUrl.projectsList}?pageNumber=${currentPage}&pageSize=5`,
         {
           headers: {
             "X-Debug-Role": "marketing",
@@ -111,7 +112,7 @@ export function MarketingDashboard() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch("/api/gateway/api/lookups/skills/list", {
+        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
           headers: {
             "X-Debug-Role": "marketing",
             "X-Debug-User": "marketing-user",
@@ -197,7 +198,7 @@ export function MarketingDashboard() {
 
       try {
         const response = await fetch(
-          `/api/gateway/api/projects/${project.id}/revision`,
+          BackendApiUrl.projectRevision(project.id),
           {
             headers: {
               "X-Debug-Role": "marketing",
@@ -310,7 +311,7 @@ export function MarketingDashboard() {
       };
 
       const response = await fetch(
-        `/api/gateway/api/projects/${selectedDraftId}`,
+        BackendApiUrl.projectUpdate(selectedDraftId),
         {
           method: "PUT",
           headers: {
@@ -399,7 +400,7 @@ export function MarketingDashboard() {
       };
 
       const response = await fetch(
-        `/api/gateway/api/projects/${selectedDraftId}`,
+        BackendApiUrl.projectUpdate(selectedDraftId),
         {
           method: "PUT",
           headers: {

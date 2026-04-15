@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { XCircle } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
+import { BackendApiUrl } from "@/functions/BackendApiUrl";
 import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
 
@@ -122,7 +123,7 @@ export function ProjectEntry() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch("/api/gateway/api/lookups/skills/list", {
+        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
           headers: {
             "X-Debug-Role": "marketing",
             "X-Debug-User": "marketing-user",
@@ -187,7 +188,7 @@ export function ProjectEntry() {
         })),
       };
 
-      const response = await fetch("/api/gateway/api/projects/create", {
+      const response = await fetch(BackendApiUrl.projectCreate, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -287,7 +288,7 @@ export function ProjectEntry() {
         })),
       };
 
-      const response = await fetch("/api/gateway/api/projects/create", {
+      const response = await fetch(BackendApiUrl.projectCreate, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -318,7 +319,7 @@ export function ProjectEntry() {
           formDataUpload.append("file", file);
 
           const uploadResponse = await fetch(
-            `/api/gateway/api/projects/${projectId}/attachments`,
+            BackendApiUrl.projectAttachments(projectId),
             {
               method: "POST",
               headers: {

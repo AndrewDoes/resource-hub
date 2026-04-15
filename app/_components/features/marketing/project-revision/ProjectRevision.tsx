@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Paperclip, Plus, Save, Send, XCircle, X } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
+import { BackendApiUrl } from "@/functions/BackendApiUrl";
 import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
 import { RejectedProjectsModal } from "../projects/components/RejectedProjectsModal";
@@ -61,7 +62,7 @@ export function ProjectRevision() {
       setIsProjectsLoading(true);
       try {
         const response = await fetch(
-          `/api/gateway/api/projects/list?status=Rejected&pageNumber=${currentPage}&pageSize=5`,
+          `${BackendApiUrl.projectsList}?status=Rejected&pageNumber=${currentPage}&pageSize=5`,
           {
             headers: {
               "X-Debug-Role": "marketing",
@@ -172,7 +173,7 @@ export function ProjectRevision() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch("/api/gateway/api/lookups/skills/list", {
+        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
           headers: {
             "X-Debug-Role": "marketing",
             "X-Debug-User": "marketing-user",
@@ -284,7 +285,7 @@ export function ProjectRevision() {
       };
 
       const response = await fetch(
-        `/api/gateway/api/projects/${selectedProjectId}`,
+        BackendApiUrl.projectUpdate(selectedProjectId),
         {
           method: "PUT",
           headers: {
@@ -326,7 +327,7 @@ export function ProjectRevision() {
 
     try {
       const response = await fetch(
-        `/api/gateway/api/projects/${project.id}/revision`,
+        BackendApiUrl.projectRevision(project.id),
         {
           headers: {
             "X-Debug-Role": "marketing",
