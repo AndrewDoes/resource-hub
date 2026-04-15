@@ -178,13 +178,8 @@ export function ProjectEntry() {
         })),
       };
 
-      const response = await fetch(BackendApiUrl.projectCreate, {
+      const response = await authorizedFetch(BackendApiUrl.projectCreate, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Role": "marketing",
-          "X-Debug-User": "marketing-user",
-        },
         body: JSON.stringify(payload),
       });
 
@@ -302,14 +297,10 @@ export function ProjectEntry() {
           const formDataUpload = new FormData();
           formDataUpload.append("file", file);
 
-          const uploadResponse = await fetch(
+          const uploadResponse = await authorizedFetch(
             BackendApiUrl.projectAttachments(projectId),
             {
               method: "POST",
-              headers: {
-                "X-Debug-Role": "marketing",
-                "X-Debug-User": "marketing-user",
-              },
               body: formDataUpload,
             },
           );
