@@ -30,6 +30,7 @@ const mapAssignmentStatus = (status: string): ProjectStatus => {
     case 'accepted': return 'assigned';
     case 'inprogress':
     case 'in-progress': return 'in-progress';
+    case 'completed': return 'completed';
     case 'rejected': return 'rejected';
     default: return 'submitted';
   }
