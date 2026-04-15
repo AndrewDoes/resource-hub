@@ -99,6 +99,11 @@ export function MyProjects() {
     return s === 'accepted' || s === 'inprogress' || s === 'in-progress';
   });
 
+  const completedAssignmentsList = data.assignments.filter((a) => {
+    const s = a.status.toLowerCase();
+    return s === 'completed';
+  });
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -173,6 +178,28 @@ export function MyProjects() {
           </div>
         )}
       </div>
+
+      {/* Project History */}
+      {completedAssignmentsList.length > 0 && (
+        <div className="space-y-4 pt-6 opacity-85">
+          <div className="flex items-center gap-3 px-1">
+            <div className="p-1.5 bg-blue-100 rounded-lg">
+              <Clock className="w-4 h-4 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Project History</h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {completedAssignmentsList.map((assignment) => (
+              <div key={assignment.id} className="grayscale-[0.4] hover:grayscale-0 transition-all">
+                <AssignmentCard
+                  assignment={assignment}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
