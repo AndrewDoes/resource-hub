@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { ProjectStatus } from '../types';
 import { workflowSteps } from '../data';
 import { StatusBadge } from './StatusBadge';
+import { normalizeStatus } from '@/utils/stringUtils';
 
 interface WorkflowVisualizerProps {
   currentStatus: ProjectStatus;
@@ -12,8 +13,9 @@ interface WorkflowVisualizerProps {
 
 export function WorkflowVisualizer({ currentStatus, compact = false }: WorkflowVisualizerProps) {
   const getCurrentStepIndex = () => {
+    const normalizedStatus = normalizeStatus(currentStatus) as ProjectStatus;
     for (let i = 0; i < workflowSteps.length; i++) {
-      if (workflowSteps[i].status.includes(currentStatus)) {
+      if (workflowSteps[i].status.includes(normalizedStatus)) {
         return i;
       }
     }
