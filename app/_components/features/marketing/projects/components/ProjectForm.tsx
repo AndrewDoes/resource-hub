@@ -23,6 +23,7 @@ export interface ProjectFormProps {
   resourceRequirements: ResourceRequirement[];
   suggestedEmployees: SuggestedEmployee[];
   isRevisionMode?: boolean;
+  isDraftEditMode?: boolean;
   isSubmitting?: boolean;
   uploadErrors?: string[];
 
@@ -50,6 +51,7 @@ export function ProjectForm({
   resourceRequirements,
   suggestedEmployees,
   isRevisionMode,
+  isDraftEditMode,
   isSubmitting,
   uploadErrors,
   onFormDataChange,
@@ -237,7 +239,7 @@ export function ProjectForm({
       </div>
 
       {/* Attachments */}
-      {!isRevisionMode && (
+      {!isRevisionMode && !isDraftEditMode && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Attachments
@@ -325,7 +327,7 @@ export function ProjectForm({
 
       {/* Action Buttons */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-        {!isRevisionMode && (
+        {!isRevisionMode && !isDraftEditMode && (
           <>
             <button
               type="button"
@@ -343,6 +345,16 @@ export function ProjectForm({
               Save Draft
             </button>
           </>
+        )}
+        {isDraftEditMode && (
+          <button
+            type="button"
+            onClick={onSaveDraft}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all"
+          >
+            <Save className="w-4 h-4" />
+            Save as Draft
+          </button>
         )}
         <button
           type="submit"
