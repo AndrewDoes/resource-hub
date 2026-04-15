@@ -182,8 +182,20 @@ const asNumber = (value: unknown, fallback: number): number => {
 };
 
 const normalizeDateOnlyString = (value: string): string => {
-  const match = value.match(/\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : value;
+  const isoMatch = value.match(/\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) {
+    return isoMatch[0];
+  }
+
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const day = slashMatch[1].padStart(2, "0");
+    const month = slashMatch[2].padStart(2, "0");
+    const year = slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  return value;
 };
 
 const normalizeTaskPriority = (value: unknown): TaskPriority => {
@@ -232,21 +244,29 @@ const readErrorMessage = async (response: Response, fallbackMessage: string): Pr
       return directMessage;
     }
 
+    const errors = payload.errors;
+    if (errors && typeof errors === "object") {
+      const allErrors = Object.values(errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((value) => value.length > 0);
+
+      const meaningfulError = allErrors.find(
+        (message) => message.toLowerCase() !== "the request field is required."
+      );
+
+      if (meaningfulError) {
+        return meaningfulError;
+      }
+
+      if (allErrors.length > 0) {
+        return allErrors[0];
+      }
+    }
+
     const titleMessage = asString(payload.title, "");
     if (titleMessage) {
       return titleMessage;
-    }
-
-    const errors = payload.errors;
-    if (errors && typeof errors === "object") {
-      const firstError = Object.values(errors as Record<string, unknown>)
-        .flatMap((value) => (Array.isArray(value) ? value : [value]))
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .find((value) => value.length > 0);
-
-      if (firstError) {
-        return firstError;
-      }
     }
   } catch {
     // fall back to plain text handling below
@@ -343,17 +363,17 @@ const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember
     const record = item as Record<string, unknown>;
 
     return {
-      assignmentId: asString(record.assignmentId ?? record.assignment_id ?? record.id ?? record.Id, ''),
-      employeeId: asString(record.employeeId ?? record.employee_id, String(index + 1)),
-      fullName: asString(record.fullName ?? record.full_name, "Unknown Employee"),
-      jobTitle: asString(record.jobTitle ?? record.job_title, "Unknown Role"),
-      roleName: asString(record.roleName ?? record.role_name, "Member"),
-      allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
-      assignmentStatus: asString(record.assignmentStatus ?? record.assignment_status, "Pending"),
-      availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 0),
-      workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
-      assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
-      employeeStatus: asString(record.employeeStatus ?? record.employee_status, "Active"),
+      assignmentId: asString(record.assignmentId ?? record.AssignmentId ?? record.assignment_id ?? record.id ?? record.Id, ''),
+      employeeId: asString(record.employeeId ?? record.EmployeeId ?? record.employee_id, ''),
+      fullName: asString(record.fullName ?? record.FullName ?? record.full_name, "Unknown Employee"),
+      jobTitle: asString(record.jobTitle ?? record.JobTitle ?? record.job_title, "Unknown Role"),
+      roleName: asString(record.roleName ?? record.RoleName ?? record.role_name, "Member"),
+      allocationPercent: asNumber(record.allocationPercent ?? record.AllocationPercent ?? record.allocation_percent, 0),
+      assignmentStatus: asString(record.assignmentStatus ?? record.AssignmentStatus ?? record.assignment_status, "Pending"),
+      availabilityPercent: asNumber(record.availabilityPercent ?? record.AvailabilityPercent ?? record.availability_percent, 0),
+      workloadPercent: asNumber(record.workloadPercent ?? record.WorkloadPercent ?? record.workload_percent, 0),
+      assignedHours: asNumber(record.assignedHours ?? record.AssignedHours ?? record.assigned_hours, 0),
+      employeeStatus: asString(record.employeeStatus ?? record.EmployeeStatus ?? record.employee_status, "Active"),
     };
   });
 };

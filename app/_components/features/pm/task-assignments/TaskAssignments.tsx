@@ -169,10 +169,19 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
         const members = await fetchProjectManagerProjectTeam(pmUserId, formData.projectId);
         setTeamMembers(members);
 
-        // Reset selected member if it no longer exists in the selected project's team.
-        if (formData.employeeId && !members.some((member) => member.employeeId === formData.employeeId)) {
-          setFormData((prev) => ({ ...prev, employeeId: "" }));
-        }
+        // Keep selection valid and ensure a real employee ID is bound.
+        setFormData((prev) => {
+          if (members.length === 0) {
+            return { ...prev, employeeId: "" };
+          }
+
+          const hasCurrent = prev.employeeId && members.some((member) => member.employeeId === prev.employeeId);
+          if (hasCurrent) {
+            return prev;
+          }
+
+          return { ...prev, employeeId: members[0].employeeId };
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load team members");
         setTeamMembers([]);
