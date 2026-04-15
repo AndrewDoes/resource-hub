@@ -161,6 +161,8 @@ export function Settings() {
   // };
 
   const handleSave = async () => {
+    if (!currentUser) return;
+
     console.log("Current user name: ", currentUser.name);
     setIsSaving(true);
     setSaveStatus("idle");
@@ -267,7 +269,7 @@ export function Settings() {
 
       {/* Access Control */}
       <AccessControlSection
-        selectedRole={currentUser.role}
+        selectedRole={currentUser?.role || ""}
       // setSelectedRole={handleRoleSwitch} // OLD: removed
       />
 
