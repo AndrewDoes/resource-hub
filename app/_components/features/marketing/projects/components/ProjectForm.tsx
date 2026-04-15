@@ -207,6 +207,21 @@ export function ProjectForm({
       {/* Suggested Resource Match */}
       {/* <SuggestedResources suggestedEmployees={suggestedEmployees} /> */}
 
+      {/* Project Description */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Project Description <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          rows={5}
+          value={formData.description}
+          onChange={(e) => onFormDataChange("description", e.target.value)}
+          placeholder="Describe the project scope, objectives, and key deliverables..."
+          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          required
+        ></textarea>
+      </div>
+
       {/* Notes */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">

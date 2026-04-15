@@ -32,6 +32,7 @@ export function ProjectRevision() {
     clientName: "",
     startDate: "",
     endDate: "",
+    description: "",
     notes: "",
   });
 
@@ -263,6 +264,7 @@ export function ProjectRevision() {
         clientName: formData.clientName,
         startDate: formData.startDate,
         endDate: formData.endDate,
+        description: formData.description,
         notes: formData.notes,
         skillIds: selectedSkills.map((s) => s.id),
         resourceRequirements: resourceRequirements.map((r, index) => ({
@@ -344,7 +346,8 @@ export function ProjectRevision() {
         clientName: revisionDetail.clientName || "",
         startDate: revisionDetail.startDate || "",
         endDate: revisionDetail.endDate || "",
-        notes: revisionDetail.description || "",
+        description: revisionDetail.description || "",
+        notes: revisionDetail.notes || "",
         rejectionReason: revisionDetail.rejectionReason || "",
       });
 

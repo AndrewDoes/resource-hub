@@ -31,6 +31,7 @@ export function ProjectEntry() {
     clientName: "",
     startDate: "",
     endDate: "",
+    description: "",
     notes: "",
   });
 
@@ -164,13 +165,56 @@ export function ProjectEntry() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveDraft = () => {
-    setProjectStatus("draft");
-    addToast({
-      type: "success",
-      title: "Draft Saved",
-      message: "Your project proposal has been saved as draft",
-    });
+  const handleSaveDraft = async () => {
+    try {
+      const payload = {
+        createdByUserId: marketingUserId,
+        name: formData.name,
+        clientName: formData.clientName,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        description: formData.description,
+        notes: formData.notes,
+        status: "Draft",
+        skillIds: selectedSkills.map((s) => s.id),
+        resourceRequirements: resourceRequirements.map((r, index) => ({
+          roleName: r.role,
+          quantity: r.quantity,
+          experienceLevel: r.experienceLevel,
+          notes: r.notes,
+          sortOrder: index,
+          skillIds: r.requiredSkills.map((s) => s.id),
+        })),
+      };
+
+      const response = await fetch("/api/gateway/api/projects/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Role": "marketing",
+          "X-Debug-User": "marketing-user",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save draft");
+      }
+
+      setProjectStatus("draft");
+      addToast({
+        type: "success",
+        title: "Draft Saved",
+        message: "Your project proposal has been saved as draft",
+      });
+    } catch (error) {
+      console.error(error);
+      addToast({
+        type: "error",
+        title: "Save Failed",
+        message: "There was an error saving your draft.",
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -179,6 +223,7 @@ export function ProjectEntry() {
       clientName: "",
       startDate: "",
       endDate: "",
+      description: "",
       notes: "",
     });
     setSelectedSkills([]);
@@ -228,7 +273,9 @@ export function ProjectEntry() {
         clientName: formData.clientName,
         startDate: formData.startDate,
         endDate: formData.endDate,
+        description: formData.description,
         notes: formData.notes,
+        status: "Submitted",
         skillIds: selectedSkills.map((s) => s.id),
         resourceRequirements: resourceRequirements.map((r, index) => ({
           roleName: r.role,

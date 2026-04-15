@@ -1,20 +1,13 @@
-'use client';
+"use client";
 
-import { 
-  FileText, 
-  Clock, 
-  XCircle,
-  X 
-} from 'lucide-react';
-import Link from 'next/link';
+import { FileText, Clock, XCircle, X } from "lucide-react";
+import Link from "next/link";
 // import { marketingProjects } from '@/app/_components/features/common/dashboard/data';
-import { ProjectStatus } from '@/app/types';
-import React, { useState, useEffect } from 'react';
-import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
-import { ProjectList } from '@/app/_components/features/marketing/project-revision/ProjectList';
-import { WorkflowVisualizer } from '@/app/_components/system/components/WorkflowVisualizer';
-
-
+import { ProjectStatus } from "@/app/types";
+import React, { useState, useEffect } from "react";
+import { StatusBadge } from "@/app/_components/system/components/StatusBadge";
+import { ProjectList } from "@/app/_components/features/marketing/project-revision/ProjectList";
+import { WorkflowVisualizer } from "@/app/_components/system/components/WorkflowVisualizer";
 
 export function MarketingDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -28,27 +21,30 @@ export function MarketingDashboard() {
     const fetchProjects = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/gateway/api/projects/list?pageNumber=${currentPage}&pageSize=5`, {
-          headers: {
-            'X-Debug-Role': 'marketing',
-            'X-Debug-User': 'marketing-user'
-          }
-        });
-        
+        const response = await fetch(
+          `/api/gateway/api/projects/list?pageNumber=${currentPage}&pageSize=5`,
+          {
+            headers: {
+              "X-Debug-Role": "marketing",
+              "X-Debug-User": "marketing-user",
+            },
+          },
+        );
+
         if (!response.ok) {
-          throw new Error('Failed to fetch projects');
+          throw new Error("Failed to fetch projects");
         }
-        
+
         const data = await response.json();
         // Fallback for mapping the API fields to the fields expected by the UI.
         const mappedProjects = (data.projects || []).map((p: any) => ({
           id: p.id,
           name: p.name,
           status: p.status as ProjectStatus,
-          lastModified: p.startDate ? `Started ${p.startDate}` : 'Unknown', // Fallback since API lacks lastModified
-          feedback: null // Fallback since API lacks feedback field for now
+          lastModified: p.startDate ? `Started ${p.startDate}` : "Unknown", // Fallback since API lacks lastModified
+          feedback: null, // Fallback since API lacks feedback field for now
         }));
-        
+
         setProjects(mappedProjects);
         setTotalPages(data.totalPages || 1);
       } catch (err: any) {
@@ -64,8 +60,12 @@ export function MarketingDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Marketing Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your project proposals</p>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Marketing Dashboard
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage your project proposals
+        </p>
       </div>
 
       {error && (
@@ -82,12 +82,17 @@ export function MarketingDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Link href="/marketing/projects" className="bg-linear-to-br from-purple-500 to-pink-500 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+        <Link
+          href="/marketing/projects"
+          className="bg-linear-to-br from-purple-500 to-pink-500 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow"
+        >
           <div className="flex items-center gap-3 mb-3">
             <FileText className="w-6 h-6" />
             <h3 className="font-semibold text-lg">Create New Project</h3>
           </div>
-          <p className="text-sm text-purple-50">Submit a new project proposal</p>
+          <p className="text-sm text-purple-50">
+            Submit a new project proposal
+          </p>
         </Link>
 
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -96,7 +101,10 @@ export function MarketingDashboard() {
             <h3 className="font-semibold text-gray-900">Pending Review</h3>
           </div>
           <p className="text-3xl font-semibold text-gray-900">
-            {projects.filter(p => p.status === 'submitted').length}
+            {
+              projects.filter((p) => p.status.toLowerCase() === "submitted")
+                .length
+            }
           </p>
           <p className="text-sm text-gray-500 mt-1">Awaiting GM approval</p>
         </div>
@@ -107,17 +115,20 @@ export function MarketingDashboard() {
             <h3 className="font-semibold text-gray-900">Needs Revision</h3>
           </div>
           <p className="text-3xl font-semibold text-gray-900">
-            {projects.filter(p => p.status === 'rejected').length}
+            {
+              projects.filter((p) => p.status.toLowerCase() === "rejected")
+                .length
+            }
           </p>
           <p className="text-sm text-gray-500 mt-1">Requires updates</p>
         </div>
       </div>
 
       {/* My Projects */}
-      <ProjectList 
-        projects={projects} 
-        isLoading={isLoading} 
-        error={error} 
+      <ProjectList
+        projects={projects}
+        isLoading={isLoading}
+        error={error}
         title="My Projects"
         currentPage={currentPage}
         totalPages={totalPages}
@@ -131,7 +142,9 @@ export function MarketingDashboard() {
           <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-start justify-between z-10">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">Project Workflow</h3>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Project Workflow
+                </h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {selectedProject.name}
                 </p>
@@ -145,7 +158,9 @@ export function MarketingDashboard() {
               </button>
             </div>
             <div className="p-6">
-              <WorkflowVisualizer currentStatus={selectedProject.status as ProjectStatus} />
+              <WorkflowVisualizer
+                currentStatus={selectedProject.status as ProjectStatus}
+              />
             </div>
           </div>
         </div>

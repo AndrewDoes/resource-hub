@@ -80,10 +80,10 @@ export function ProfileSection({
                 {initials}
               </span>
             </div>
-            <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+            {/* <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
               <Upload className="w-3.5 h-3.5" />
               Change Photo
-            </button>
+            </button> */}
           </div>
 
           <div className="flex-1 space-y-4">

@@ -9,6 +9,7 @@ export interface ProjectFormData {
   clientName: string;
   startDate: string;
   endDate: string;
+  description: string;
   notes: string;
   rejectionReason?: string;
   attachments?: File[];
