@@ -22,13 +22,18 @@ export interface AIRecommendation {
     risk?: string;
     workload?: string;
   };
-  confidence: number;
   reasoning: string;
   metadata?: {
     employeeId?: string;
+    employeeName?: string;
     roleName?: string;
     requiredSkills?: string[];
     allocationPercent?: number;
+    candidateOptions?: Array<{
+      employeeId: string;
+      fullName: string;
+      availabilityPercent: number;
+    }>;
   };
 }
 
