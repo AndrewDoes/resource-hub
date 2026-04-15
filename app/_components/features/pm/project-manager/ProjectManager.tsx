@@ -38,6 +38,16 @@ interface TeamMember {
   avatar: string;
 }
 
+interface TimelineTaskItem {
+  id: string;
+  name: string;
+  startOffsetDays: number;
+  durationDays: number;
+  colorTag: string;
+  status: 'pending' | 'in-progress' | 'completed';
+  sortOrder: number;
+}
+
 const fallbackMilestones: Milestone[] = [
   { id: '1', title: 'Requirements Gathering', date: '2026-04-15', completed: true },
   { id: '2', title: 'Design System Creation', date: '2026-04-30', completed: true },
