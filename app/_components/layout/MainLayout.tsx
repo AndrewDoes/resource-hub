@@ -230,8 +230,8 @@ export function Root({ children }: { children: ReactNode }) {
   const filteredNotifications = filterNotificationsByRole(notifications, currentUser.role as UserRole);
   const unreadCount = filteredNotifications.filter((n) => !n.read).length;
   const isActive = (path: string) => {
-    if (path === "/dashboard") {
-      return pathname === "/" || pathname === "/dashboard";
+    if (path.endsWith("/dashboard") && pathname === "/") {
+      return true;
     }
     return pathname === path || pathname.startsWith(path + "/");
   };
