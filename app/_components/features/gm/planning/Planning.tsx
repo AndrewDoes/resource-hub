@@ -10,12 +10,17 @@ import {
 import { AIDecisionPanel } from '@/app/_components/features/gm/decision-panel/components/AIDecisionPanel';
 import type { ProjectData } from '@/app/_components/features/gm/decision-panel/types';
 import {
+  fetchAllTaskAssignments,
+  fetchProjectManagerMilestones,
+  fetchProjectManagerProjectOverview,
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
+  fetchProjectManagerTimelineTasks,
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
 interface GanttProject {
   id: string;
@@ -55,16 +60,20 @@ const riskFromStatus = (status: GanttProject['status']): GanttProject['riskLevel
 
 const mapSummaryToGanttProject = (
   summary: ProjectManagerProjectSummary,
-  teamMembers: string[] = []
+  teamMembers: string[] = [],
+  resolvedProgress?: number
 ): GanttProject => ({
   id: summary.id,
   name: summary.name,
   startDate: summary.startDate,
   endDate: summary.endDate,
-  progress: summary.progress,
+  progress: clampPercent(Number.isFinite(resolvedProgress) ? Number(resolvedProgress) : summary.progress),
   status: statusFromProject(summary),
   assignedResources: teamMembers,
-  resourceUtilization: Math.min(150, Math.round(summary.progress + teamMembers.length * 8)),
+  resourceUtilization: Math.min(
+    150,
+    Math.round((Number.isFinite(resolvedProgress) ? Number(resolvedProgress) : summary.progress) + teamMembers.length * 8)
+  ),
   riskLevel: riskFromStatus(statusFromProject(summary)),
 });
 
@@ -166,6 +175,70 @@ export function Planning() {
           return;
         }
 
+        const allTasks = await fetchAllTaskAssignments(defaultPmUserId).catch(() => []);
+
+        const progressEntries = await Promise.all(
+          activeSummaries.map(async (summary) => {
+            const projectTasks = allTasks.filter((task) => task.projectId === summary.id);
+            const completedTasks = projectTasks.filter((task) => task.status === 'completed').length;
+            const taskRatio = projectTasks.length > 0 ? completedTasks / projectTasks.length : null;
+
+            const [milestoneRatio, timelineRatio] = await Promise.all([
+              (async () => {
+                try {
+                  const milestones = await fetchProjectManagerMilestones(defaultPmUserId, summary.id);
+                  if (milestones.length === 0) {
+                    return null;
+                  }
+                  const completedMilestones = milestones.filter((item) => item.isCompleted).length;
+                  return completedMilestones / milestones.length;
+                } catch {
+                  return null;
+                }
+              })(),
+              (async () => {
+                try {
+                  const timelineTasks = await fetchProjectManagerTimelineTasks(defaultPmUserId, summary.id);
+                  if (timelineTasks.length === 0) {
+                    return null;
+                  }
+                  const completedTimelineTasks = timelineTasks.filter((item) => {
+                    const normalized = item.status.toLowerCase().replace('_', '-');
+                    return normalized === 'completed';
+                  }).length;
+                  return completedTimelineTasks / timelineTasks.length;
+                } catch {
+                  return null;
+                }
+              })(),
+            ]);
+
+            const weightedRatios: Array<{ ratio: number; weight: number }> = [];
+            if (taskRatio !== null) {
+              weightedRatios.push({ ratio: taskRatio, weight: 0.7 });
+            }
+            if (milestoneRatio !== null) {
+              weightedRatios.push({ ratio: milestoneRatio, weight: 0.2 });
+            }
+            if (timelineRatio !== null) {
+              weightedRatios.push({ ratio: timelineRatio, weight: 0.1 });
+            }
+
+            if (weightedRatios.length > 0) {
+              const totalWeight = weightedRatios.reduce((sum, item) => sum + item.weight, 0);
+              const weightedProgress = weightedRatios.reduce((sum, item) => sum + item.ratio * item.weight, 0) / totalWeight;
+              return [summary.id, clampPercent(weightedProgress * 100)] as const;
+            }
+
+            try {
+              const overview = await fetchProjectManagerProjectOverview(defaultPmUserId, summary.id);
+              return [summary.id, clampPercent(overview.progressPercent)] as const;
+            } catch {
+              return [summary.id, clampPercent(summary.progress)] as const;
+            }
+          })
+        );
+
         const teamResponses = await Promise.all(
           activeSummaries.map(async (project) => {
             try {
@@ -182,8 +255,13 @@ export function Planning() {
         }
 
         const teamMap = new Map(teamResponses.map((entry) => [entry.projectId, entry.teamMembers]));
+        const derivedProgressMap = new Map<string, number>(progressEntries);
         const liveProjects = activeSummaries.map((summary) =>
-          mapSummaryToGanttProject(summary, teamMap.get(summary.id) ?? [])
+          mapSummaryToGanttProject(
+            summary,
+            teamMap.get(summary.id) ?? [],
+            derivedProgressMap.get(summary.id)
+          )
         );
 
         setProjects(liveProjects);
