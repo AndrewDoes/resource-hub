@@ -7,6 +7,7 @@ import { Lock, Info } from 'lucide-react';
 import type { ResourceSummary } from './types';
 import {
   fetchGeneralManagerWorkforceSummary,
+  recalculateEmployeeWorkloads,
   type GeneralManagerWorkforceSummary,
 } from '@/functions/api/generalManager';
 import { fetchHREmployeeCurrentProjectsMap, fetchHREmployeeList } from '@/functions/api/humanResource';
@@ -50,6 +51,9 @@ export function ResourceOverview() {
     let isMounted = true;
 
     const loadSummary = async () => {
+      // One-time bulk refresh ensures existing records reflect current assignment/task workload rules.
+      await recalculateEmployeeWorkloads().catch(() => undefined);
+
       const [summaryResult, employeesResult] = await Promise.allSettled([
         fetchGeneralManagerWorkforceSummary(),
         fetchHREmployeeList(),
@@ -123,7 +127,7 @@ export function ResourceOverview() {
       const hasError = summaryResult.status === 'rejected' || employeesResult.status === 'rejected';
       setError(
         hasError
-            ? 'Some GM resource data failed to load from backend. Showing backend-returned fields only.'
+          ? 'Some GM resource data failed to load from backend. Showing backend-returned fields only.'
           : null
       );
       setIsLoading(false);

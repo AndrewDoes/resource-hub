@@ -1,5 +1,6 @@
 import { BackendApiUrl } from "../BackendApiUrl";
 import { GeneralManagerContractDecision, GeneralManagerDecision } from "./generalManager";
+import { authorizedFetch } from "./authorizedFetch";
 
 export interface HREmployeeListItem {
   id: string;
@@ -11,6 +12,7 @@ export interface HREmployeeListItem {
   workloadPercent: number;
   phone: string;
   status: string;
+  workloadStatus: string;
   assignedHours: number;
   assignments: any[];
   hireDate?: string;
@@ -103,6 +105,7 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
       assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
       phone: asString(record.phone, "N/A"),
       status: asString(record.status, "Active"),
+      workloadStatus: asString(record.workloadStatus ?? record.workload_status, ""),
       assignments: Array.isArray(record.assignments) ? record.assignments : [],
       hireDate: asString(record.hireDate, ""),
       skills: Array.isArray(record.skills) ? record.skills as string[] : [],
@@ -112,7 +115,7 @@ const normalizeEmployees = (payload: unknown): HREmployeeListItem[] => {
 };
 
 export async function fetchHREmployeeList(): Promise<HREmployeeListItem[]> {
-  const response = await fetch(BackendApiUrl.employeesList);
+  const response = await authorizedFetch(BackendApiUrl.employeesList);
 
   if (!response.ok) {
     throw new Error(`Failed to load employee list (${response.status})`);
@@ -172,7 +175,7 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
   const entries = await Promise.all(
     employeeIds.map(async (employeeId) => {
       try {
-        const response = await fetch(`${BackendApiUrl.employees}/${employeeId}/assignments?pageNumber=1&pageSize=100`);
+        const response = await authorizedFetch(`${BackendApiUrl.employees}/${employeeId}/assignments?pageNumber=1&pageSize=100`);
 
         if (!response.ok) {
           return [employeeId, [] as string[]] as const;
@@ -186,7 +189,6 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
             assignments
               .filter((assignment) => activeStatuses.has(assignment.status.trim().toLowerCase()))
               .filter((assignment) => !finishedProjectStatuses.has(assignment.projectStatus.trim().toLowerCase()))
-              .filter((assignment) => assignment.allocationPercent > 0)
               .map((assignment) => assignment.projectName)
               .filter((name) => name.trim().length > 0)
           )
@@ -207,10 +209,20 @@ export async function fetchHREmployeeCurrentProjectsMap(employeeIds: string[]): 
  * This can be used in the component to bridge the API and the UI types.
  */
 export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
+  const workload = Math.max(0, Math.round(apiItem.workloadPercent));
+  const workloadStatus =
+    workload > 100
+      ? 'overloaded'
+      : workload > 70
+        ? 'busy'
+        : workload > 40
+          ? 'moderate'
+          : 'available';
+
   return {
     id: apiItem.id,
     name: apiItem.fullName,
-    avatar: getInitials(apiItem.fullName),
+    avatar: getInitials(apiItem.fullName) || 'U',
     role: apiItem.jobTitle,
     email: apiItem.email,
     phone: apiItem.phone,
@@ -218,13 +230,20 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
     department: apiItem.department ?? "General",
     skills: apiItem.skills || [],
     status: apiItem.status.toLowerCase() === "active" ? "active" : apiItem.status.toLowerCase() === "inactive" ? "inactive" : "terminated",
-    availability: apiItem.availabilityPercent,
-    workload: apiItem.workloadPercent,
-    assignedHours: apiItem.assignedHours,
+    workloadStatus,
+    availability: Math.max(0, Math.min(100, Math.round(apiItem.availabilityPercent))),
+    workload,
+    assignedHours: Math.max(0, Math.round(apiItem.assignedHours * 10) / 10),
     currentProjects: apiItem.assignments
       .filter((a: any) => {
         const s = a.status?.toLowerCase();
-        return s === "approved" || s === "accepted" || s === "inprogress";
+        return (
+          s === "pending" ||
+          s === "gmapproved" ||
+          s === "approved" ||
+          s === "accepted" ||
+          s === "inprogress"
+        );
       })
       .map((a: any) => a.projectName || "Unknown Project"),
     projectHistory: apiItem.assignments
@@ -240,13 +259,37 @@ export const mapToUIEmployee = (apiItem: HREmployeeListItem): any => {
  * Maps the backend HREmployeeListItem to the EmployeeStatus type used by Validation components.
  */
 export const mapToUIEmployeeStatus = (apiItem: HREmployeeListItem): any => {
+  const workload = Math.max(0, Math.round(apiItem.workloadPercent));
+  const workloadStatus =
+    workload > 100
+      ? 'overloaded'
+      : workload > 70
+        ? 'busy'
+        : workload > 40
+          ? 'moderate'
+          : 'available';
+
   return {
     id: apiItem.id,
     name: apiItem.fullName,
-    avatar: getInitials(apiItem.fullName),
-    status: apiItem.status.toLowerCase() === "active" ? "available" : "blocked", // UI status mapping logic
-    currentProjects: [], // Not in list API
-    assignedHours: apiItem.assignedHours,
+    avatar: getInitials(apiItem.fullName) || 'U',
+    status: apiItem.status.toLowerCase(),
+    workloadStatus,
+    currentProjects: apiItem.assignments
+      .filter((a: any) => {
+        const s = a.status?.toLowerCase();
+        return (
+          s === "pending" ||
+          s === "gmapproved" ||
+          s === "approved" ||
+          s === "accepted" ||
+          s === "inprogress"
+        );
+      })
+      .map((a: any) => a.projectName || "Unknown Project"),
+    assignedHours: Math.max(0, Math.round(apiItem.assignedHours * 10) / 10),
+    workload,
+    availability: Math.max(0, Math.min(100, Math.round(apiItem.availabilityPercent))),
   };
 };
 
@@ -283,6 +326,17 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
   else if (apiType.includes('hire')) type = 'hire-resource';
   else if (apiType.includes('projectassignment')) type = 'project-assignment';
 
+  // Clean up details for display
+  let cleanDetails = decision.details.replace(/\[recommendation:[^\]]+\]/g, '').trim();
+  try {
+    const parsed = JSON.parse(cleanDetails);
+    if (parsed && typeof parsed === 'object' && 'reasoning' in parsed) {
+      cleanDetails = parsed.reasoning;
+    }
+  } catch (e) {
+    // Not JSON, use as is
+  }
+
   return {
     id: decision.id,
     type,
@@ -291,15 +345,15 @@ export const mapToUIDecision = (decision: GeneralManagerDecision): any => {
     deadline: decision.deadline ?? 'No deadline',
     submittedDate: decision.submittedAt.split('T')[0],
     status: decision.status.toLowerCase() === 'pending' ? 'pending' :
-      decision.status.toLowerCase().includes('clarification') ? 'clarification-requested' : 'executed',
-    details: decision.details,
+      decision.status.toLowerCase() === 'gmapproved' ? 'gmapproved' :
+        decision.status.toLowerCase().includes('clarification') ? 'clarification-requested' : 'executed',
+    details: cleanDetails,
   };
 };
 
 export async function executeDecision(decisionId: string, notes?: string): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.executeDecision, {
+  const response = await authorizedFetch(BackendApiUrl.executeDecision, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decisionId, notes }),
   });
 
@@ -307,9 +361,8 @@ export async function executeDecision(decisionId: string, notes?: string): Promi
 }
 
 export async function executeContractAction(decisionId: string): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.executeContract, {
+  const response = await authorizedFetch(BackendApiUrl.executeContract, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decisionId }),
   });
 
@@ -317,9 +370,8 @@ export async function executeContractAction(decisionId: string): Promise<boolean
 }
 
 export async function startHiring(decisionId: string): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.startHiring, {
+  const response = await authorizedFetch(BackendApiUrl.startHiring, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decisionId }),
   });
 
@@ -341,8 +393,8 @@ export interface HRAssignmentRequestItem {
 }
 
 export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestItem[]> {
-  const url = `${BackendApiUrl.assignmentsList}?status=Pending`;
-  const response = await fetch(url);
+  const url = `${BackendApiUrl.assignmentsList}?status=GmApproved`;
+  const response = await authorizedFetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to load assignment requests (${response.status})`);
@@ -367,9 +419,8 @@ export async function fetchHRAssignmentRequests(): Promise<HRAssignmentRequestIt
 }
 
 export async function updateAssignmentStatus(assignmentId: string, status: 'Approved' | 'Rejected' | 'Accepted'): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.updateAssignmentStatus, {
+  const response = await authorizedFetch(BackendApiUrl.updateAssignmentStatus, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignmentId, status }),
   });
 
@@ -399,7 +450,7 @@ export const mapToUIAssignmentRequest = (item: HRAssignmentRequestItem): any => 
     duration: formatDateRange(item.startDate, item.endDate),
     allocation: item.allocationPercent,
     requestedBy: item.requestedByName,
-    status: item.status.toLowerCase() as 'pending' | 'approved' | 'rejected',
+    status: item.status.toLowerCase() as 'pending' | 'gmapproved' | 'approved' | 'rejected',
   };
 };
 
@@ -432,7 +483,7 @@ export interface HRDashboardSummary {
 }
 
 export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
-  const response = await fetch(BackendApiUrl.hrDashboardSummary);
+  const response = await authorizedFetch(BackendApiUrl.hrDashboardSummary);
 
   if (!response.ok) {
     throw new Error(`Failed to load HR summary (${response.status})`);
@@ -469,7 +520,7 @@ export async function fetchHRDashboardSummary(): Promise<HRDashboardSummary> {
 }
 
 export async function fetchDepartmentsLookup(): Promise<DepartmentLookup[]> {
-  const response = await fetch(`${BackendApiUrl.lookups}/departments/list?pageSize=100`);
+  const response = await authorizedFetch(`${BackendApiUrl.lookups}/departments/list?pageSize=100`);
   if (!response.ok) {
     throw new Error(`Failed to load departments (${response.status})`);
   }
@@ -481,7 +532,7 @@ export async function fetchDepartmentsLookup(): Promise<DepartmentLookup[]> {
 }
 
 export async function fetchProjectsLookup(): Promise<ProjectLookup[]> {
-  const response = await fetch(`${BackendApiUrl.projects}/list?pageSize=100`);
+  const response = await authorizedFetch(`${BackendApiUrl.projects}/list?pageSize=100`);
   if (!response.ok) {
     throw new Error(`Failed to load projects (${response.status})`);
   }
@@ -493,7 +544,7 @@ export async function fetchProjectsLookup(): Promise<ProjectLookup[]> {
 }
 
 export async function fetchSkillsLookup(): Promise<SkillLookup[]> {
-  const response = await fetch(`${BackendApiUrl.lookups}/skills/list?pageSize=1000`);
+  const response = await authorizedFetch(`${BackendApiUrl.lookups}/skills/list?pageSize=1000`);
   if (!response.ok) {
     throw new Error(`Failed to load skills (${response.status})`);
   }
@@ -508,10 +559,9 @@ export async function fetchSkillsLookup(): Promise<SkillLookup[]> {
 
 export async function createEmployee(data: any): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(BackendApiUrl.employeeCreate, {
+    const response = await authorizedFetch(BackendApiUrl.employeeCreate, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+        body: JSON.stringify(data),
     });
 
     const body = await response.json();
@@ -530,10 +580,9 @@ export async function createEmployee(data: any): Promise<{ success: boolean; mes
 
 export async function updateEmployee(id: string, data: any): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(BackendApiUrl.employeeUpdate(id), {
+    const response = await authorizedFetch(BackendApiUrl.employeeUpdate(id), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+        body: JSON.stringify(data),
     });
 
     const body = await response.json();
@@ -552,7 +601,7 @@ export async function updateEmployee(id: string, data: any): Promise<{ success: 
 
 export async function deleteEmployee(id: string): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(BackendApiUrl.employeeDelete(id), {
+    const response = await authorizedFetch(BackendApiUrl.employeeDelete(id), {
       method: 'DELETE',
     });
 
@@ -571,7 +620,7 @@ export async function deleteEmployee(id: string): Promise<{ success: boolean; me
 }
 
 export async function fetchHiringRequests(): Promise<HiringRequestItem[]> {
-  const response = await fetch(`${BackendApiUrl.humanResources}/hiring/list`);
+  const response = await authorizedFetch(`${BackendApiUrl.humanResources}/hiring/list`);
   if (!response.ok) {
     throw new Error(`Failed to load hiring requests (${response.status})`);
   }
@@ -581,10 +630,9 @@ export async function fetchHiringRequests(): Promise<HiringRequestItem[]> {
 
 export async function updateHiringStage(id: string, status: HiringRequestStatus): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(`${BackendApiUrl.humanResources}/hiring/update-stage`, {
+    const response = await authorizedFetch(`${BackendApiUrl.humanResources}/hiring/update-stage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hiringRequestId: id, newStatus: status }),
+        body: JSON.stringify({ hiringRequestId: id, newStatus: status }),
     });
 
     const body = await response.json();
@@ -605,10 +653,9 @@ export async function rehireEmployee(data: {
   notes?: string
 }): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(`${BackendApiUrl.humanResources}/rehire`, {
+    const response = await authorizedFetch(`${BackendApiUrl.humanResources}/rehire`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+        body: JSON.stringify(data),
     });
 
     const body = await response.json();
@@ -623,10 +670,9 @@ export async function rehireEmployee(data: {
 
 export async function requestClarification(id: string, reason: string): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await fetch(`${BackendApiUrl.humanResources}/decision/${id}/clarify`, {
+    const response = await authorizedFetch(`${BackendApiUrl.humanResources}/decision/${id}/clarify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason }),
     });
 
     const body = await response.json();
@@ -640,9 +686,8 @@ export async function requestClarification(id: string, reason: string): Promise<
 }
 
 export async function splitAssignmentWorkload(assignmentId: string, primaryAllocation: number): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.assignmentsSplitWorkload, {
+  const response = await authorizedFetch(BackendApiUrl.assignmentsSplitWorkload, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignmentId, primaryAllocation }),
   });
 
@@ -650,9 +695,8 @@ export async function splitAssignmentWorkload(assignmentId: string, primaryAlloc
 }
 
 export async function reassignAssignment(assignmentId: string, targetEmployeeId: string): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.reassignAssignment, {
+  const response = await authorizedFetch(BackendApiUrl.reassignAssignment, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignmentId, targetEmployeeId }),
   });
 
@@ -667,9 +711,8 @@ export interface UpdateAssignmentPayload {
 }
 
 export async function updateAssignment(payload: UpdateAssignmentPayload): Promise<boolean> {
-  const response = await fetch(BackendApiUrl.updateAssignment, {
+  const response = await authorizedFetch(BackendApiUrl.updateAssignment, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 

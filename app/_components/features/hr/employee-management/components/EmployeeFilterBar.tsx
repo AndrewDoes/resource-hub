@@ -15,10 +15,11 @@ interface EmployeeFilterBarProps {
   departments: string[];
   counts: {
     total: number;
-    active: number;
     available: number;
-    assigned: number;
+    moderate: number;
+    busy: number;
     overloaded: number;
+    avgUtilization: number;
   };
 }
 
@@ -39,11 +40,13 @@ export function EmployeeFilterBar({
       <div className="border-b border-gray-200">
         <nav className="flex -mb-px overflow-x-auto">
           {[
-            { key: 'all', label: 'All Employees', count: counts.total },
-            { key: 'active', label: 'Active', count: counts.active },
-            { key: 'available', label: 'Available', count: counts.available },
-            { key: 'assigned', label: 'Assigned', count: counts.assigned },
-            { key: 'overloaded', label: 'Overloaded', count: counts.overloaded },
+            { key: 'all', label: 'All', count: counts.total },
+            { key: 'active', label: 'Active (Status)' }, // Keep "Active" as it's separate from workload
+            { key: 'available', label: 'Available (≤40%)', count: counts.available },
+            { key: 'moderate', label: 'Moderate (41-70%)', count: counts.moderate },
+            { key: 'busy', label: 'Busy (71-100%)', count: counts.busy },
+            { key: 'overloaded', label: 'Overloaded (>100%)', count: counts.overloaded },
+            { key: 'assigned', label: 'Assigned (Project)' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -54,14 +57,16 @@ export function EmployeeFilterBar({
                 }`}
             >
               {tab.label}
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === tab.key
-                  ? 'bg-blue-100 text-blue-600'
-                  : 'bg-gray-100 text-gray-600'
-                  }`}
-              >
-                {tab.count}
-              </span>
+              {tab.count !== undefined && (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${activeTab === tab.key
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-gray-100 text-gray-600'
+                    }`}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </nav>

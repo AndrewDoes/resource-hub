@@ -8,31 +8,40 @@ export function RoleSwitcher() {
   const roles: UserRole[] = ['marketing', 'pm', 'gm', 'hr', 'employee'];
 
   const handleRoleChange = (role: UserRole) => {
+    const ids = {
+      marketing: '58032228-86c3-4dce-b591-ca24c1f7a9e1',
+      pm: '11111111-1111-1111-1111-111111111111',
+      gm: 'gm-1',
+      hr: 'hr-1',
+      employee: '91da3fc8-1f9b-4b19-92f9-ba35d6d64a9b',
+    };
+
     const names = {
       marketing: 'Sarah Martinez',
-      pm: 'Alex Johnson',
+      pm: 'Peter PM',
       gm: 'John Doe',
       hr: 'Emily Chen',
-      employee: 'David Lee',
+      employee: 'Diana Design',
     };
 
     const emails = {
       marketing: 'sarah.martinez@company.com',
-      pm: 'alex.johnson@company.com',
+      pm: 'pm.demo@accelist.local',
       gm: 'john.doe@company.com',
       hr: 'emily.chen@company.com',
-      employee: 'david.lee@company.com',
+      employee: 'designer.demo@accelist.local',
     };
 
     const avatars = {
       marketing: 'SM',
-      pm: 'AJ',
+      pm: 'PP',
       gm: 'JD',
       hr: 'EC',
-      employee: 'DL',
+      employee: 'DD',
     };
 
     setCurrentUser({
+      id: ids[role],
       name: names[role],
       role,
       avatar: avatars[role],

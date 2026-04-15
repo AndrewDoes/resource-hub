@@ -1,71 +1,18 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown } from "lucide-react";
+import { ShieldCheck, LogOut } from "lucide-react";
 import { roleConfig, useRole } from "@/app/context/RoleContext";
-import { UserRole } from "@/app/types";
 
 interface ProfileDropdownProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const roleDefaultPages: Record<UserRole, string> = {
-  marketing: "/marketing/dashboard",
-  pm: "/pm/project-overview",
-  gm: "/gm/planning",
-  hr: "/hr/hr-validation",
-  employee: "/employee/my-projects",
-};
-
 export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
-  const { currentUser, setCurrentUser } = useRole();
+  const { currentUser, logout } = useRole();
   const router = useRouter();
 
-  const roles: UserRole[] = ["marketing", "pm", "gm", "hr", "employee"];
-
-  const roleUserData = {
-    marketing: {
-      name: "Sarah Martinez",
-      email: "sarah.martinez@company.com",
-      avatar: "SM",
-    },
-    pm: {
-      name: "Alex Johnson",
-      email: "alex.johnson@company.com",
-      avatar: "AJ",
-    },
-    gm: {
-      name: "John Doe",
-      email: "john.doe@company.com",
-      avatar: "JD",
-    },
-    hr: {
-      name: "Emily Chen",
-      email: "emily.chen@company.com",
-      avatar: "EC",
-    },
-    employee: {
-      name: "David Lee",
-      email: "david.lee@company.com",
-      avatar: "DL",
-    },
-  };
-
-  const handleRoleSwitch = (role: UserRole) => {
-    const userData = roleUserData[role];
-    setCurrentUser({
-      name: userData.name,
-      role,
-      avatar: userData.avatar,
-      email: userData.email,
-    });
-
-    // Navigate to the default page for this role
-    router.push(roleDefaultPages[role]);
-    onClose();
-  };
-
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
   return (
     <>
@@ -76,12 +23,12 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
       <div className="absolute top-16 right-6 z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
         {/* User Info Section */}
         <div
-          className={`bg-linear-to-br ${roleConfig[currentUser.role].color} p-6 text-white`}
+          className={`bg-linear-to-br ${roleConfig[currentUser.role]?.color || 'from-gray-500 to-gray-600'} p-6 text-white`}
         >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-full flex items-center justify-center">
               <span className="text-xl font-semibold">
-                {currentUser.avatar}
+                {currentUser.avatar || currentUser.name.charAt(0)}
               </span>
             </div>
             <div>
@@ -92,67 +39,39 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
           <div className="bg-white/20 backdrop-blur rounded-lg px-3 py-2 inline-block">
             <p className="text-xs opacity-75 mb-0.5">Current Role</p>
             <p className="text-sm font-semibold">
-              {roleConfig[currentUser.role].label}
+              {roleConfig[currentUser.role]?.label || 'User'}
             </p>
           </div>
         </div>
 
-        {/* Role Switcher Section */}
+        {/* Action Section */}
         <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Switch Role</h3>
-            <span className="text-xs text-gray-500">Demo Mode</span>
-          </div>
-
-          <div className="space-y-1">
-            {roles.map((role) => {
-              const isActive = currentUser.role === role;
-              return (
-                <button
-                  key={role}
-                  onClick={() => handleRoleSwitch(role)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-left ${
-                    isActive
-                      ? `bg-linear-to-r ${roleConfig[role].color} text-white shadow-md`
-                      : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        isActive
-                          ? "bg-white/20 backdrop-blur"
-                          : `bg-linear-to-br ${roleConfig[role].color}`
-                      }`}
-                    >
-                      <span
-                        className={`text-xs font-medium ${isActive ? "text-white" : "text-white"}`}
-                      >
-                        {roleUserData[role].avatar}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {roleConfig[role].label}
-                      </p>
-                      <p
-                        className={`text-xs ${isActive ? "text-white/75" : "text-gray-500"}`}
-                      >
-                        {roleUserData[role].name}
-                      </p>
-                    </div>
-                  </div>
-                  {isActive && <Check className="w-5 h-5" />}
-                </button>
-              );
-            })}
-          </div>
+           <p className="text-xs text-gray-500 px-3 mb-2 uppercase font-bold tracking-wider">Account</p>
+           <button 
+             onClick={() => {
+                router.push('/settings');
+                onClose();
+             }}
+             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-left"
+           >
+              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">Account Settings</span>
+           </button>
         </div>
 
         {/* Footer */}
         <div className="border-t border-gray-200 p-4">
-          <button className="w-full text-sm text-gray-600 hover:text-gray-900 transition-colors text-left">
-            Sign Out
+          <button 
+            onClick={() => {
+              logout();
+              onClose();
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-left font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm">Sign Out</span>
           </button>
         </div>
       </div>

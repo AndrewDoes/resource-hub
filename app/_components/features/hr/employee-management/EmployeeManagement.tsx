@@ -31,6 +31,7 @@ import {
   SkillLookup,
   rehireEmployee
 } from '@/functions/api/humanResource';
+import { recalculateEmployeeWorkloads } from '@/functions/api/generalManager';
 import { RehireModal } from './components/RehireModal';
 
 
@@ -59,9 +60,12 @@ export function EmployeeManagement() {
   const { addToast } = useFeedbackToast();
 
   useEffect(() => {
-    const loadEmployees = async () => {
+    const loadInitialData = async () => {
       try {
         setIsLoading(true);
+        // Refresh workload rules backend-wide on load
+        await recalculateEmployeeWorkloads().catch(() => undefined);
+        
         const apiEmployees = await fetchHREmployeeList();
         const uiEmployees = apiEmployees.map(mapToUIEmployee);
         setEmployees(uiEmployees);
@@ -69,7 +73,6 @@ export function EmployeeManagement() {
       } catch (err) {
         console.error('Error loading employees:', err);
         setError('Failed to load employees. Please try again later.');
-        // Fallback to mock data if API fails during development
         setEmployees(mockEmployees);
         addToast({
           type: 'error',
@@ -96,7 +99,7 @@ export function EmployeeManagement() {
       }
     };
 
-    loadEmployees();
+    loadInitialData();
     loadLookups();
   }, [addToast]);
 
@@ -104,13 +107,19 @@ export function EmployeeManagement() {
   const getFilteredEmployees = () => {
     let filtered = employees;
 
-    // Tab filtering
+    // Tab filtering (Availability-based)
     switch (activeTab) {
       case 'active':
         filtered = filtered.filter((e) => e.status === 'active');
         break;
       case 'available':
-        filtered = filtered.filter((e) => e.assignedHours <= ((70 / 100) * 8) && e.status === 'active');
+        filtered = filtered.filter((e) => e.workloadStatus === 'available' && e.status === 'active');
+        break;
+      case 'moderate':
+        filtered = filtered.filter((e) => e.workloadStatus === 'moderate' && e.status === 'active');
+        break;
+      case 'busy':
+        filtered = filtered.filter((e) => e.workloadStatus === 'busy' && e.status === 'active');
         break;
       case 'assigned':
         filtered = filtered.filter(
@@ -118,7 +127,7 @@ export function EmployeeManagement() {
         );
         break;
       case 'overloaded':
-        filtered = filtered.filter((e) => e.assignedHours > 8 && e.status === 'active');
+        filtered = filtered.filter((e) => e.workloadStatus === 'overloaded' && e.status === 'active');
         break;
     }
 
@@ -154,13 +163,18 @@ export function EmployeeManagement() {
   // Get department list for filtering (derived from employees)
   const filterDepartments = Array.from(new Set(employees.map((e) => e.department)));
 
-  // Calculate stats
+  // Calculate stats using unified GM thresholds
   const stats = {
     total: employees.length,
-    active: employees.filter((e) => e.status === 'active').length,
-    available: employees.filter((e) => (e.workload <= 70) && e.status === 'active').length,
-    assigned: employees.filter((e) => e.currentProjects.length > 0 && e.status === 'active').length,
-    overloaded: employees.filter((e) => e.workload > 100 && e.status === 'active').length,
+    available: employees.filter((e) => e.workloadStatus === 'available' && e.status === 'active').length,
+    moderate: employees.filter((e) => e.workloadStatus === 'moderate' && e.status === 'active').length,
+    busy: employees.filter((e) => e.workloadStatus === 'busy' && e.status === 'active').length,
+    overloaded: employees.filter((e) => e.workloadStatus === 'overloaded' && e.status === 'active').length,
+    avgUtilization: Math.round(
+      employees.length === 0 
+        ? 0 
+        : employees.reduce((acc, e) => acc + e.workload, 0) / employees.length
+    ),
   };
 
   const handleDeleteEmployee = (employee: Employee) => {

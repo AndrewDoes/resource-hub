@@ -1,32 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { XCircle } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
 import { BackendApiUrl } from "@/functions/BackendApiUrl";
-import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
-import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
-
-// Types, Data
-import {
-  ResourceRequirement,
-  RejectedProject,
-  SuggestedEmployee,
-  SkillItem,
-  ProjectFormData,
-} from "./types";
+import { authorizedFetch } from "@/functions/api/authorizedFetch";
+import { useEffect, useState } from "react";
+import { ProjectFormData, RejectedProject, ResourceRequirement, SkillItem, SuggestedEmployee } from "./types";
+import { ProjectStatus } from "@/app/types";
 import { rejectedProjects } from "./data";
-
-// Sub-components
+import { Paperclip, Plus, Save, Send, XCircle } from "lucide-react";
+import { ProjectBasicInfo } from "./components/ProjectBasicInfo";
+import { SkillSelector } from "./components/SkillSelector";
+import { ResourceRequirementItem } from "./components/ResourceRequirementItem";
+import { SuggestedResources } from "./components/SuggestedResources";
+import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import { RejectedProjectsModal } from "./components/RejectedProjectsModal";
 import { ProjectForm } from "./components/ProjectForm";
 
+
 export function ProjectEntry() {
   const { addToast } = useFeedbackToast();
-  const marketingUserId =
-    process.env.NEXT_PUBLIC_MARKETING_ID ??
-    "58032228-86c3-4dce-b591-ca24c1f7a9e1";
-
+  // We no longer rely on a hardcoded ID; the backend will resolve the user from the token.
+  // However, we keep the state for form tracking if needed.
   const [formData, setFormData] = useState<ProjectFormData>({
     name: "",
     clientName: "",
@@ -102,33 +96,29 @@ export function ProjectEntry() {
   const suggestedEmployees: SuggestedEmployee[] =
     selectedSkills.length > 0
       ? [
-          {
-            name: "Agus Pratama",
-            skills: ["Critical Thinking", "Leadership", "Project Management"],
-            match: 85,
-          },
-          {
-            name: "Budi Santoso",
-            skills: ["Node.js", "API Development", "Backend"],
-            match: 92,
-          },
-          {
-            name: "Sarah Chen",
-            skills: ["React", "UI/UX Design", "Frontend"],
-            match: 88,
-          },
-        ]
+        {
+          name: "Agus Pratama",
+          skills: ["Critical Thinking", "Leadership", "Project Management"],
+          match: 85,
+        },
+        {
+          name: "Budi Santoso",
+          skills: ["Node.js", "API Development", "Backend"],
+          match: 92,
+        },
+        {
+          name: "Sarah Chen",
+          skills: ["React", "UI/UX Design", "Frontend"],
+          match: 88,
+        },
+      ]
       : [];
 
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        });
+        const response = await authorizedFetch(BackendApiUrl.lookupsSkillsList);
+        
         if (response.ok) {
           const data = await response.json();
           const skills: SkillItem[] = data.skills;
@@ -169,7 +159,7 @@ export function ProjectEntry() {
   const handleSaveDraft = async () => {
     try {
       const payload = {
-        createdByUserId: marketingUserId,
+        // createdByUserId: marketingUserId,
         name: formData.name,
         clientName: formData.clientName,
         startDate: formData.startDate,
@@ -269,7 +259,6 @@ export function ProjectEntry() {
 
     try {
       const payload = {
-        createdByUserId: marketingUserId,
         name: formData.name,
         clientName: formData.clientName,
         startDate: formData.startDate,
@@ -288,13 +277,8 @@ export function ProjectEntry() {
         })),
       };
 
-      const response = await fetch(BackendApiUrl.projectCreate, {
+      const response = await authorizedFetch(BackendApiUrl.projectCreate, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Role": "marketing",
-          "X-Debug-User": "marketing-user",
-        },
         body: JSON.stringify(payload),
       });
 

@@ -1,72 +1,114 @@
 'use client';
-import { useState } from 'react';
-import { Briefcase, CheckCircle, XCircle, Clock, Calendar, Users } from 'lucide-react';
 
-interface ProjectAssignment {
-  id: string;
-  projectName: string;
-  role: string;
-  startDate: string;
-  endDate: string;
-  allocation: number;
-  assignedBy: string;
-  status: 'pending' | 'accepted' | 'declined';
-  description: string;
-}
+import { useEffect, useState } from 'react';
+import {
+  Briefcase,
+  CheckCircle,
+  Clock,
+  Calendar,
+  AlertCircle
+} from 'lucide-react';
+import { useRole } from '@/app/context/RoleContext';
+import { useFeedbackToast } from '@/app/context/ToastContext';
+import { fetchEmployeeDashboard, acceptAssignment, type EmployeeDashboardData } from '@/functions/api/employeeDashboard';
+import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
+import { ProjectStatus } from '@/app/_components/system/types';
 
-const mockAssignments: ProjectAssignment[] = [
-  {
-    id: '1',
-    projectName: 'Website Redesign',
-    role: 'Frontend Developer',
-    startDate: '2026-04-15',
-    endDate: '2026-07-15',
-    allocation: 100,
-    assignedBy: 'Emily Chen (HR)',
-    status: 'pending',
-    description: 'Lead frontend development for company website redesign project with React and Tailwind CSS',
-  },
-  {
-    id: '2',
-    projectName: 'Mobile App Development',
-    role: 'Frontend Developer',
-    startDate: '2026-06-01',
-    endDate: '2026-09-30',
-    allocation: 80,
-    assignedBy: 'Emily Chen (HR)',
-    status: 'pending',
-    description: 'Develop mobile application UI components using React Native',
-  },
-  {
-    id: '3',
-    projectName: 'Marketing Campaign Q2',
-    role: 'Developer',
-    startDate: '2026-03-01',
-    endDate: '2026-05-31',
-    allocation: 100,
-    assignedBy: 'Emily Chen (HR)',
-    status: 'accepted',
-    description: 'Build landing pages and marketing tools for Q2 campaigns',
-  },
-];
+const mapAssignmentStatus = (status: string): ProjectStatus => {
+  const s = status.toLowerCase();
+  switch (s) {
+    case 'pending': return 'submitted';
+    case 'gmapproved': return 'under-review';
+    case 'approved': return 'approved';
+    case 'accepted': return 'assigned';
+    case 'inprogress':
+    case 'in-progress': return 'in-progress';
+    case 'rejected': return 'rejected';
+    default: return 'submitted';
+  }
+};
+
 
 export function MyProjects() {
-  const [assignments, setAssignments] = useState<ProjectAssignment[]>(mockAssignments);
+  const { currentUser } = useRole();
+  const { addToast } = useFeedbackToast();
+  const [data, setData] = useState<EmployeeDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAccept = (id: string) => {
-    setAssignments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'accepted' } : a))
-    );
+  const loadProjects = async () => {
+    try {
+      setIsLoading(true);
+      const result = await fetchEmployeeDashboard(currentUser.id);
+      setData(result);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load projects:', err);
+      setError('Failed to load project data. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDecline = (id: string) => {
-    setAssignments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'declined' } : a))
-    );
+  useEffect(() => {
+    if (currentUser.id && currentUser.role === 'employee') {
+      loadProjects();
+    }
+  }, [currentUser.id, currentUser.role]);
+
+  const handleAccept = async (assignmentId: string) => {
+    try {
+      const success = await acceptAssignment(assignmentId);
+      if (success) {
+        addToast({
+          type: 'success',
+          title: 'Assignment Accepted',
+          message: 'You have joined the project successfully.',
+        });
+        loadProjects();
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Action Failed',
+        message: 'Could not accept the assignment.',
+      });
+    }
   };
 
-  const pendingAssignments = assignments.filter((a) => a.status === 'pending');
-  const acceptedAssignments = assignments.filter((a) => a.status === 'accepted');
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 font-medium">Loading your projects...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="max-w-7xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="text-gray-900 font-semibold">{error || 'Something went wrong'}</p>
+        <button
+          onClick={() => loadProjects()}
+          className="px-4 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const pendingAssignments = data.assignments.filter((a) => {
+    const s = a.status.toLowerCase();
+    return s === 'pending' || s === 'gmapproved' || s === 'approved';
+  });
+
+  const acceptedAssignments = data.assignments.filter((a) => {
+    const s = a.status.toLowerCase();
+    return s === 'accepted' || s === 'inprogress' || s === 'in-progress';
+  });
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -112,32 +154,38 @@ export function MyProjects() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{assignment.projectName}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{assignment.description}</p>
+                  <p className="text-sm text-gray-600 mt-1">Role: <span className="font-medium">{assignment.roleName}</span></p>
                 </div>
-                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium whitespace-nowrap">
-                  AWAITING RESPONSE
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={mapAssignmentStatus(assignment.status)} />
+                  <span className="text-[10px] text-gray-400 font-mono">Raw: {assignment.status}</span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  <span>Progress</span>
+                  <span className="text-gray-900">{assignment.projectProgressPercent}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-1000"
+                    style={{ width: `${assignment.projectProgressPercent}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-100">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Your Role</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.role}</p>
+                  <p className="text-xs text-gray-500 mb-1 text-uppercase">Allocation</p>
+                  <p className="text-sm text-gray-900 font-medium">{assignment.allocationPercent}%</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Duration</p>
+                  <p className="text-xs text-gray-500 mb-1 text-uppercase">Timeline</p>
                   <div className="flex items-center gap-1 text-sm text-gray-900 font-medium">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    3 months
+                    Project Timeline
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Start Date</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.startDate}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Allocation</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.allocation}%</p>
                 </div>
               </div>
 
@@ -149,15 +197,8 @@ export function MyProjects() {
                   <CheckCircle className="w-4 h-4" />
                   Accept Assignment
                 </button>
-                <button
-                  onClick={() => handleDecline(assignment.id)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-all shadow-sm hover:shadow-md text-sm font-medium"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Decline
-                </button>
-                <p className="text-sm text-gray-600 ml-auto">
-                  Assigned by <span className="font-medium">{assignment.assignedBy}</span>
+                <p className="text-sm text-gray-500 ml-auto italic">
+                  Assigned by <span className="font-medium">System</span>
                 </p>
               </div>
             </div>
@@ -179,51 +220,64 @@ export function MyProjects() {
           acceptedAssignments.map((assignment) => (
             <div
               key={assignment.id}
-              className="bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+              className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:border-blue-200 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{assignment.projectName}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{assignment.description}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-2xl">{assignment.projectDescription}</p>
                 </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium whitespace-nowrap">
-                  ACTIVE
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ${assignment.status.toLowerCase() === 'accepted' || assignment.status.toLowerCase() === 'inprogress'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-blue-100 text-blue-700'
+                    }`}>
+                    {assignment.status.toLowerCase() === 'accepted' ? 'ACTIVE' : assignment.status.toUpperCase()}
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-mono mt-1">Raw: {assignment.status}</span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Your Role</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.role}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-100">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Your Role</p>
+                  <p className="text-sm font-bold text-gray-900 leading-tight">{assignment.roleName}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Progress</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div className="h-2 bg-green-500 rounded-full" style={{ width: '65%' }}></div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-gray-100 rounded-full h-2 min-w-[100px] overflow-hidden shadow-inner">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${assignment.projectProgressPercent}%` }}
+                      ></div>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">65%</span>
+                    <span className="text-xs font-bold text-gray-900">{assignment.projectProgressPercent}%</span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">End Date</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.endDate}</p>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">End Date</p>
+                  <p className="text-sm font-bold text-gray-900">{assignment.endDate}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Allocation</p>
-                  <p className="text-sm text-gray-900 font-medium">{assignment.allocation}%</p>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Allocation</p>
+                  <p className="text-sm font-bold text-gray-900">{assignment.allocationPercent}%</p>
                 </div>
               </div>
+
             </div>
           ))
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <div className="p-4 bg-gray-100 rounded-full w-fit mx-auto mb-4">
+            <div className="p-4 bg-gray-50 rounded-full w-fit mx-auto mb-4">
               <Briefcase className="w-8 h-8 text-gray-400" />
             </div>
             <p className="text-sm font-medium text-gray-900 mb-1">No Active Projects</p>
             <p className="text-xs text-gray-500">
-              You'll see your active projects here once you accept assignments
+              You'll see your active projects here once you've been assigned and projects start
             </p>
           </div>
         )}

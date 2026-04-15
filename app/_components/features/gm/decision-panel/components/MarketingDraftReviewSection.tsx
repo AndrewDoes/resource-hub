@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Megaphone, XCircle } from 'lucide-react';
 import {
-  fetchGeneralManagerProjectPrediction,
+  fetchGeneralManagerProjectPmRecommendation,
   type GeneralManagerMarketingDraftProject,
-  type GeneralManagerProjectPrediction,
 } from '@/functions/api/generalManager';
 
 interface MarketingDraftReviewSectionProps {
@@ -19,6 +18,7 @@ interface RecommendationInfo {
   loading: boolean;
   pmOwnerUserId: string | null;
   pmOwnerName: string | null;
+  pmRequirementAlreadyFull: boolean;
   error: string | null;
 }
 
@@ -44,7 +44,6 @@ export function MarketingDraftReviewSection({
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
   const [recommendations, setRecommendations] = useState<Record<string, RecommendationInfo>>({});
-  const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => a.name.localeCompare(b.name));
@@ -62,17 +61,19 @@ export function MarketingDraftReviewSection({
             loading: true,
             pmOwnerUserId: null,
             pmOwnerName: null,
+            pmRequirementAlreadyFull: false,
             error: null,
           };
 
           try {
-            const prediction = await fetchGeneralManagerProjectPrediction(project.id, 5);
-            const recommendation = pickRecommendedPm(prediction);
+            const recommendationPayload = await fetchGeneralManagerProjectPmRecommendation(project.id, 5);
+            const recommendation = recommendationPayload.recommendedPm;
 
             nextState[project.id] = {
               loading: false,
               pmOwnerUserId: recommendation?.employeeId ?? null,
               pmOwnerName: recommendation?.fullName ?? null,
+              pmRequirementAlreadyFull: recommendationPayload.pmRequirementAlreadyFull,
               error: null,
             };
           } catch (error) {
@@ -80,6 +81,7 @@ export function MarketingDraftReviewSection({
               loading: false,
               pmOwnerUserId: null,
               pmOwnerName: null,
+              pmRequirementAlreadyFull: false,
               error: error instanceof Error ? error.message : 'Unable to load PM recommendation',
             };
           }
@@ -101,30 +103,6 @@ export function MarketingDraftReviewSection({
       isMounted = false;
     };
   }, [sortedProjects]);
-
-  const pickRecommendedPm = (prediction: GeneralManagerProjectPrediction) => {
-    const prioritizedRequirements = [...prediction.requirements].sort((left, right) => {
-      const leftIsPm = /project manager|\bpm\b/i.test(left.roleName);
-      const rightIsPm = /project manager|\bpm\b/i.test(right.roleName);
-
-      if (leftIsPm === rightIsPm) {
-        return 0;
-      }
-
-      return leftIsPm ? -1 : 1;
-    });
-
-    const pmRequirement = prioritizedRequirements.find((requirement) => requirement.recommendedCandidates.length > 0);
-    const pmCandidate = pmRequirement?.recommendedCandidates[0];
-
-    if (pmCandidate) {
-      return pmCandidate;
-    }
-
-    const allCandidates = prediction.requirements.flatMap((requirement) => requirement.recommendedCandidates);
-
-    return allCandidates.sort((left, right) => right.fitScore - left.fitScore)[0] ?? null;
-  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -175,9 +153,11 @@ export function MarketingDraftReviewSection({
                 <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
                   {recommendation?.loading
                     ? 'Loading recommended PM from system...'
-                    : recommendation?.pmOwnerName
-                      ? `Recommended PM: ${recommendation.pmOwnerName}`
-                      : 'No PM recommendation available yet.'}
+                    : recommendation?.pmRequirementAlreadyFull
+                      ? 'No recommendation needed: PM requirement is already full.'
+                      : recommendation?.pmOwnerName
+                        ? `Recommended PM: ${recommendation.pmOwnerName}`
+                        : 'No PM recommendation available yet.'}
                   {recommendation?.error && !recommendation?.loading && (
                     <div className="mt-1 text-[11px] text-blue-700/80">
                       {recommendation.error}
@@ -208,7 +188,7 @@ export function MarketingDraftReviewSection({
                       }
 
                       setActiveActionId(project.id);
-                      await onApprove(project, defaultPmUserId);
+                      await onApprove(project, recommendation?.pmOwnerUserId ?? undefined);
                       setActiveActionId(null);
                     }}
                     disabled={isActing || recommendation?.loading === true}

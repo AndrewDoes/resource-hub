@@ -1,8 +1,6 @@
-'use client';
-
-import { Mail, Briefcase, ChevronRight, Edit2, Trash2, Award } from 'lucide-react';
+import { Mail, Briefcase, ChevronRight, Edit2, Trash2, Award, CheckCircle, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Employee } from '../types';
-import { getAvailabilityStatus, getEmployeeStatus } from '../utils';
+import { getEmployeeStatus } from '../utils';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -12,6 +10,8 @@ interface EmployeeTableProps {
 }
 
 export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: EmployeeTableProps) {
+  const weeklyBaselineHours = 40;
+
   const sortedEmployees = [...employees].sort((a, b) => {
     if (a.status === 'terminated' && b.status !== 'terminated') return 1;
     if (a.status !== 'terminated' && b.status === 'terminated') return -1;
@@ -34,10 +34,13 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                 Skills
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Allocated Hours (Week)
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Availability
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                Workload
+                Workload (%)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Projects
@@ -52,11 +55,11 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
           </thead>
           <tbody className="divide-y divide-gray-200">
             {sortedEmployees.map((employee) => {
-              const availStatus = getAvailabilityStatus(
-                employee.assignedHours
-              );
-              const isOverloaded = employee.workload > 100;
+              const workload = Math.max(0, Math.round(employee.workload));
+              const status = employee.workloadStatus;
+              const isOverloaded = workload > 100;
               const isTerminated = employee.status === 'terminated';
+              const weeklyHours = Math.round(employee.assignedHours * 10) / 10;
 
               return (
                 <tr
@@ -64,7 +67,7 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                   className={`transition-colors ${isTerminated
                     ? 'bg-gray-50/50 opacity-60 grayscale cursor-pointer hover:bg-gray-100'
                     : isOverloaded
-                      ? 'bg-red-50/30 hover:bg-red-50/50 cursor-pointer'
+                      ? 'bg-red-50/30 border-l-4 border-l-red-500 hover:bg-red-50/50 cursor-pointer'
                       : 'hover:bg-gray-50 cursor-pointer'
                     }`}
                   onClick={() => onSelect(employee)}
@@ -94,8 +97,9 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                       {employee.skills.slice(0, 3).map((skill) => (
                         <span
                           key={skill}
-                          className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
                         >
+                          <Award className="w-3 h-3" />
                           {skill}
                         </span>
                       ))}
@@ -107,92 +111,95 @@ export function EmployeeTable({ employees, onSelect, onEdit, onDelete }: Employe
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {employee.availability}%
+                    <div>
+                      <div className={`text-sm font-semibold ${
+                        weeklyHours > weeklyBaselineHours ? 'text-red-600' :
+                        weeklyHours > 28 ? 'text-orange-600' :
+                        weeklyHours > 16 ? 'text-yellow-600' : 'text-green-600'
+                      }`}>
+                        {weeklyHours}h / {weeklyBaselineHours}h
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Assigned / Weekly Capacity
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 w-20 bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${employee.workload <= 40
-                            ? 'bg-green-500' :
-                            employee.workload <= 70
-                              ? 'bg-yellow-500'
-                              : employee.workload <= 100
-                                ? 'bg-orange-500'
-                                : 'bg-red-500'
-                            }`}
-                          style={{ width: `${Math.min(employee.workload, 100)}%` }}
+                          className={`h-2 rounded-full ${employee.availability >= 80 ? 'bg-green-500' :
+                            employee.availability >= 50 ? 'bg-yellow-500' :
+                            employee.availability > 0 ? 'bg-orange-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${employee.availability}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 w-12">
+                        {employee.availability}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 w-24 bg-gray-200 rounded-full h-3">
+                        <div
+                          className={`h-3 rounded-full transition-all ${workload > 100 ? 'bg-red-500' :
+                            workload > 70 ? 'bg-orange-500' :
+                            workload > 40 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(workload, 100)}%` }}
                         ></div>
                       </div>
                       <span
-                        className={`text-sm font-medium w-12 ${isOverloaded ? 'text-red-600' : 'text-gray-900'
-                          }`}
+                        className={`text-sm font-bold whitespace-nowrap min-w-[50px] text-right ${workload > 100 ? 'text-red-600' :
+                          workload > 70 ? 'text-orange-600' :
+                          workload > 40 ? 'text-yellow-600' : 'text-green-600'
+                        }`}
                       >
-                        {employee.workload}%
+                        {workload}%
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     {employee.currentProjects.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 max-w-[200px]">
-                        {/* {employee.currentProjects.slice(0, 2).map((project, idx) => (
-                          <div key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100 min-w-0">
-                            <Briefcase className="w-3 h-3 shrink-0" />
-                            <span className="text-xs font-medium truncate" title={project}>
-                              {project}
-                            </span>
+                      <div className="space-y-1">
+                        {employee.currentProjects.map((project, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 text-sm">
+                            <Briefcase className="w-3 h-3 text-blue-500 shrink-0" />
+                            <span className="text-gray-900 truncate max-w-[120px]" title={project}>{project}</span>
                           </div>
                         ))}
-                        {employee.currentProjects.length > 2 && (
-                          <span className="text-[10px] text-gray-500 font-medium px-1">
-                            +{employee.currentProjects.length - 2} more
-                          </span>
-                        )} */}
-
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100 min-w-0">
-                          <Briefcase className="w-3 h-3 shrink-0" />
-                          <span className="text-xs font-medium truncate">
-                            {employee.currentProjects.length} Active
-                          </span>
-                        </div>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400 italic">No assignments</span>
+                      <span className="text-sm text-gray-400 italic">No assignments</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      {employee.status === 'active' ? (
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${availStatus.color === 'green'
-                            ? 'bg-green-100 text-green-700'
-                            : availStatus.color === 'yellow'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : availStatus.color === 'orange'
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${availStatus.color === 'green'
-                              ? 'bg-green-500'
-                              : availStatus.color === 'yellow'
-                                ? 'bg-yellow-500'
-                                : availStatus.color === 'orange'
-                                  ? 'bg-orange-500'
-                                  : 'bg-red-500'
-                              }`}
-                          ></span>
-                          {availStatus.label}
-                        </span>
-                      ) : (
+                    <div className="flex flex-col gap-2">
+                      {isTerminated || employee.status === 'inactive' ? (
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${employee.status === 'terminated'
                           ? 'bg-gray-100 text-gray-500 border border-gray-200'
                           : 'bg-red-50/50 text-red-700 border border-red-100'
                           }`}>
                           {getEmployeeStatus(employee.status).label}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                          status === 'available' ? 'bg-green-100 text-green-700' :
+                          status === 'moderate' ? 'bg-yellow-100 text-yellow-700' :
+                          status === 'busy' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {status === 'available' && <CheckCircle className="w-3.5 h-3.5" />}
+                          {status === 'moderate' && <TrendingUp className="w-3.5 h-3.5" />}
+                          {status === 'busy' && <Briefcase className="w-3.5 h-3.5" />}
+                          {status === 'overloaded' && <AlertTriangle className="w-3.5 h-3.5" />}
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            status === 'available' ? 'bg-green-500' :
+                            status === 'moderate' ? 'bg-yellow-500' :
+                            status === 'busy' ? 'bg-orange-500' : 'bg-red-500'
+                          }`}></span>
+                          {status.toUpperCase()}
                         </span>
                       )}
                     </div>

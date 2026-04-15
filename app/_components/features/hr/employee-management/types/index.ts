@@ -35,6 +35,7 @@ export interface EmployeeStatus {
   name: string;
   avatar: string;
   status: 'available' | 'assigned' | 'blocked';
+  workloadStatus: 'available' | 'moderate' | 'busy' | 'overloaded';
   currentProjects: string[];
   assignedHours: number; // Daily working hours assigned
 }
@@ -65,6 +66,7 @@ export interface Employee {
   department: string;
   skills: string[];
   status: 'active' | 'inactive' | 'resigned' | 'terminated';
+  workloadStatus: 'available' | 'moderate' | 'busy' | 'overloaded';
   availability: number;
   workload: number;
   assignedHours: number;
@@ -75,4 +77,4 @@ export interface Employee {
   contractEndDate?: string;
 }
 
-export type TabType = 'all' | 'active' | 'available' | 'assigned' | 'overloaded';
+export type TabType = 'all' | 'active' | 'available' | 'moderate' | 'busy' | 'assigned' | 'overloaded';

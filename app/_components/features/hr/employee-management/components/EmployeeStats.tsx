@@ -1,21 +1,20 @@
-'use client';
-
-import { Users, UserCircle, Briefcase, AlertTriangle } from 'lucide-react';
+import { Users, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface EmployeeStatsProps {
   stats: {
     total: number;
-    active: number;
     available: number;
-    assigned: number;
+    moderate: number;
+    busy: number;
     overloaded: number;
+    avgUtilization: number;
   };
 }
 
 export function EmployeeStats({ stats }: EmployeeStatsProps) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-600">Total Employees</h3>
@@ -24,34 +23,32 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
           <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Active</h3>
-            <UserCircle className="w-5 h-5 text-blue-500" />
-          </div>
-          <p className="text-2xl font-semibold text-gray-900">{stats.active}</p>
-        </div>
-
-        <div className="rounded-xl p-5 border border-green-200 bg-green-50 shadow-sm">
+        <div className="bg-white rounded-xl p-5 border border-green-200 bg-green-50 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-green-700">Available</h3>
-            <UserCircle className="w-5 h-5 text-green-600" />
+            <Users className="w-5 h-5 text-green-600" />
           </div>
           <p className="text-2xl font-semibold text-green-900">{stats.available}</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-xl p-5 border border-yellow-200 bg-yellow-50 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Assigned</h3>
-            <Briefcase className="w-5 h-5 text-blue-500" />
+            <h3 className="text-sm font-medium text-yellow-700">Moderate</h3>
+            <Users className="w-5 h-5 text-yellow-600" />
           </div>
-          <p className="text-2xl font-semibold text-gray-900">{stats.assigned}</p>
+          <p className="text-2xl font-semibold text-yellow-900">{stats.moderate}</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 border border-orange-200 bg-orange-50 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-orange-700">Busy</h3>
+            <Users className="w-5 h-5 text-orange-600" />
+          </div>
+          <p className="text-2xl font-semibold text-orange-900">{stats.busy}</p>
         </div>
 
         <div
-          className={`rounded-xl p-5 border shadow-sm ${stats.overloaded > 0
-            ? 'bg-red-50 border-red-200'
-            : 'bg-white border-gray-200'
+          className={`rounded-xl p-5 border shadow-sm ${stats.overloaded > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'
             }`}
         >
           <div className="flex items-center justify-between mb-2">
@@ -72,6 +69,14 @@ export function EmployeeStats({ stats }: EmployeeStatsProps) {
           >
             {stats.overloaded}
           </p>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-600">Avg Utilization</h3>
+            <TrendingUp className="w-5 h-5 text-gray-400" />
+          </div>
+          <p className="text-2xl font-semibold text-gray-900">{stats.avgUtilization}%</p>
         </div>
       </div>
 

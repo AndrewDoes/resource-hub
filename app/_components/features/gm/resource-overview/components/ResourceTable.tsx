@@ -15,6 +15,8 @@ interface ResourceTableProps {
 }
 
 export function ResourceTable({ resources }: ResourceTableProps) {
+  const weeklyBaselineHours = 40;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -31,7 +33,7 @@ export function ResourceTable({ resources }: ResourceTableProps) {
                 Skills
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                Working Hours
+                Allocated Hours (Week)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                 Availability
@@ -117,19 +119,19 @@ export function ResourceTable({ resources }: ResourceTableProps) {
                     <div>
                       <div
                         className={`text-sm font-semibold ${
-                          resource.assignedHours > 8
+                          resource.assignedHours > weeklyBaselineHours
                             ? "text-red-600"
-                            : resource.assignedHours > 5.6
+                            : resource.assignedHours > 28
                               ? "text-orange-600"
-                              : resource.assignedHours > 3.2
+                              : resource.assignedHours > 16
                                 ? "text-yellow-600"
                                 : "text-green-600"
                         }`}
                       >
-                        {resource.assignedHours}h / 8h
+                        {resource.assignedHours}h / {weeklyBaselineHours}h
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        Assigned / Capacity
+                        Assigned / Weekly Capacity
                       </div>
                     </div>
                   </td>
@@ -248,7 +250,7 @@ export function ResourceTable({ resources }: ResourceTableProps) {
                         {status === "busy" &&
                           "High workload (71–100%), near full capacity"}
                         {status === "overloaded" &&
-                          "Work exceeds 8 hours/day (>100%), needs attention"}
+                          "Work exceeds weekly capacity (>100% of baseline), needs attention"}
                       </div>
                     </div>
                   </td>

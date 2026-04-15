@@ -1,11 +1,17 @@
 "use client";
 
-import { FileText, Clock, XCircle, X } from "lucide-react";
-import Link from "next/link";
+import {
+  FileText,
+  Clock,
+  XCircle,
+  X
+} from 'lucide-react';
+import Link from 'next/link';
 // import { marketingProjects } from '@/app/_components/features/common/dashboard/data';
 import { ProjectStatus } from "@/app/types";
-import React, { useState, useEffect } from "react";
-import { StatusBadge } from "@/app/_components/system/components/StatusBadge";
+import { authorizedFetch } from '@/functions/api/authorizedFetch';
+import { useEffect, useState } from "react";
+import { StatusBadge } from "@/app/_components/system/WorkflowSystem";
 import { ProjectList } from "@/app/_components/features/marketing/project-revision/ProjectList";
 import { WorkflowVisualizer } from "@/app/_components/system/components/WorkflowVisualizer";
 import { ProjectForm } from "@/app/_components/features/marketing/projects/components/ProjectForm";
@@ -71,15 +77,7 @@ export function MarketingDashboard() {
   const fetchProjects = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${BackendApiUrl.projectsList}?pageNumber=${currentPage}&pageSize=5`,
-        {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        },
-      );
+      const response = await authorizedFetch(`${BackendApiUrl.projectsList}?pageNumber=${currentPage}&pageSize=5`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch projects");

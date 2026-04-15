@@ -23,6 +23,7 @@ import {
   fetchProjectManagerProjectTeam,
   createProjectManagerChangeRequest,
   type ProjectManagerProjectSummary,
+  type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
 
 // Sub-components
@@ -33,8 +34,7 @@ import { AIRecommendationSection } from './components/AIRecommendationSection';
 import { ContractDecisionSection } from './components/ContractDecisionSection';
 import { MarketingDraftReviewSection } from './components/MarketingDraftReviewSection';
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
-const defaultDecisionActorUserId = process.env.NEXT_PUBLIC_GM_USER_ID ?? defaultPmUserId;
+
 
 const mapSummaryToProject = (
   summary: ProjectManagerProjectSummary,
@@ -93,9 +93,15 @@ const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
 };
 
 const buildRecommendationsFromPrediction = (
-  projectPrediction: GeneralManagerProjectPrediction
+  projectPrediction: GeneralManagerProjectPrediction,
+  assignedResources: string[],
+  requiredResources: number
 ): AIRecommendation[] => {
   const recommendations: AIRecommendation[] = [];
+  const assignedResourceNames = assignedResources
+    .map((name) => name.trim().toLowerCase())
+    .filter((name) => name.length > 0);
+  const hasRemainingResourceSlots = assignedResources.length < requiredResources;
 
   if (projectPrediction.staffingRiskScore >= 40) {
     recommendations.push({
@@ -107,15 +113,27 @@ const buildRecommendationsFromPrediction = (
         time: 'Review needed',
         risk: projectPrediction.staffingRiskScore >= 65 ? 'High → Medium' : 'Medium → Low',
       },
-      confidence: Math.min(95, Math.max(60, Math.round(projectPrediction.overallCoverageScore))),
       reasoning: `Backend prediction shows ${projectPrediction.overallCoverageScore}% coverage across ${projectPrediction.requiredResourceCount} required resources.`,
     });
   }
 
   projectPrediction.requirements.forEach((requirement, index) => {
+    if (!hasRemainingResourceSlots) {
+      return;
+    }
+
+    if (requirement.coverageScore >= 100) {
+      return;
+    }
+
     const topCandidate = requirement.recommendedCandidates[0];
 
     if (!topCandidate) {
+      return;
+    }
+
+    const isAlreadyAssigned = assignedResourceNames.includes(topCandidate.fullName.trim().toLowerCase());
+    if (isAlreadyAssigned) {
       return;
     }
 
@@ -128,12 +146,18 @@ const buildRecommendationsFromPrediction = (
         workload: `${Math.max(0, Math.round(topCandidate.capacityScore / 2))}%`,
         risk: projectPrediction.staffingRiskScore >= 65 ? 'High → Medium' : 'Medium → Low',
       },
-      confidence: Math.min(99, Math.max(50, Math.round(topCandidate.fitScore))),
       reasoning: topCandidate.reason,
       metadata: {
         employeeId: topCandidate.employeeId,
+        employeeName: topCandidate.fullName,
         roleName: requirement.roleName,
         requiredSkills: requirement.requiredSkills,
+          allocationPercent: 0,
+        candidateOptions: requirement.recommendedCandidates.map((candidate) => ({
+          employeeId: candidate.employeeId,
+          fullName: candidate.fullName,
+          availabilityPercent: candidate.availabilityPercent,
+        })),
       },
     });
   });
@@ -213,7 +237,7 @@ export function DecisionPanel() {
 
     const loadProjects = async () => {
       const [projectResult, contractResult] = await Promise.allSettled([
-        fetchProjectManagerProjects(defaultPmUserId),
+        fetchProjectManagerProjects(""),
         fetchGeneralManagerContractDecisions(),
       ]);
 
@@ -223,17 +247,17 @@ export function DecisionPanel() {
 
       if (projectResult.status === 'fulfilled') {
         const activeSummaries = projectResult.value.filter(
-          (summary) => !isFinishedProject(summary)
+          (summary: ProjectManagerProjectSummary) => !isFinishedProject(summary)
         );
 
         const teamResults = await Promise.all(
-          activeSummaries.map(async (summary) => {
+          activeSummaries.map(async (summary: ProjectManagerProjectSummary) => {
             try {
-              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, summary.id);
+              const team = await fetchProjectManagerProjectTeam("", summary.id);
 
               return {
                 projectId: summary.id,
-                teamMembers: team.map((member) => member.fullName),
+                teamMembers: team.map((member: ProjectManagerProjectTeamMember) => member.fullName),
               };
             } catch {
               return {
@@ -244,9 +268,9 @@ export function DecisionPanel() {
           })
         );
 
-        const teamMap = new Map(teamResults.map((entry) => [entry.projectId, entry.teamMembers]));
-        const backendProjects = activeSummaries.map((summary) =>
-          mapSummaryToProject(summary, teamMap.get(summary.id) ?? [])
+        const teamMap = new Map<string, string[]>(teamResults.map((entry: { projectId: string; teamMembers: string[] }) => [entry.projectId, entry.teamMembers]));
+        const backendProjects = activeSummaries.map((summary: ProjectManagerProjectSummary) =>
+          mapSummaryToProject(summary, teamMap.get(summary.id) ?? ([] as string[]))
         );
 
         const initialProject = backendProjects[0] ?? null;
@@ -395,9 +419,12 @@ export function DecisionPanel() {
     }
 
     try {
+      let responseDetails = recommendation.reasoning;
+
       if (recommendation.type === 'add-resource') {
         const employeeId = recommendation.metadata?.employeeId;
         const roleName = recommendation.metadata?.roleName;
+        const allocationPercent = 0;
 
         if (!employeeId || !roleName) {
           addToast({
@@ -408,40 +435,18 @@ export function DecisionPanel() {
           return false;
         }
 
-        await createProjectManagerChangeRequest({
-          projectId: selectedProject.id,
-          employeeId,
-          assignedByUserId: defaultDecisionActorUserId,
-          roleName,
-          startDate: selectedProject.startDate,
-          endDate: selectedProject.endDate,
-          allocationPercent: 100,
-          requiredSkills: recommendation.metadata?.requiredSkills ?? [],
-          additionalNeeds: 'Auto-assigned from GM recommendation apply action.',
+        // pack assignment metadata into JSON string for backend to process after HR execution
+        responseDetails = JSON.stringify({
+          reasoning: recommendation.reasoning,
+          assignment: {
+            employeeId,
+            roleName,
+            startDate: selectedProject.startDate,
+            endDate: selectedProject.endDate,
+            allocationPercent: 100,
+            requiredSkills: recommendation.metadata?.requiredSkills ?? [],
+          },
         });
-
-        const refreshedTeam = await fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id);
-        const refreshedNames = refreshedTeam.map((member) => member.fullName);
-
-        setProjects((prev) =>
-          prev.map((project) =>
-            project.id === selectedProject.id
-              ? {
-                ...project,
-                assignedResources: refreshedNames,
-              }
-              : project
-          )
-        );
-
-        setSelectedProject((prev) =>
-          prev && prev.id === selectedProject.id
-            ? {
-              ...prev,
-              assignedResources: refreshedNames,
-            }
-            : prev
-        );
       }
 
       await submitGeneralManagerRecommendationResponse({
@@ -449,7 +454,7 @@ export function DecisionPanel() {
         recommendationId: recommendation.id,
         recommendationType: recommendation.type,
         title: recommendation.title,
-        details: recommendation.reasoning,
+        details: responseDetails,
         action: 'Applied',
       });
 
@@ -458,7 +463,7 @@ export function DecisionPanel() {
         title: 'Recommendation Applied',
         message:
           recommendation.type === 'add-resource'
-            ? `${recommendation.title} was auto-assigned and submitted to backend successfully.`
+            ? `${recommendation.title} has been submitted for HR validation.`
             : `${recommendation.title} has been submitted to backend successfully.`,
       });
 
@@ -514,7 +519,7 @@ export function DecisionPanel() {
 
   const handleApproveAssignmentRequest = async (requestId: string) => {
     try {
-      await updateGeneralManagerAssignmentRequestStatus(requestId, 'Approved');
+      await updateGeneralManagerAssignmentRequestStatus(requestId, 'GmApproved');
 
       setPendingAssignmentRequests((prev) => prev.filter((r) => r.id !== requestId));
 
@@ -648,7 +653,11 @@ export function DecisionPanel() {
       return [];
     }
 
-    return buildRecommendationsFromPrediction(prediction);
+    return buildRecommendationsFromPrediction(
+      prediction,
+      selectedProject.assignedResources,
+      selectedProject.requiredResources
+    );
   }, [prediction, selectedProject]);
 
   return (
