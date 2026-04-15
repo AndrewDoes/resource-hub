@@ -17,6 +17,7 @@ export const BackendApiUrl = {
   generalManager: `${baseUrl}/api/general-manager`,
   generalManagerWorkforceSummary: `${baseUrl}/api/general-manager/predictions/workforce-summary`,
   generalManagerProjectPrediction: (projectId: string) => `${baseUrl}/api/general-manager/predictions/projects/${projectId}`,
+  generalManagerProjectPmRecommendation: (projectId: string) => `${baseUrl}/api/general-manager/predictions/projects/${projectId}/pm-recommendation`,
   generalManagerContractDecisions: `${baseUrl}/api/general-manager/predictions/contract-decisions`,
   generalManagerDecisions: `${baseUrl}/api/general-manager/predictions/decisions`,
   generalManagerRecommendationResponse: `${baseUrl}/api/general-manager/predictions/decisions/recommendation-response`,
