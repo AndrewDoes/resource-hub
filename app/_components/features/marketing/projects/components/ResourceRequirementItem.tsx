@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Users, Trash2, X } from 'lucide-react';
-import { ResourceRequirement, SkillItem } from '../types';
-import { roleOptions, experienceLevels } from '../data';
+import { useState } from "react";
+import { Users, Trash2, X } from "lucide-react";
+import { ResourceRequirement, SkillItem } from "../types";
+import { roleOptions, experienceLevels } from "../data";
 // import { allSkills } from '../data';
 
 interface ResourceRequirementItemProps {
@@ -21,15 +21,18 @@ export function ResourceRequirementItem({
   onUpdate,
   onRemove,
   showRemove,
-  allSkills
+  allSkills,
 }: ResourceRequirementItemProps) {
-  const [skillInput, setSkillInput] = useState('');
+  const [skillInput, setSkillInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
   const addSkill = (skill: SkillItem) => {
-    if (!resource.requiredSkills.some(s => s.id === skill.id)) {
-      onUpdate(resource.id, 'requiredSkills', [...resource.requiredSkills, skill]);
-      setSkillInput('');
+    if (!resource.requiredSkills.some((s) => s.id === skill.id)) {
+      onUpdate(resource.id, "requiredSkills", [
+        ...resource.requiredSkills,
+        skill,
+      ]);
+      setSkillInput("");
       setShowDropdown(false);
     }
   };
@@ -37,8 +40,8 @@ export function ResourceRequirementItem({
   const removeSkill = (skillId: string) => {
     onUpdate(
       resource.id,
-      'requiredSkills',
-      resource.requiredSkills.filter((s) => s.id !== skillId)
+      "requiredSkills",
+      resource.requiredSkills.filter((s) => s.id !== skillId),
     );
   };
 
@@ -71,7 +74,7 @@ export function ResourceRequirementItem({
           </label>
           <select
             value={resource.role}
-            onChange={(e) => onUpdate(resource.id, 'role', e.target.value)}
+            onChange={(e) => onUpdate(resource.id, "role", e.target.value)}
             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
@@ -87,14 +90,14 @@ export function ResourceRequirementItem({
         {/* Quantity */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            Quantity
+            Quantity <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
             min="1"
             value={resource.quantity}
             onChange={(e) =>
-              onUpdate(resource.id, 'quantity', parseInt(e.target.value) || 1)
+              onUpdate(resource.id, "quantity", parseInt(e.target.value) || 1)
             }
             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -103,11 +106,13 @@ export function ResourceRequirementItem({
         {/* Experience Level */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            Experience Level
+            Experience Level <span className="text-red-500">*</span>
           </label>
           <select
             value={resource.experienceLevel}
-            onChange={(e) => onUpdate(resource.id, 'experienceLevel', e.target.value)}
+            onChange={(e) =>
+              onUpdate(resource.id, "experienceLevel", e.target.value)
+            }
             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {experienceLevels.map((level) => (
@@ -122,7 +127,7 @@ export function ResourceRequirementItem({
       {/* Assigned Skills for this Resource */}
       <div className="mb-3">
         <label className="block text-xs font-medium text-gray-700 mb-1.5">
-          Assigned Skill Requirements
+          Assigned Skill Requirements <span className="text-red-500">*</span>
         </label>
         <div className="relative">
           <input
@@ -138,8 +143,10 @@ export function ResourceRequirementItem({
               {allSkills
                 .filter(
                   (skill) =>
-                    skill.name.toLowerCase().includes(skillInput.toLowerCase()) &&
-                    !resource.requiredSkills.some(s => s.id === skill.id)
+                    skill.name
+                      .toLowerCase()
+                      .includes(skillInput.toLowerCase()) &&
+                    !resource.requiredSkills.some((s) => s.id === skill.id),
                 )
                 .map((skill) => (
                   <button
@@ -183,7 +190,7 @@ export function ResourceRequirementItem({
         <input
           type="text"
           value={resource.notes}
-          onChange={(e) => onUpdate(resource.id, 'notes', e.target.value)}
+          onChange={(e) => onUpdate(resource.id, "notes", e.target.value)}
           placeholder="Additional requirements or preferences..."
           className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />

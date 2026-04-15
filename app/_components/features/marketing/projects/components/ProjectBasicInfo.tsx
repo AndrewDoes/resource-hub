@@ -7,9 +7,10 @@ interface ProjectBasicInfoProps {
   totalResources: number;
   formData: ProjectFormData;
   onFormDataChange: (field: keyof ProjectFormData, value: string) => void;
+  isRevisionMode?: boolean;
 }
 
-export function ProjectBasicInfo({ totalResources, formData, onFormDataChange }: ProjectBasicInfoProps) {
+export function ProjectBasicInfo({ totalResources, formData, onFormDataChange, isRevisionMode }: ProjectBasicInfoProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Project Name */}
@@ -22,8 +23,9 @@ export function ProjectBasicInfo({ totalResources, formData, onFormDataChange }:
           value={formData.name}
           onChange={(e) => onFormDataChange('name', e.target.value)}
           placeholder="e.g., Q2 Marketing Campaign"
-          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRevisionMode ? 'bg-gray-50 cursor-not-allowed text-gray-500' : ''}`}
           required
+          disabled={isRevisionMode}
         />
       </div>
 
@@ -37,8 +39,9 @@ export function ProjectBasicInfo({ totalResources, formData, onFormDataChange }:
           value={formData.clientName}
           onChange={(e) => onFormDataChange('clientName', e.target.value)}
           placeholder="e.g., Acme Corporation"
-          className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isRevisionMode ? 'bg-gray-50 cursor-not-allowed text-gray-500' : ''}`}
           required
+          disabled={isRevisionMode}
         />
       </div>
 

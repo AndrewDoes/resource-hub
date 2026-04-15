@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
-import { SkillItem } from '../types';
+import { useState, useRef, useEffect } from "react";
+import { X } from "lucide-react";
+import { SkillItem } from "../types";
 // import { skillCategories } from '../data';
 
 interface SkillSelectorProps {
@@ -16,10 +16,27 @@ export function SkillSelector({
   selectedSkills,
   onAddSkill,
   onRemoveSkill,
-  skillCategories
+  skillCategories,
 }: SkillSelectorProps) {
-  const [skillInput, setSkillInput] = useState('');
+  const [skillInput, setSkillInput] = useState("");
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSkillDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <div>
@@ -29,7 +46,7 @@ export function SkillSelector({
       <p className="text-xs text-gray-600 mb-3">
         Select structured skills to improve assignment accuracy
       </p>
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <input
           type="text"
           value={skillInput}
@@ -44,7 +61,7 @@ export function SkillSelector({
               const filteredCategorySkills = skills.filter(
                 (skill) =>
                   skill.name.toLowerCase().includes(skillInput.toLowerCase()) &&
-                  !selectedSkills.some(s => s.id === skill.id)
+                  !selectedSkills.some((s) => s.id === skill.id),
               );
 
               if (filteredCategorySkills.length === 0) return null;
@@ -52,7 +69,9 @@ export function SkillSelector({
               return (
                 <div key={category}>
                   <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
-                    <p className="text-xs font-semibold text-gray-700">{category}</p>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {category}
+                    </p>
                   </div>
                   {filteredCategorySkills.map((skill) => (
                     <button
@@ -60,7 +79,7 @@ export function SkillSelector({
                       type="button"
                       onClick={() => {
                         onAddSkill(skill);
-                        setSkillInput('');
+                        setSkillInput("");
                         setShowSkillDropdown(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 transition-colors"
