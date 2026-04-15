@@ -4,13 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar, Clock, Folder, TrendingUp, Users } from "lucide-react";
 
 import {
+  fetchAllTaskAssignments,
+  fetchProjectManagerMilestones,
+  fetchProjectManagerProjectOverview,
   fetchProjectManagerProjects,
+  fetchProjectManagerTimelineTasks,
   projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
   updateProjectManagerProjectStatus,
 } from "@/functions/api/projectManager";
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+
+const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -28,8 +34,10 @@ const formatDate = (value: string) => {
 
 export function ProjectOverview() {
   const [projects, setProjects] = useState<ProjectManagerProjectSummary[]>(projectManagerFallbackProjects);
+  const [derivedProgressByProjectId, setDerivedProgressByProjectId] = useState<Record<string, number>>({});
   const [updatingProjectIds, setUpdatingProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCalculatingProgress, setIsCalculatingProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUsingFallbackData, setIsUsingFallbackData] = useState(true);
 
@@ -90,6 +98,105 @@ export function ProjectOverview() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const deriveProjectProgress = async () => {
+      if (isLoading || projects.length === 0) {
+        if (isMounted) {
+          setDerivedProgressByProjectId({});
+        }
+        return;
+      }
+
+      setIsCalculatingProgress(true);
+
+      try {
+        const allTasks = await fetchAllTaskAssignments(defaultPmUserId);
+
+        const progressEntries = await Promise.all(
+          projects.map(async (project) => {
+            const projectTasks = allTasks.filter((task) => task.projectId === project.id);
+            const completedTasks = projectTasks.filter((task) => task.status === 'completed').length;
+            const taskRatio = projectTasks.length > 0 ? completedTasks / projectTasks.length : null;
+
+            let milestoneRatio: number | null = null;
+            try {
+              const milestones = await fetchProjectManagerMilestones(defaultPmUserId, project.id);
+              if (milestones.length > 0) {
+                const completedMilestones = milestones.filter((item) => item.isCompleted).length;
+                milestoneRatio = completedMilestones / milestones.length;
+              }
+            } catch {
+              milestoneRatio = null;
+            }
+
+            let timelineRatio: number | null = null;
+            try {
+              const timelineTasks = await fetchProjectManagerTimelineTasks(defaultPmUserId, project.id);
+              if (timelineTasks.length > 0) {
+                const completedTimelineTasks = timelineTasks.filter((item) => {
+                  const normalized = item.status.toLowerCase().replace('_', '-');
+                  return normalized === 'completed';
+                }).length;
+                timelineRatio = completedTimelineTasks / timelineTasks.length;
+              }
+            } catch {
+              timelineRatio = null;
+            }
+
+            const weightedRatios: Array<{ ratio: number; weight: number }> = [];
+
+            if (taskRatio !== null) {
+              weightedRatios.push({ ratio: taskRatio, weight: 0.7 });
+            }
+            if (milestoneRatio !== null) {
+              weightedRatios.push({ ratio: milestoneRatio, weight: 0.2 });
+            }
+            if (timelineRatio !== null) {
+              weightedRatios.push({ ratio: timelineRatio, weight: 0.1 });
+            }
+
+            if (weightedRatios.length > 0) {
+              const totalWeight = weightedRatios.reduce((sum, entry) => sum + entry.weight, 0);
+              const weightedProgress = weightedRatios.reduce((sum, entry) => sum + entry.ratio * entry.weight, 0) / totalWeight;
+
+              return [project.id, clampPercent(weightedProgress * 100)] as const;
+            }
+
+            try {
+              const overview = await fetchProjectManagerProjectOverview(defaultPmUserId, project.id);
+              return [project.id, clampPercent(overview.progressPercent)] as const;
+            } catch {
+              return [project.id, clampPercent(project.progress)] as const;
+            }
+          })
+        );
+
+        if (isMounted) {
+          setDerivedProgressByProjectId(Object.fromEntries(progressEntries));
+        }
+      } catch {
+        if (isMounted) {
+          setDerivedProgressByProjectId(
+            Object.fromEntries(projects.map((project) => [project.id, clampPercent(project.progress)]))
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsCalculatingProgress(false);
+        }
+      }
+    };
+
+    void deriveProjectProgress();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoading, projects]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'on-track':
@@ -188,6 +295,12 @@ export function ProjectOverview() {
           </div>
         )}
 
+        {!isLoading && isCalculatingProgress && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-sm text-gray-500">
+            Recalculating progress from tasks, milestones, and timeline updates...
+          </div>
+        )}
+
         {!isLoading && projects.map((project) => (
           <div
             key={project.id}
@@ -243,13 +356,21 @@ export function ProjectOverview() {
                   Progress
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${getProgressColor(project.status)}`}
-                      style={{ width: `${project.progress}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">{project.progress}%</span>
+                  {(() => {
+                    const displayedProgress = clampPercent(derivedProgressByProjectId[project.id] ?? project.progress);
+
+                    return (
+                      <>
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${getProgressColor(project.status)}`}
+                            style={{ width: `${displayedProgress}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{displayedProgress}%</span>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
