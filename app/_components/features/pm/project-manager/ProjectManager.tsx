@@ -10,6 +10,7 @@ import {
   fetchProjectManagerProjectTeam,
   fetchProjectManagerTimelineTasks,
   fetchProjectManagerProjects,
+  fetchTaskAssignmentsForProject,
   createProjectManagerMilestone,
   createProjectManagerTimelineTask,
   updateProjectManagerMilestoneStatus,
@@ -44,6 +45,11 @@ interface TimelineTaskItem {
   colorTag: string;
   status: 'pending' | 'in-progress' | 'completed';
   sortOrder: number;
+}
+
+interface TaskProgressSnapshot {
+  total: number;
+  completed: number;
 }
 
 const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
@@ -155,6 +161,7 @@ export function ProjectManager() {
   const [activities, setActivities] = useState<Array<{ id: string; user: string; action: string; task: string; time: string }>>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [ganttTasks, setGanttTasks] = useState<TimelineTaskItem[]>([]);
+  const [taskProgress, setTaskProgress] = useState<TaskProgressSnapshot | null>(null);
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
   const [isUpdatingMilestoneId, setIsUpdatingMilestoneId] = useState<string | null>(null);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
@@ -219,12 +226,13 @@ export function ProjectManager() {
     const loadSelectedProjectData = async () => {
       setIsLoading(true);
 
-      const [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult] = await Promise.allSettled([
+      const [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult, taskAssignmentsResult] = await Promise.allSettled([
         fetchProjectManagerProjectOverview(defaultPmUserId, selectedProject.id),
         fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id),
         fetchProjectManagerProjectActivity(defaultPmUserId, selectedProject.id),
         fetchProjectManagerMilestones(defaultPmUserId, selectedProject.id),
         fetchProjectManagerTimelineTasks(defaultPmUserId, selectedProject.id),
+        fetchTaskAssignmentsForProject(defaultPmUserId, selectedProject.id),
       ]);
 
       if (!isMounted) {
@@ -248,8 +256,16 @@ export function ProjectManager() {
           ? mapTimelineTasks(timelineTaskResult.value)
           : []
       );
+      setTaskProgress(
+        taskAssignmentsResult.status === 'fulfilled'
+          ? {
+              total: taskAssignmentsResult.value.length,
+              completed: taskAssignmentsResult.value.filter((task) => task.status === 'completed').length,
+            }
+          : null
+      );
 
-      const hasAnyFailure = [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult]
+      const hasAnyFailure = [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult, taskAssignmentsResult]
         .some((result) => result.status === 'rejected');
 
       setError(hasAnyFailure ? 'Some project data is unavailable right now.' : null);
@@ -274,6 +290,32 @@ export function ProjectManager() {
 
     return null;
   }, [projectOverview, selectedProject]);
+
+  const derivedProgressPercent = useMemo(() => {
+    const weightedRatios: Array<{ ratio: number; weight: number }> = [];
+
+    if (taskProgress && taskProgress.total > 0) {
+      weightedRatios.push({ ratio: taskProgress.completed / taskProgress.total, weight: 0.7 });
+    }
+
+    if (milestones.length > 0) {
+      const completedMilestones = milestones.filter((item) => item.completed).length;
+      weightedRatios.push({ ratio: completedMilestones / milestones.length, weight: 0.2 });
+    }
+
+    if (ganttTasks.length > 0) {
+      const completedTimelineTasks = ganttTasks.filter((item) => item.status === 'completed').length;
+      weightedRatios.push({ ratio: completedTimelineTasks / ganttTasks.length, weight: 0.1 });
+    }
+
+    if (weightedRatios.length > 0) {
+      const totalWeight = weightedRatios.reduce((sum, item) => sum + item.weight, 0);
+      const weightedProgress = weightedRatios.reduce((sum, item) => sum + item.ratio * item.weight, 0) / totalWeight;
+      return Math.max(0, Math.min(100, Math.round(weightedProgress * 100)));
+    }
+
+    return Math.max(0, Math.min(100, Math.round(overview?.progressPercent ?? 0)));
+  }, [ganttTasks, milestones, overview?.progressPercent, taskProgress]);
 
   const refreshMilestones = async () => {
     if (!selectedProject) {
@@ -468,11 +510,11 @@ export function ProjectManager() {
             </div>
             <p className="text-sm font-medium text-gray-600">Overall Progress</p>
           </div>
-          <p className="text-3xl font-semibold text-gray-900 mb-2">{overview.progressPercent}%</p>
+          <p className="text-3xl font-semibold text-gray-900 mb-2">{derivedProgressPercent}%</p>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${overview.progressPercent}%` }}
+              style={{ width: `${derivedProgressPercent}%` }}
             ></div>
           </div>
         </div>
