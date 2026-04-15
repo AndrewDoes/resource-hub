@@ -60,7 +60,7 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
   }, [selectedProject?.id]);
 
   const recommendations = useMemo(() => {
-    if (!prediction) {
+    if (!selectedProject || !prediction) {
       return [] as AIRecommendation[];
     }
 
@@ -80,10 +80,29 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
       });
     }
 
+    const assignedResourceNames = selectedProject.assignedResources
+      .map((name) => name.trim().toLowerCase())
+      .filter((name) => name.length > 0);
+    const hasRemainingResourceSlots = selectedProject.assignedResources.length < selectedProject.requiredResources;
+
     prediction.requirements.forEach((requirement, index) => {
+      if (!hasRemainingResourceSlots) {
+        return;
+      }
+
+      if (requirement.coverageScore >= 100) {
+        return;
+      }
+
       const topCandidate = requirement.recommendedCandidates[0];
 
       if (!topCandidate) {
+        return;
+      }
+
+      const isAlreadyAssigned = assignedResourceNames.includes(topCandidate.fullName.trim().toLowerCase());
+
+      if (isAlreadyAssigned) {
         return;
       }
 
@@ -113,7 +132,7 @@ export function AIDecisionPanel({ selectedProject }: AIDecisionPanelProps) {
     });
 
     return items;
-  }, [prediction]);
+  }, [prediction, selectedProject]);
 
   const handleApplyRecommendation = async (recommendation: AIRecommendation) => {
     if (!selectedProject) {
