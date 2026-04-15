@@ -1,3 +1,4 @@
+'use client'
 import { useFeedbackToast } from "@/app/context/ToastContext";
 import { authorizedFetch } from "@/functions/api/authorizedFetch";
 import { useEffect, useState } from "react";
@@ -179,6 +180,7 @@ export function ProjectEntry() {
         startDate: formData.startDate,
         endDate: formData.endDate,
         notes: formData.notes,
+        status: "Submitted",
         skillIds: selectedSkills.map(s => s.id),
         resourceRequirements: resourceRequirements.map((r, index) => ({
           roleName: r.role,

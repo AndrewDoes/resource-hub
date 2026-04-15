@@ -5,12 +5,11 @@ import { Calendar, Clock, Folder, TrendingUp, Users } from "lucide-react";
 
 import {
   fetchProjectManagerProjects,
-  projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
   updateProjectManagerProjectStatus,
 } from "@/functions/api/projectManager";
+import { useRole } from "@/app/context/RoleContext";
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -27,11 +26,14 @@ const formatDate = (value: string) => {
 };
 
 export function ProjectOverview() {
-  const [projects, setProjects] = useState<ProjectManagerProjectSummary[]>(projectManagerFallbackProjects);
+  const { currentUser } = useRole();
+  const pmUserId = currentUser?.id ?? '';
+
+  const [projects, setProjects] = useState<ProjectManagerProjectSummary[]>([]);
   const [updatingProjectIds, setUpdatingProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isUsingFallbackData, setIsUsingFallbackData] = useState(true);
+  const [isUsingFallbackData] = useState(false);
 
   const handleMarkCompleted = async (projectId: string) => {
     if (isUsingFallbackData) {
@@ -44,9 +46,8 @@ export function ProjectOverview() {
     try {
       await updateProjectManagerProjectStatus(projectId, 'Completed');
 
-      const refreshed = await fetchProjectManagerProjects(defaultPmUserId);
-      setProjects(refreshed.length > 0 ? refreshed : []);
-      setIsUsingFallbackData(false);
+      const refreshed = await fetchProjectManagerProjects(pmUserId);
+      setProjects(refreshed);
       setError(null);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update project status');
@@ -56,26 +57,28 @@ export function ProjectOverview() {
   };
 
   useEffect(() => {
+    if (!pmUserId) {
+      return;
+    }
+
     let isMounted = true;
 
     const loadProjects = async () => {
       try {
-        const response = await fetchProjectManagerProjects(defaultPmUserId);
+        const response = await fetchProjectManagerProjects(pmUserId);
 
         if (!isMounted) {
           return;
         }
 
-        setProjects(response.length > 0 ? response : projectManagerFallbackProjects);
-        setIsUsingFallbackData(response.length === 0);
+        setProjects(response);
         setError(null);
       } catch (loadError) {
         if (!isMounted) {
           return;
         }
 
-        setProjects(projectManagerFallbackProjects);
-        setIsUsingFallbackData(true);
+        setProjects([]);
         setError(loadError instanceof Error ? loadError.message : "Failed to load projects");
       } finally {
         if (isMounted) {
@@ -89,7 +92,7 @@ export function ProjectOverview() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [pmUserId]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'on-track':

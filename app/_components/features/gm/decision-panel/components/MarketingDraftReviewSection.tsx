@@ -45,7 +45,6 @@ export function MarketingDraftReviewSection({
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
   const [recommendations, setRecommendations] = useState<Record<string, RecommendationInfo>>({});
-  const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => a.name.localeCompare(b.name));
@@ -225,7 +224,7 @@ export function MarketingDraftReviewSection({
                       }
 
                       setActiveActionId(project.id);
-                      await onApprove(project, defaultPmUserId);
+                      await onApprove(project, recommendation?.pmOwnerUserId ?? undefined);
                       setActiveActionId(null);
                     }}
                     disabled={isActing || recommendation?.loading === true}

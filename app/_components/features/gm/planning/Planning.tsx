@@ -15,7 +15,7 @@ import {
   type ProjectManagerProjectSummary,
 } from '@/functions/api/projectManager';
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
+
 
 interface GanttProject {
   id: string;
@@ -145,7 +145,7 @@ export function Planning() {
     let isMounted = true;
 
     const loadProjects = async () => {
-      const projectResult = await fetchProjectManagerProjects(defaultPmUserId)
+      const projectResult = await fetchProjectManagerProjects("")
         .then((result) => ({ status: 'fulfilled' as const, value: result }))
         .catch((reason) => ({ status: 'rejected' as const, reason }));
 
@@ -169,7 +169,7 @@ export function Planning() {
         const teamResponses = await Promise.all(
           activeSummaries.map(async (project) => {
             try {
-              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, project.id);
+              const team = await fetchProjectManagerProjectTeam("", project.id);
               return { projectId: project.id, teamMembers: team.map((member) => member.fullName) };
             } catch {
               return { projectId: project.id, teamMembers: [] as string[] };

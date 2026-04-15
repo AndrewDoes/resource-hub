@@ -25,8 +25,8 @@ import {
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
+import { useRole } from '@/app/context/RoleContext';
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 const isActiveAssignmentStatus = (value: string): boolean => {
   const normalized = value.trim().toLowerCase();
@@ -273,6 +273,9 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
 
 export function PMDashboard() {
   const { addToast } = useFeedbackToast();
+  const { currentUser } = useRole();
+  const pmUserId = currentUser?.id ?? '';
+
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [filters, setFilters] = useState<FilterOptions>({
     search: '',
@@ -303,11 +306,15 @@ export function PMDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!pmUserId) {
+      return;
+    }
+
     let isMounted = true;
 
     const loadDashboard = async () => {
       try {
-        const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+        const snapshot = await loadPmDashboardSnapshot(pmUserId);
         const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
         const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
 
@@ -333,7 +340,7 @@ export function PMDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [pmUserId]);
 
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
@@ -425,7 +432,7 @@ export function PMDashboard() {
       try {
         await createProjectManagerChangeRequest({
           projectId: targetProject.id,
-          assignedByUserId: defaultPmUserId,
+          assignedByUserId: pmUserId,
           roleName: inferredRoleName,
           startDate: targetProject.startDate,
           endDate: targetProject.endDate,
@@ -534,7 +541,7 @@ export function PMDashboard() {
         roleName: affectedEmployee.skills[0] ?? 'Resource',
         startDate: allProjects.find((project) => project.id === targetProjectId)?.startDate ?? new Date().toISOString(),
         endDate: allProjects.find((project) => project.id === targetProjectId)?.endDate ?? new Date().toISOString(),
-        assignedByUserId: defaultPmUserId,
+        assignedByUserId: pmUserId,
       });
     } catch (persistError) {
       addToast({
@@ -704,7 +711,7 @@ export function PMDashboard() {
     try {
       await createProjectManagerChangeRequest({
         projectId: changeRequestForm.projectId,
-        assignedByUserId: defaultPmUserId,
+        assignedByUserId: pmUserId,
         roleName: changeRequestForm.roleName.trim(),
         startDate: changeRequestForm.startDate,
         endDate: changeRequestForm.endDate,
@@ -749,7 +756,7 @@ export function PMDashboard() {
     setIsLoading(true);
 
     try {
-      const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+      const snapshot = await loadPmDashboardSnapshot(pmUserId);
       const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
       const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
 

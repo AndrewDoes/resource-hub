@@ -18,6 +18,7 @@ import {
   type ProjectManagerProjectTeamMember,
   type ProjectManagerTimelineTask,
 } from '@/functions/api/projectManager';
+import { useRole } from '@/app/context/RoleContext';
 
 interface Milestone {
   id: string;
@@ -33,7 +34,6 @@ interface TeamMember {
   avatar: string;
 }
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 const fallbackMilestones: Milestone[] = [
   { id: '1', title: 'Requirements Gathering', date: '2026-04-15', completed: true },
@@ -189,7 +189,10 @@ const mapTimelineTasks = (items: ProjectManagerTimelineTask[]) => {
 };
 
 export function ProjectManager() {
-  const [projectList, setProjectList] = useState<ProjectManagerProjectSummary[]>(projectManagerFallbackProjects);
+  const { currentUser } = useRole();
+  const pmUserId = currentUser?.id ?? '';
+
+  const [projectList, setProjectList] = useState<ProjectManagerProjectSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectManagerProjectSummary | null>(null);
   const [projectOverview, setProjectOverview] = useState<ProjectManagerProjectOverview | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(fallbackTeamMembers);
@@ -200,24 +203,27 @@ export function ProjectManager() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!pmUserId) {
+      return;
+    }
+
     let isMounted = true;
 
     const loadProjectList = async () => {
       try {
-        const projects = await fetchProjectManagerProjects(defaultPmUserId);
-        const resolvedProjects = projects.length > 0 ? projects : projectManagerFallbackProjects;
+        const projects = await fetchProjectManagerProjects(pmUserId);
 
         if (!isMounted) {
           return;
         }
 
-        setProjectList(resolvedProjects);
+        setProjectList(projects);
         setSelectedProject((currentProject) => {
-          if (currentProject && resolvedProjects.some((project) => project.id === currentProject.id)) {
+          if (currentProject && projects.some((project) => project.id === currentProject.id)) {
             return currentProject;
           }
 
-          return resolvedProjects[0] ?? null;
+          return projects[0] ?? null;
         });
         setError(null);
       } catch (loadError) {
@@ -225,8 +231,8 @@ export function ProjectManager() {
           return;
         }
 
-        setProjectList(projectManagerFallbackProjects);
-        setSelectedProject(projectManagerFallbackProjects[0]);
+        setProjectList([]);
+        setSelectedProject(null);
         setError(loadError instanceof Error ? loadError.message : 'Failed to load project manager data');
       }
     };
@@ -236,7 +242,7 @@ export function ProjectManager() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [pmUserId]);
 
   useEffect(() => {
     if (!selectedProject) {
@@ -249,11 +255,11 @@ export function ProjectManager() {
       setIsLoading(true);
 
       const [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult] = await Promise.allSettled([
-        fetchProjectManagerProjectOverview(defaultPmUserId, selectedProject.id),
-        fetchProjectManagerProjectTeam(defaultPmUserId, selectedProject.id),
-        fetchProjectManagerProjectActivity(defaultPmUserId, selectedProject.id),
-        fetchProjectManagerMilestones(defaultPmUserId, selectedProject.id),
-        fetchProjectManagerTimelineTasks(defaultPmUserId, selectedProject.id),
+        fetchProjectManagerProjectOverview(pmUserId, selectedProject.id),
+        fetchProjectManagerProjectTeam(pmUserId, selectedProject.id),
+        fetchProjectManagerProjectActivity(pmUserId, selectedProject.id),
+        fetchProjectManagerMilestones(pmUserId, selectedProject.id),
+        fetchProjectManagerTimelineTasks(pmUserId, selectedProject.id),
       ]);
 
       if (!isMounted) {
@@ -297,8 +303,24 @@ export function ProjectManager() {
       return projectOverview;
     }
 
-    return mapSummaryToOverview(projectManagerFallbackProjects[0]);
-  }, [projectOverview]);
+    if (selectedProject) {
+      return mapSummaryToOverview(selectedProject);
+    }
+
+    return null;
+  }, [projectOverview, selectedProject]);
+
+
+  if (!overview) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-lg font-medium text-gray-700">No projects found</p>
+        <p className="mt-1 text-sm text-gray-500">
+          {error ?? 'You have no projects assigned yet.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -465,7 +487,7 @@ export function ProjectManager() {
       <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
         <div className="space-y-4">
-            {activities.map((activity) => (
+          {activities.map((activity) => (
             <div key={activity.id} className="flex gap-3">
               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 shrink-0"></div>
               <div className="flex-1">

@@ -22,13 +22,11 @@ import {
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from "@/functions/api/projectManager";
+import { useRole } from "@/app/context/RoleContext";
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? "11111111-1111-1111-1111-111111111111";
 const WEEKLY_CAPACITY_HOURS = 40;
 
-interface TaskAssignmentsProps {
-  pmUserId?: string;
-}
+
 
 interface LocalButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md";
@@ -74,7 +72,10 @@ function Badge({ className = "", children }: { className?: string; children: Rea
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${className}`.trim()}>{children}</span>;
 }
 
-export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsProps) {
+export function TaskAssignments() {
+  const { currentUser } = useRole();
+  const pmUserId = currentUser?.id ?? '';
+
   const [tasks, setTasks] = useState<ProjectTaskAssignment[]>([]);
   const [projects, setProjects] = useState<ProjectManagerProjectSummary[]>([]);
   const [teamMembers, setTeamMembers] = useState<ProjectManagerProjectTeamMember[]>([]);
@@ -100,6 +101,10 @@ export function TaskAssignments({ pmUserId = defaultPmUserId }: TaskAssignmentsP
 
   // Load data
   useEffect(() => {
+    if (!pmUserId) {
+      return;
+    }
+
     const loadData = async () => {
       try {
         setLoading(true);

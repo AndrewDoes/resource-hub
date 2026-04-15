@@ -34,8 +34,7 @@ import { AIRecommendationSection } from './components/AIRecommendationSection';
 import { ContractDecisionSection } from './components/ContractDecisionSection';
 import { MarketingDraftReviewSection } from './components/MarketingDraftReviewSection';
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
-const defaultDecisionActorUserId = process.env.NEXT_PUBLIC_GM_USER_ID ?? defaultPmUserId;
+
 
 const mapSummaryToProject = (
   summary: ProjectManagerProjectSummary,
@@ -215,7 +214,7 @@ export function DecisionPanel() {
 
     const loadProjects = async () => {
       const [projectResult, contractResult] = await Promise.allSettled([
-        fetchProjectManagerProjects(defaultPmUserId),
+        fetchProjectManagerProjects(""),
         fetchGeneralManagerContractDecisions(),
       ]);
 
@@ -231,7 +230,7 @@ export function DecisionPanel() {
         const teamResults = await Promise.all(
           activeSummaries.map(async (summary: ProjectManagerProjectSummary) => {
             try {
-              const team = await fetchProjectManagerProjectTeam(defaultPmUserId, summary.id);
+              const team = await fetchProjectManagerProjectTeam("", summary.id);
 
               return {
                 projectId: summary.id,
