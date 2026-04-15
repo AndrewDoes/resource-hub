@@ -36,6 +36,7 @@ export function MarketingDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [projectSummary, setProjectSummary] = useState<any>(null);
 
   // Draft edit modal state
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
@@ -102,20 +103,29 @@ export function MarketingDashboard() {
     }
   };
 
+  // Fetch project summary
+  const fetchProjectSummary = async () => {
+    try {
+      const response = await authorizedFetch(BackendApiUrl.projectSummary);
+      if (response.ok) {
+        const data = await response.json();
+        setProjectSummary(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch project summary:", error);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchProjectSummary();
   }, [currentPage]);
 
   // Fetch skills for the draft edit form
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        });
+        const response = await authorizedFetch(BackendApiUrl.lookupsSkillsList);
         if (response.ok) {
           const data = await response.json();
           const skills: SkillItem[] = data.skills;
@@ -195,14 +205,8 @@ export function MarketingDashboard() {
       setSelectedDraftId(project.id);
 
       try {
-        const response = await fetch(
-          BackendApiUrl.projectRevision(project.id),
-          {
-            headers: {
-              "X-Debug-Role": "marketing",
-              "X-Debug-User": "marketing-user",
-            },
-          },
+        const response = await authorizedFetch(
+          BackendApiUrl.projectRevision(project.id)
         );
 
         if (!response.ok) {
@@ -308,15 +312,10 @@ export function MarketingDashboard() {
         })),
       };
 
-      const response = await fetch(
+      const response = await authorizedFetch(
         BackendApiUrl.projectUpdate(selectedDraftId),
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
           body: JSON.stringify(payload),
         },
       );
@@ -333,6 +332,7 @@ export function MarketingDashboard() {
       });
       setIsDraftModalOpen(false);
       fetchProjects();
+      fetchProjectSummary();
     } catch (error: any) {
       console.error(error);
       addToast({
@@ -397,15 +397,10 @@ export function MarketingDashboard() {
         })),
       };
 
-      const response = await fetch(
+      const response = await authorizedFetch(
         BackendApiUrl.projectUpdate(selectedDraftId),
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
           body: JSON.stringify(payload),
         },
       );
@@ -422,6 +417,7 @@ export function MarketingDashboard() {
       });
       setIsDraftModalOpen(false);
       fetchProjects();
+      fetchProjectSummary();
     } catch (error: any) {
       console.error(error);
       addToast({
@@ -477,10 +473,7 @@ export function MarketingDashboard() {
             <h3 className="font-semibold text-gray-900">Pending Review</h3>
           </div>
           <p className="text-3xl font-semibold text-gray-900">
-            {
-              projects.filter((p) => p.status.toLowerCase() === "submitted")
-                .length
-            }
+            {projectSummary?.projectsByStatus?.Submitted || 0}
           </p>
           <p className="text-sm text-gray-500 mt-1">Awaiting GM approval</p>
         </div>
@@ -491,10 +484,7 @@ export function MarketingDashboard() {
             <h3 className="font-semibold text-gray-900">Needs Revision</h3>
           </div>
           <p className="text-3xl font-semibold text-gray-900">
-            {
-              projects.filter((p) => p.status.toLowerCase() === "rejected")
-                .length
-            }
+            {projectSummary?.projectsByStatus?.Rejected || 0}
           </p>
           <p className="text-sm text-gray-500 mt-1">Requires updates</p>
         </div>
