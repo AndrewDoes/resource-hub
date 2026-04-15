@@ -693,6 +693,8 @@ export interface TaskAssignmentCreateInput {
 export interface TaskAssignmentUpdateInput {
   taskId: string;
   status: "pending" | "in-progress" | "completed";
+  taskName?: string;
+  description?: string;
   priority?: TaskPriority;
   workloadHours?: number;
   dueDate?: string;
@@ -783,7 +785,9 @@ export async function createTaskAssignment(input: TaskAssignmentCreateInput): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create task assignment (${response.status})`);
+    const fallbackMessage = `Failed to create task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
@@ -810,6 +814,8 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
     body: JSON.stringify({
       taskId: input.taskId,
       status,
+      taskName: input.taskName,
+      description: input.description,
       priority,
       workloadHours: input.workloadHours,
       dueDate: input.dueDate ? normalizeDateOnlyString(input.dueDate) : undefined,
@@ -817,10 +823,24 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update task assignment (${response.status})`);
+    const fallbackMessage = `Failed to update task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
   const normalized = normalizeTaskAssignments([payload]);
   return normalized[0] || { taskId: '', projectId: '', projectName: '', employeeId: '', employeeName: '', taskName: '', description: '', priority: 'low', workloadHours: 20, assignedDate: new Date().toISOString(), dueDate: new Date().toISOString(), status: 'pending', createdAt: new Date().toISOString() };
+}
+
+export async function deleteTaskAssignment(taskId: string): Promise<void> {
+  const response = await fetch(BackendApiUrl.taskAssignmentsDelete(taskId), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to delete task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
 }

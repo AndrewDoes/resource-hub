@@ -12,6 +12,7 @@ export const BackendApiUrl = {
   projectManagerProjectTimelineTasks: (projectId: string) => `${baseUrl}/api/project-manager/projects/${projectId}/timeline-tasks`,
   taskAssignmentsCreate: `${baseUrl}/api/task-assignments/create`,
   taskAssignmentsUpdate: `${baseUrl}/api/task-assignments/update`,
+  taskAssignmentsDelete: (taskId: string) => `${baseUrl}/api/task-assignments/${taskId}`,
   taskAssignmentsList: `${baseUrl}/api/task-assignments/list`,
   taskAssignmentsForProject: (projectId: string) => `${baseUrl}/api/task-assignments/projects/${projectId}`,
   generalManager: `${baseUrl}/api/general-manager`,
