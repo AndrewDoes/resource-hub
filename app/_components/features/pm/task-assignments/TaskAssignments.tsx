@@ -649,22 +649,7 @@ export function TaskAssignments() {
 
                 {/* Status Update Buttons */}
                 <div className="mt-auto flex gap-2 border-t border-gray-100 pt-2">
-                  <Button
-                    onClick={() => handleStartEditTask(task)}
-                    size="sm"
-                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs"
-                  >
-                    <Pencil className="w-3 h-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    onClick={() => void handleDeleteTask(task.taskId)}
-                    size="sm"
-                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs"
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Remove
-                  </Button>
+
                   {task.status !== "in-progress" && (
                     <Button
                       onClick={() =>
@@ -698,6 +683,22 @@ export function TaskAssignments() {
                       Reopen
                     </Button>
                   )}
+                  <Button
+                    onClick={() => handleStartEditTask(task)}
+                    size="sm"
+                    title="Edit Task"
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => void handleDeleteTask(task.taskId)}
+                    size="sm"
+                    title="Remove Task"
+                    className="bg-red-50 hover:bg-red-100 text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
 
                 {editingTaskId === task.taskId && (

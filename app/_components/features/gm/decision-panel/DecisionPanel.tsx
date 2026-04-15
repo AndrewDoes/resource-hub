@@ -93,9 +93,15 @@ const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
 };
 
 const buildRecommendationsFromPrediction = (
-  projectPrediction: GeneralManagerProjectPrediction
+  projectPrediction: GeneralManagerProjectPrediction,
+  assignedResources: string[],
+  requiredResources: number
 ): AIRecommendation[] => {
   const recommendations: AIRecommendation[] = [];
+  const assignedResourceNames = assignedResources
+    .map((name) => name.trim().toLowerCase())
+    .filter((name) => name.length > 0);
+  const hasRemainingResourceSlots = assignedResources.length < requiredResources;
 
   if (projectPrediction.staffingRiskScore >= 40) {
     recommendations.push({
@@ -112,9 +118,22 @@ const buildRecommendationsFromPrediction = (
   }
 
   projectPrediction.requirements.forEach((requirement, index) => {
+    if (!hasRemainingResourceSlots) {
+      return;
+    }
+
+    if (requirement.coverageScore >= 100) {
+      return;
+    }
+
     const topCandidate = requirement.recommendedCandidates[0];
 
     if (!topCandidate) {
+      return;
+    }
+
+    const isAlreadyAssigned = assignedResourceNames.includes(topCandidate.fullName.trim().toLowerCase());
+    if (isAlreadyAssigned) {
       return;
     }
 
@@ -634,7 +653,11 @@ export function DecisionPanel() {
       return [];
     }
 
-    return buildRecommendationsFromPrediction(prediction);
+    return buildRecommendationsFromPrediction(
+      prediction,
+      selectedProject.assignedResources,
+      selectedProject.requiredResources
+    );
   }, [prediction, selectedProject]);
 
   return (
