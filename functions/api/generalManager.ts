@@ -58,6 +58,17 @@ export interface GeneralManagerProjectPrediction {
   requirements: GeneralManagerProjectRequirementPrediction[];
 }
 
+export interface GeneralManagerProjectPmRecommendation {
+  projectId: string;
+  projectName: string;
+  candidateLimit: number;
+  candidatePoolSize: number;
+  hasPmRequirement: boolean;
+  pmRequirementAlreadyFull: boolean;
+  recommendedPm: GeneralManagerProjectCandidatePrediction | null;
+  candidates: GeneralManagerProjectCandidatePrediction[];
+}
+
 export interface GeneralManagerContractDecision {
   rowId: string;
   decisionId: string;
@@ -152,6 +163,19 @@ interface GeneralManagerProjectPredictionResponse {
   candidatePoolSize?: unknown;
   candidateLimit?: unknown;
   requirements?: unknown;
+  data?: unknown;
+  Data?: unknown;
+}
+
+interface GeneralManagerProjectPmRecommendationResponse {
+  projectId?: unknown;
+  projectName?: unknown;
+  candidateLimit?: unknown;
+  candidatePoolSize?: unknown;
+  hasPmRequirement?: unknown;
+  pmRequirementAlreadyFull?: unknown;
+  recommendedPm?: unknown;
+  candidates?: unknown;
   data?: unknown;
   Data?: unknown;
 }
@@ -300,6 +324,28 @@ const normalizeProjectPrediction = (payload: unknown): GeneralManagerProjectPred
   };
 };
 
+const normalizeProjectPmRecommendation = (payload: unknown): GeneralManagerProjectPmRecommendation => {
+  const wrapper = payload as GeneralManagerProjectPmRecommendationResponse | null;
+  const source = (wrapper?.data ?? wrapper?.Data ?? payload) as Record<string, unknown>;
+  const recommendedPmRaw = source.recommendedPm ?? source.RecommendedPm;
+  const candidatesRaw = source.candidates ?? source.Candidates;
+
+  const recommendedPmList = normalizeCandidates(
+    Array.isArray(recommendedPmRaw) ? recommendedPmRaw : recommendedPmRaw ? [recommendedPmRaw] : []
+  );
+
+  return {
+    projectId: asString(source.projectId ?? source.ProjectId, ""),
+    projectName: asString(source.projectName ?? source.ProjectName, "Unnamed Project"),
+    candidateLimit: asNumber(source.candidateLimit ?? source.CandidateLimit, 0),
+    candidatePoolSize: asNumber(source.candidatePoolSize ?? source.CandidatePoolSize, 0),
+    hasPmRequirement: Boolean(source.hasPmRequirement ?? source.HasPmRequirement),
+    pmRequirementAlreadyFull: Boolean(source.pmRequirementAlreadyFull ?? source.PmRequirementAlreadyFull),
+    recommendedPm: recommendedPmList[0] ?? null,
+    candidates: normalizeCandidates(candidatesRaw),
+  };
+};
+
 const normalizeContractDecisions = (payload: unknown): GeneralManagerContractDecision[] => {
   const source =
     (payload as GeneralManagerContractDecisionResponse | null)?.data ??
@@ -444,6 +490,24 @@ export async function fetchGeneralManagerProjectPrediction(projectId: string, ca
 
   const payload: unknown = await response.json();
   return normalizeProjectPrediction(payload);
+}
+
+export async function fetchGeneralManagerProjectPmRecommendation(
+  projectId: string,
+  candidateLimit?: number
+): Promise<GeneralManagerProjectPmRecommendation> {
+  const url = withQuery(BackendApiUrl.generalManagerProjectPmRecommendation(projectId), {
+    candidateLimit: typeof candidateLimit === "number" ? String(candidateLimit) : undefined,
+  });
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load PM recommendation (${response.status})`);
+  }
+
+  const payload: unknown = await response.json();
+  return normalizeProjectPmRecommendation(payload);
 }
 
 export async function fetchGeneralManagerContractDecisions(): Promise<GeneralManagerContractDecision[]> {

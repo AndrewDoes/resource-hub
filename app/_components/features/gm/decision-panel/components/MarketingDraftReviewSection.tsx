@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Megaphone, XCircle } from 'lucide-react';
 import {
-  fetchGeneralManagerProjectPrediction,
+  fetchGeneralManagerProjectPmRecommendation,
   type GeneralManagerMarketingDraftProject,
-  type GeneralManagerProjectPrediction,
 } from '@/functions/api/generalManager';
 
 interface MarketingDraftReviewSectionProps {
@@ -67,15 +66,14 @@ export function MarketingDraftReviewSection({
           };
 
           try {
-            const prediction = await fetchGeneralManagerProjectPrediction(project.id, 5);
-            const recommendation = pickRecommendedPm(prediction);
-            const pmRequirementAlreadyFull = isPmRequirementAlreadyFull(prediction);
+            const recommendationPayload = await fetchGeneralManagerProjectPmRecommendation(project.id, 5);
+            const recommendation = recommendationPayload.recommendedPm;
 
             nextState[project.id] = {
               loading: false,
               pmOwnerUserId: recommendation?.employeeId ?? null,
               pmOwnerName: recommendation?.fullName ?? null,
-              pmRequirementAlreadyFull,
+              pmRequirementAlreadyFull: recommendationPayload.pmRequirementAlreadyFull,
               error: null,
             };
           } catch (error) {
@@ -105,40 +103,6 @@ export function MarketingDraftReviewSection({
       isMounted = false;
     };
   }, [sortedProjects]);
-
-  const pickRecommendedPm = (prediction: GeneralManagerProjectPrediction) => {
-    const prioritizedRequirements = [...prediction.requirements].sort((left, right) => {
-      const leftIsPm = /project manager|\bpm\b/i.test(left.roleName);
-      const rightIsPm = /project manager|\bpm\b/i.test(right.roleName);
-
-      if (leftIsPm === rightIsPm) {
-        return 0;
-      }
-
-      return leftIsPm ? -1 : 1;
-    });
-
-    const pmRequirement = prioritizedRequirements.find((requirement) => requirement.recommendedCandidates.length > 0);
-    const pmCandidate = pmRequirement?.recommendedCandidates[0];
-
-    if (pmCandidate) {
-      return pmCandidate;
-    }
-
-    const allCandidates = prediction.requirements.flatMap((requirement) => requirement.recommendedCandidates);
-
-    return allCandidates.sort((left, right) => right.fitScore - left.fitScore)[0] ?? null;
-  };
-
-  const isPmRequirementAlreadyFull = (prediction: GeneralManagerProjectPrediction) => {
-    const pmRequirement = prediction.requirements.find((requirement) => /project manager|\bpm\b/i.test(requirement.roleName));
-
-    if (!pmRequirement) {
-      return false;
-    }
-
-    return pmRequirement.coverageScore >= 100 && pmRequirement.recommendedCandidates.length === 0;
-  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -191,9 +155,9 @@ export function MarketingDraftReviewSection({
                     ? 'Loading recommended PM from system...'
                     : recommendation?.pmRequirementAlreadyFull
                       ? 'No recommendation needed: PM requirement is already full.'
-                    : recommendation?.pmOwnerName
-                      ? `Recommended PM: ${recommendation.pmOwnerName}`
-                      : 'No PM recommendation available yet.'}
+                      : recommendation?.pmOwnerName
+                        ? `Recommended PM: ${recommendation.pmOwnerName}`
+                        : 'No PM recommendation available yet.'}
                   {recommendation?.error && !recommendation?.loading && (
                     <div className="mt-1 text-[11px] text-blue-700/80">
                       {recommendation.error}

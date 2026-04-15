@@ -107,7 +107,6 @@ const buildRecommendationsFromPrediction = (
         time: 'Review needed',
         risk: projectPrediction.staffingRiskScore >= 65 ? 'High → Medium' : 'Medium → Low',
       },
-      confidence: Math.min(95, Math.max(60, Math.round(projectPrediction.overallCoverageScore))),
       reasoning: `Backend prediction shows ${projectPrediction.overallCoverageScore}% coverage across ${projectPrediction.requiredResourceCount} required resources.`,
     });
   }
@@ -128,13 +127,18 @@ const buildRecommendationsFromPrediction = (
         workload: `${Math.max(0, Math.round(topCandidate.capacityScore / 2))}%`,
         risk: projectPrediction.staffingRiskScore >= 65 ? 'High → Medium' : 'Medium → Low',
       },
-      confidence: Math.min(99, Math.max(50, Math.round(topCandidate.fitScore))),
       reasoning: topCandidate.reason,
       metadata: {
         employeeId: topCandidate.employeeId,
+        employeeName: topCandidate.fullName,
         roleName: requirement.roleName,
         requiredSkills: requirement.requiredSkills,
-        allocationPercent: Math.max(10, Math.min(0, Math.round(topCandidate.availabilityPercent))),
+          allocationPercent: 0,
+        candidateOptions: requirement.recommendedCandidates.map((candidate) => ({
+          employeeId: candidate.employeeId,
+          fullName: candidate.fullName,
+          availabilityPercent: candidate.availabilityPercent,
+        })),
       },
     });
   });
@@ -401,10 +405,7 @@ export function DecisionPanel() {
       if (recommendation.type === 'add-resource') {
         const employeeId = recommendation.metadata?.employeeId;
         const roleName = recommendation.metadata?.roleName;
-        const allocationPercent = Math.max(
-          10,
-          Math.min(100, recommendation.metadata?.allocationPercent ?? 50)
-        );
+        const allocationPercent = 0;
 
         if (!employeeId || !roleName) {
           addToast({
