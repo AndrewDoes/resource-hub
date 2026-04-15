@@ -89,6 +89,44 @@ export interface ProjectManagerTimelineTask {
   sortOrder: number;
 }
 
+export interface ProjectManagerCreateMilestoneInput {
+  pmUserId: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  dueDate: string;
+  sortOrder: number;
+}
+
+export interface ProjectManagerUpdateMilestoneStatusInput {
+  pmUserId: string;
+  projectId: string;
+  milestoneId: string;
+  isCompleted: boolean;
+}
+
+export interface ProjectManagerCreateTimelineTaskInput {
+  pmUserId: string;
+  projectId: string;
+  name: string;
+  startOffsetDays: number;
+  durationDays: number;
+  colorTag: string;
+  sortOrder: number;
+}
+
+export interface ProjectManagerUpdateTimelineTaskInput {
+  pmUserId: string;
+  projectId: string;
+  timelineTaskId: string;
+  name: string;
+  startOffsetDays: number;
+  durationDays: number;
+  colorTag: string;
+  status: "pending" | "in-progress" | "completed";
+  sortOrder: number;
+}
+
 export interface ProjectManagerCreateChangeRequestInput {
   projectId: string;
   employeeId?: string;
@@ -571,6 +609,106 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
 
   const payload: unknown = await response.json();
   return normalizeTimelineTasks(payload);
+}
+
+export async function createProjectManagerMilestone(input: ProjectManagerCreateMilestoneInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerCreateMilestone, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      title: input.title,
+      description: input.description,
+      dueDate: normalizeDateOnlyString(input.dueDate),
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to create milestone (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function updateProjectManagerMilestoneStatus(input: ProjectManagerUpdateMilestoneStatusInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerUpdateMilestoneStatus, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      milestoneId: input.milestoneId,
+      isCompleted: input.isCompleted,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to update milestone status (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function createProjectManagerTimelineTask(input: ProjectManagerCreateTimelineTaskInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerCreateTimelineTask, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      name: input.name,
+      startOffsetDays: input.startOffsetDays,
+      durationDays: input.durationDays,
+      colorTag: input.colorTag,
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to create timeline task (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function updateProjectManagerTimelineTask(input: ProjectManagerUpdateTimelineTaskInput): Promise<void> {
+  const status = input.status === "in-progress"
+    ? "InProgress"
+    : input.status === "completed"
+      ? "Completed"
+      : "Pending";
+
+  const response = await fetch(BackendApiUrl.projectManagerUpdateTimelineTask, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      timelineTaskId: input.timelineTaskId,
+      name: input.name,
+      startOffsetDays: input.startOffsetDays,
+      durationDays: input.durationDays,
+      colorTag: input.colorTag,
+      status,
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to update timeline task (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
 }
 
 export async function updateProjectManagerProjectStatus(
