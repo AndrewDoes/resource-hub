@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, Calendar, CheckCircle, Circle, Users } from 'lucide-react';
+import { Activity, Calendar, CheckCircle, Circle, Plus, Users } from 'lucide-react';
 
 import {
   fetchProjectManagerProjectActivity,
@@ -10,13 +10,17 @@ import {
   fetchProjectManagerProjectTeam,
   fetchProjectManagerTimelineTasks,
   fetchProjectManagerProjects,
-  projectManagerFallbackProjects,
+  createProjectManagerMilestone,
+  createProjectManagerTimelineTask,
+  updateProjectManagerMilestoneStatus,
+  updateProjectManagerTimelineTask,
   type ProjectManagerProjectActivity,
   type ProjectManagerMilestone,
   type ProjectManagerProjectOverview,
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
   type ProjectManagerTimelineTask,
+  projectManagerFallbackProjects,
 } from '@/functions/api/projectManager';
 import { useRole } from '@/app/context/RoleContext';
 
@@ -33,7 +37,6 @@ interface TeamMember {
   role: string;
   avatar: string;
 }
-
 
 const fallbackMilestones: Milestone[] = [
   { id: '1', title: 'Requirements Gathering', date: '2026-04-15', completed: true },
@@ -120,10 +123,6 @@ const mapSummaryToOverview = (summary: ProjectManagerProjectSummary): ProjectMan
 });
 
 const mapTeamMembers = (members: ProjectManagerProjectTeamMember[]): TeamMember[] => {
-  if (members.length === 0) {
-    return fallbackTeamMembers;
-  }
-
   return members.map((member) => ({
     id: member.employeeId,
     name: member.fullName,
@@ -138,10 +137,6 @@ const mapTeamMembers = (members: ProjectManagerProjectTeamMember[]): TeamMember[
 };
 
 const mapActivities = (items: ProjectManagerProjectActivity[]) => {
-  if (items.length === 0) {
-    return fallbackActivities;
-  }
-
   return items.map((item, index) => {
     const [user, ...messageParts] = item.message.split(' ');
 
@@ -156,10 +151,6 @@ const mapActivities = (items: ProjectManagerProjectActivity[]) => {
 };
 
 const mapMilestones = (items: ProjectManagerMilestone[]) => {
-  if (items.length === 0) {
-    return fallbackMilestones;
-  }
-
   return items.map((item) => ({
     id: item.milestoneId,
     title: item.title,
@@ -168,24 +159,36 @@ const mapMilestones = (items: ProjectManagerMilestone[]) => {
   }));
 };
 
-const mapTimelineTasks = (items: ProjectManagerTimelineTask[]) => {
-  if (items.length === 0) {
-    return fallbackGanttTasks;
+const mapTimelineTasks = (items: ProjectManagerTimelineTask[]): TimelineTaskItem[] => {
+  return items.map((item) => ({
+    id: item.timelineTaskId,
+    name: item.name,
+    startOffsetDays: item.startOffsetDays,
+    durationDays: item.durationDays,
+    colorTag: item.colorTag,
+    status: item.status.toLowerCase() === 'completed'
+      ? 'completed'
+      : item.status.toLowerCase() === 'inprogress' || item.status.toLowerCase() === 'in-progress'
+        ? 'in-progress'
+        : 'pending',
+    sortOrder: item.sortOrder,
+  }));
+};
+
+const timelineColorClass = (colorTag: string) => {
+  if (colorTag === 'green') {
+    return 'bg-green-500';
   }
 
-  return items.map((item) => ({
-    task: item.name,
-    start: item.startOffsetDays,
-    duration: item.durationDays,
-    color:
-      item.colorTag === 'green'
-        ? 'bg-green-500'
-        : item.colorTag === 'yellow'
-          ? 'bg-yellow-500'
-          : item.colorTag === 'purple'
-            ? 'bg-purple-500'
-            : 'bg-blue-500',
-  }));
+  if (colorTag === 'yellow') {
+    return 'bg-yellow-500';
+  }
+
+  if (colorTag === 'purple') {
+    return 'bg-purple-500';
+  }
+
+  return 'bg-blue-500';
 };
 
 export function ProjectManager() {
@@ -195,10 +198,22 @@ export function ProjectManager() {
   const [projectList, setProjectList] = useState<ProjectManagerProjectSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectManagerProjectSummary | null>(null);
   const [projectOverview, setProjectOverview] = useState<ProjectManagerProjectOverview | null>(null);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(fallbackTeamMembers);
-  const [activities, setActivities] = useState(fallbackActivities);
-  const [milestones, setMilestones] = useState<Milestone[]>(fallbackMilestones);
-  const [ganttTasks, setGanttTasks] = useState(fallbackGanttTasks);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [activities, setActivities] = useState<Array<{ id: string; user: string; action: string; task: string; time: string }>>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [ganttTasks, setGanttTasks] = useState<TimelineTaskItem[]>([]);
+  const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
+  const [isUpdatingMilestoneId, setIsUpdatingMilestoneId] = useState<string | null>(null);
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [newMilestoneDate, setNewMilestoneDate] = useState('');
+  const [isCreatingTimelineTask, setIsCreatingTimelineTask] = useState(false);
+  const [newTimelineName, setNewTimelineName] = useState('');
+  const [newTimelineStartOffset, setNewTimelineStartOffset] = useState(0);
+  const [newTimelineDuration, setNewTimelineDuration] = useState(7);
+  const [newTimelineColorTag, setNewTimelineColorTag] = useState('blue');
+  const [editingTimelineTaskId, setEditingTimelineTaskId] = useState<string | null>(null);
+  const [timelineEditDraft, setTimelineEditDraft] = useState<TimelineTaskItem | null>(null);
+  const [isSavingTimelineTask, setIsSavingTimelineTask] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,6 +227,7 @@ export function ProjectManager() {
     const loadProjectList = async () => {
       try {
         const projects = await fetchProjectManagerProjects(pmUserId);
+        const resolvedProjects = projects.length > 0 ? projects : projectManagerFallbackProjects;
 
         if (!isMounted) {
           return;
@@ -267,27 +283,27 @@ export function ProjectManager() {
       }
 
       setProjectOverview(
-        overviewResult.status === 'fulfilled' ? overviewResult.value : mapSummaryToOverview(selectedProject)
+        overviewResult.status === 'fulfilled' ? overviewResult.value : null
       );
       setTeamMembers(
-        teamResult.status === 'fulfilled' ? mapTeamMembers(teamResult.value) : fallbackTeamMembers
+        teamResult.status === 'fulfilled' ? mapTeamMembers(teamResult.value) : []
       );
       setActivities(
-        activityResult.status === 'fulfilled' ? mapActivities(activityResult.value) : fallbackActivities
+        activityResult.status === 'fulfilled' ? mapActivities(activityResult.value) : []
       );
       setMilestones(
-        milestoneResult.status === 'fulfilled' ? mapMilestones(milestoneResult.value) : fallbackMilestones
+        milestoneResult.status === 'fulfilled' ? mapMilestones(milestoneResult.value) : []
       );
       setGanttTasks(
         timelineTaskResult.status === 'fulfilled'
           ? mapTimelineTasks(timelineTaskResult.value)
-          : fallbackGanttTasks
+          : []
       );
 
       const hasAnyFailure = [overviewResult, teamResult, activityResult, milestoneResult, timelineTaskResult]
         .some((result) => result.status === 'rejected');
 
-      setError(hasAnyFailure ? 'Some project data is unavailable. Showing partial fallback data.' : null);
+      setError(hasAnyFailure ? 'Some project data is unavailable right now.' : null);
       setIsLoading(false);
     };
 
@@ -310,14 +326,154 @@ export function ProjectManager() {
     return null;
   }, [projectOverview, selectedProject]);
 
+  const refreshMilestones = async () => {
+    if (!selectedProject) {
+      return;
+    }
 
-  if (!overview) {
+    const items = await fetchProjectManagerMilestones(pmUserId, selectedProject.id);
+    setMilestones(mapMilestones(items));
+  };
+
+  const refreshTimelineTasks = async () => {
+    if (!selectedProject) {
+      return;
+    }
+
+    const items = await fetchProjectManagerTimelineTasks(pmUserId, selectedProject.id);
+    setGanttTasks(mapTimelineTasks(items));
+  };
+
+  const handleToggleMilestone = async (milestone: Milestone) => {
+    if (!selectedProject || isUpdatingMilestoneId) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setIsUpdatingMilestoneId(milestone.id);
+      await updateProjectManagerMilestoneStatus({
+        pmUserId: pmUserId,
+        projectId: selectedProject.id,
+        milestoneId: milestone.id,
+        isCompleted: !milestone.completed,
+      });
+      await refreshMilestones();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Failed to update milestone');
+    } finally {
+      setIsUpdatingMilestoneId(null);
+    }
+  };
+
+  const handleCreateMilestone = async () => {
+    if (!selectedProject) {
+      return;
+    }
+
+    if (!newMilestoneTitle.trim() || !newMilestoneDate) {
+      setError('Milestone title and due date are required.');
+      return;
+    }
+
+    try {
+      setError(null);
+      setIsCreatingMilestone(true);
+      await createProjectManagerMilestone({
+        pmUserId: pmUserId,
+        projectId: selectedProject.id,
+        title: newMilestoneTitle.trim(),
+        dueDate: newMilestoneDate,
+        sortOrder: milestones.length + 1,
+      });
+      setNewMilestoneTitle('');
+      setNewMilestoneDate('');
+      await refreshMilestones();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Failed to create milestone');
+    } finally {
+      setIsCreatingMilestone(false);
+    }
+  };
+
+  const handleStartEditTimelineTask = (task: TimelineTaskItem) => {
+    setEditingTimelineTaskId(task.id);
+    setTimelineEditDraft({ ...task });
+  };
+
+  const handleSaveTimelineTask = async () => {
+    if (!selectedProject || !editingTimelineTaskId || !timelineEditDraft) {
+      return;
+    }
+
+    if (!timelineEditDraft.name.trim()) {
+      setError('Timeline task name is required.');
+      return;
+    }
+
+    try {
+      setError(null);
+      setIsSavingTimelineTask(true);
+      await updateProjectManagerTimelineTask({
+        pmUserId: pmUserId,
+        projectId: selectedProject.id,
+        timelineTaskId: editingTimelineTaskId,
+        name: timelineEditDraft.name.trim(),
+        startOffsetDays: Math.max(0, timelineEditDraft.startOffsetDays),
+        durationDays: Math.max(1, timelineEditDraft.durationDays),
+        colorTag: timelineEditDraft.colorTag,
+        status: timelineEditDraft.status,
+        sortOrder: timelineEditDraft.sortOrder,
+      });
+      setEditingTimelineTaskId(null);
+      setTimelineEditDraft(null);
+      await refreshTimelineTasks();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update timeline task');
+    } finally {
+      setIsSavingTimelineTask(false);
+    }
+  };
+
+  const handleCreateTimelineTask = async () => {
+    if (!selectedProject) {
+      return;
+    }
+
+    if (!newTimelineName.trim()) {
+      setError('Timeline task name is required.');
+      return;
+    }
+
+    try {
+      setError(null);
+      setIsCreatingTimelineTask(true);
+      await createProjectManagerTimelineTask({
+        pmUserId: pmUserId,
+        projectId: selectedProject.id,
+        name: newTimelineName.trim(),
+        startOffsetDays: Math.max(0, newTimelineStartOffset),
+        durationDays: Math.max(1, newTimelineDuration),
+        colorTag: newTimelineColorTag,
+        sortOrder: ganttTasks.length + 1,
+      });
+      setNewTimelineName('');
+      setNewTimelineStartOffset(0);
+      setNewTimelineDuration(7);
+      setNewTimelineColorTag('blue');
+      await refreshTimelineTasks();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Failed to create timeline task');
+    } finally {
+      setIsCreatingTimelineTask(false);
+    }
+  };
+
+  if (!selectedProject || !overview) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-lg font-medium text-gray-700">No projects found</p>
-        <p className="mt-1 text-sm text-gray-500">
-          {error ?? 'You have no projects assigned yet.'}
-        </p>
+      <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900">No Project Data</h2>
+        <p className="mt-1 text-sm text-gray-600">No PM projects were returned from backend.</p>
       </div>
     );
   }
@@ -349,7 +505,7 @@ export function ProjectManager() {
         </div>
         {error && (
           <p className="mt-2 text-sm text-amber-700">
-            Showing fallback data because the backend request failed: {error}
+            Backend warning: {error}
           </p>
         )}
       </div>
@@ -399,28 +555,195 @@ export function ProjectManager() {
 
       {/* Gantt Chart Timeline */}
       <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Project Timeline</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-900">Project Timeline</h3>
+          <button
+            type="button"
+            onClick={() => void handleCreateTimelineTask()}
+            disabled={isCreatingTimelineTask || !newTimelineName.trim()}
+            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {isCreatingTimelineTask ? 'Adding...' : 'Add Timeline Task'}
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs text-gray-500">
+          Start Offset = days from project start. Duration = task length in days.
+        </p>
+
+        <div className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 md:grid-cols-5">
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-xs font-medium text-gray-600">Task Name</span>
+            <input
+              type="text"
+              value={newTimelineName}
+              onChange={(event) => setNewTimelineName(event.target.value)}
+              placeholder="Task name"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-gray-600">Start Offset (days)</span>
+            <input
+              type="number"
+              min={0}
+              value={newTimelineStartOffset}
+              onChange={(event) => setNewTimelineStartOffset(Number(event.target.value) || 0)}
+              placeholder="0"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-gray-600">Duration (days)</span>
+            <input
+              type="number"
+              min={1}
+              value={newTimelineDuration}
+              onChange={(event) => setNewTimelineDuration(Math.max(1, Number(event.target.value) || 1))}
+              placeholder="7"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-gray-600">Color</span>
+            <select
+              value={newTimelineColorTag}
+              onChange={(event) => setNewTimelineColorTag(event.target.value)}
+              className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+            >
+              <option value="blue">Blue</option>
+              <option value="green">Green</option>
+              <option value="yellow">Yellow</option>
+              <option value="purple">Purple</option>
+            </select>
+          </label>
+        </div>
+
         <div className="space-y-4">
-          {ganttTasks.map((task, index) => (
-            <div key={index}>
+          {ganttTasks.map((task) => (
+            <div key={task.id} className="rounded-lg border border-gray-100 p-2">
               <div className="flex items-center gap-4 mb-2">
-                <p className="text-sm font-medium text-gray-900 w-32">{task.task}</p>
+                <p className="text-sm font-medium text-gray-900 w-40">{task.name}</p>
                 <div className="flex-1 bg-gray-100 rounded-full h-8 relative">
                   <div
-                    className={`absolute h-8 rounded-full ${task.color} flex items-center justify-center`}
+                    className={`absolute h-8 rounded-full ${timelineColorClass(task.colorTag)} flex items-center justify-center`}
                     style={{
-                      left: `${task.start}%`,
-                      width: `${task.duration}%`,
+                      left: `${Math.max(0, task.startOffsetDays)}%`,
+                      width: `${Math.max(1, task.durationDays)}%`,
                     }}
                   >
                     <span className="text-xs text-white font-medium">
-                      {task.duration} days
+                      {task.durationDays} days
                     </span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleStartEditTimelineTask(task)}
+                  className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Edit
+                </button>
               </div>
+
+              {editingTimelineTaskId === task.id && timelineEditDraft && (
+                <div className="grid grid-cols-1 gap-2 border-t border-gray-200 pt-2 md:grid-cols-6">
+                  <label className="flex flex-col gap-1 md:col-span-2">
+                    <span className="text-xs font-medium text-gray-600">Task Name</span>
+                    <input
+                      type="text"
+                      value={timelineEditDraft.name}
+                      onChange={(event) =>
+                        setTimelineEditDraft((prev) => (prev ? { ...prev, name: event.target.value } : prev))
+                      }
+                      className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-gray-600">Start Offset (days)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={timelineEditDraft.startOffsetDays}
+                      onChange={(event) =>
+                        setTimelineEditDraft((prev) => (prev ? { ...prev, startOffsetDays: Number(event.target.value) || 0 } : prev))
+                      }
+                      className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-gray-600">Duration (days)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={timelineEditDraft.durationDays}
+                      onChange={(event) =>
+                        setTimelineEditDraft((prev) => (prev ? { ...prev, durationDays: Math.max(1, Number(event.target.value) || 1) } : prev))
+                      }
+                      className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-gray-600">Color</span>
+                    <select
+                      value={timelineEditDraft.colorTag}
+                      onChange={(event) =>
+                        setTimelineEditDraft((prev) => (prev ? { ...prev, colorTag: event.target.value } : prev))
+                      }
+                      className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                    >
+                      <option value="blue">Blue</option>
+                      <option value="green">Green</option>
+                      <option value="yellow">Yellow</option>
+                      <option value="purple">Purple</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-gray-600">Status</span>
+                    <select
+                      value={timelineEditDraft.status}
+                      onChange={(event) =>
+                        setTimelineEditDraft((prev) =>
+                          prev
+                            ? { ...prev, status: event.target.value as 'pending' | 'in-progress' | 'completed' }
+                            : prev
+                        )
+                      }
+                      className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </label>
+                  <div className="flex items-center gap-2 md:col-span-6 md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTimelineTaskId(null);
+                        setTimelineEditDraft(null);
+                      }}
+                      className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveTimelineTask()}
+                      disabled={isSavingTimelineTask}
+                      className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSavingTimelineTask ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
+          {ganttTasks.length === 0 && (
+            <p className="text-sm text-gray-500">No timeline tasks yet.</p>
+          )}
         </div>
         <div className="flex justify-between mt-4 pt-4 border-t border-gray-200">
           <span className="text-xs text-gray-500">Start</span>
@@ -433,12 +756,43 @@ export function ProjectManager() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Milestones */}
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Milestones</h3>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">Milestones</h3>
+            <button
+              type="button"
+              onClick={() => void handleCreateMilestone()}
+              disabled={isCreatingMilestone || !newMilestoneTitle.trim() || !newMilestoneDate}
+              className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {isCreatingMilestone ? 'Adding...' : 'Add Milestone'}
+            </button>
+          </div>
+
+          <div className="mb-3 grid grid-cols-1 gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3 md:grid-cols-2">
+            <input
+              type="text"
+              value={newMilestoneTitle}
+              onChange={(event) => setNewMilestoneTitle(event.target.value)}
+              placeholder="Milestone title"
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+            <input
+              type="date"
+              value={newMilestoneDate}
+              onChange={(event) => setNewMilestoneDate(event.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+          </div>
+
           <div className="space-y-3">
             {milestones.map((milestone) => (
-              <div
+              <button
+                type="button"
                 key={milestone.id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => void handleToggleMilestone(milestone)}
+                disabled={isUpdatingMilestoneId === milestone.id}
+                className="flex w-full items-center gap-3 rounded-lg p-3 text-left hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {milestone.completed ? (
                   <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
@@ -456,8 +810,11 @@ export function ProjectManager() {
                     {formatDate(milestone.date)}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
+            {milestones.length === 0 && (
+              <p className="text-sm text-gray-500">No milestones yet. Add your first milestone above.</p>
+            )}
           </div>
         </div>
 
@@ -479,6 +836,9 @@ export function ProjectManager() {
                 </div>
               </div>
             ))}
+            {teamMembers.length === 0 && (
+              <p className="text-sm text-gray-500">No team members found for this project.</p>
+            )}
           </div>
         </div>
       </div>
@@ -500,6 +860,9 @@ export function ProjectManager() {
               </div>
             </div>
           ))}
+          {activities.length === 0 && (
+            <p className="text-sm text-gray-500">No recent activity yet.</p>
+          )}
         </div>
       </div>
     </div>

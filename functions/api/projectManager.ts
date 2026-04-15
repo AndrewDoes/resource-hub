@@ -90,6 +90,44 @@ export interface ProjectManagerTimelineTask {
   sortOrder: number;
 }
 
+export interface ProjectManagerCreateMilestoneInput {
+  pmUserId: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  dueDate: string;
+  sortOrder: number;
+}
+
+export interface ProjectManagerUpdateMilestoneStatusInput {
+  pmUserId: string;
+  projectId: string;
+  milestoneId: string;
+  isCompleted: boolean;
+}
+
+export interface ProjectManagerCreateTimelineTaskInput {
+  pmUserId: string;
+  projectId: string;
+  name: string;
+  startOffsetDays: number;
+  durationDays: number;
+  colorTag: string;
+  sortOrder: number;
+}
+
+export interface ProjectManagerUpdateTimelineTaskInput {
+  pmUserId: string;
+  projectId: string;
+  timelineTaskId: string;
+  name: string;
+  startOffsetDays: number;
+  durationDays: number;
+  colorTag: string;
+  status: "pending" | "in-progress" | "completed";
+  sortOrder: number;
+}
+
 export interface ProjectManagerCreateChangeRequestInput {
   projectId: string;
   employeeId?: string;
@@ -183,8 +221,20 @@ const asNumber = (value: unknown, fallback: number): number => {
 };
 
 const normalizeDateOnlyString = (value: string): string => {
-  const match = value.match(/\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : value;
+  const isoMatch = value.match(/\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) {
+    return isoMatch[0];
+  }
+
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const day = slashMatch[1].padStart(2, "0");
+    const month = slashMatch[2].padStart(2, "0");
+    const year = slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  return value;
 };
 
 const normalizeTaskPriority = (value: unknown): TaskPriority => {
@@ -233,21 +283,29 @@ const readErrorMessage = async (response: Response, fallbackMessage: string): Pr
       return directMessage;
     }
 
+    const errors = payload.errors;
+    if (errors && typeof errors === "object") {
+      const allErrors = Object.values(errors as Record<string, unknown>)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((value) => value.length > 0);
+
+      const meaningfulError = allErrors.find(
+        (message) => message.toLowerCase() !== "the request field is required."
+      );
+
+      if (meaningfulError) {
+        return meaningfulError;
+      }
+
+      if (allErrors.length > 0) {
+        return allErrors[0];
+      }
+    }
+
     const titleMessage = asString(payload.title, "");
     if (titleMessage) {
       return titleMessage;
-    }
-
-    const errors = payload.errors;
-    if (errors && typeof errors === "object") {
-      const firstError = Object.values(errors as Record<string, unknown>)
-        .flatMap((value) => (Array.isArray(value) ? value : [value]))
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .find((value) => value.length > 0);
-
-      if (firstError) {
-        return firstError;
-      }
     }
   } catch {
     // fall back to plain text handling below
@@ -344,17 +402,17 @@ const normalizeTeamMembers = (payload: unknown): ProjectManagerProjectTeamMember
     const record = item as Record<string, unknown>;
 
     return {
-      assignmentId: asString(record.assignmentId ?? record.assignment_id ?? record.id ?? record.Id, ''),
-      employeeId: asString(record.employeeId ?? record.employee_id, String(index + 1)),
-      fullName: asString(record.fullName ?? record.full_name, "Unknown Employee"),
-      jobTitle: asString(record.jobTitle ?? record.job_title, "Unknown Role"),
-      roleName: asString(record.roleName ?? record.role_name, "Member"),
-      allocationPercent: asNumber(record.allocationPercent ?? record.allocation_percent, 0),
-      assignmentStatus: asString(record.assignmentStatus ?? record.assignment_status, "Pending"),
-      availabilityPercent: asNumber(record.availabilityPercent ?? record.availability_percent, 0),
-      workloadPercent: asNumber(record.workloadPercent ?? record.workload_percent, 0),
-      assignedHours: asNumber(record.assignedHours ?? record.assigned_hours, 0),
-      employeeStatus: asString(record.employeeStatus ?? record.employee_status, "Active"),
+      assignmentId: asString(record.assignmentId ?? record.AssignmentId ?? record.assignment_id ?? record.id ?? record.Id, ''),
+      employeeId: asString(record.employeeId ?? record.EmployeeId ?? record.employee_id, ''),
+      fullName: asString(record.fullName ?? record.FullName ?? record.full_name, "Unknown Employee"),
+      jobTitle: asString(record.jobTitle ?? record.JobTitle ?? record.job_title, "Unknown Role"),
+      roleName: asString(record.roleName ?? record.RoleName ?? record.role_name, "Member"),
+      allocationPercent: asNumber(record.allocationPercent ?? record.AllocationPercent ?? record.allocation_percent, 0),
+      assignmentStatus: asString(record.assignmentStatus ?? record.AssignmentStatus ?? record.assignment_status, "Pending"),
+      availabilityPercent: asNumber(record.availabilityPercent ?? record.AvailabilityPercent ?? record.availability_percent, 0),
+      workloadPercent: asNumber(record.workloadPercent ?? record.WorkloadPercent ?? record.workload_percent, 0),
+      assignedHours: asNumber(record.assignedHours ?? record.AssignedHours ?? record.assigned_hours, 0),
+      employeeStatus: asString(record.employeeStatus ?? record.EmployeeStatus ?? record.employee_status, "Active"),
     };
   });
 };
@@ -539,6 +597,106 @@ export async function fetchProjectManagerTimelineTasks(pmUserId: string, project
   return normalizeTimelineTasks(payload);
 }
 
+export async function createProjectManagerMilestone(input: ProjectManagerCreateMilestoneInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerCreateMilestone, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      title: input.title,
+      description: input.description,
+      dueDate: normalizeDateOnlyString(input.dueDate),
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to create milestone (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function updateProjectManagerMilestoneStatus(input: ProjectManagerUpdateMilestoneStatusInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerUpdateMilestoneStatus, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      milestoneId: input.milestoneId,
+      isCompleted: input.isCompleted,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to update milestone status (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function createProjectManagerTimelineTask(input: ProjectManagerCreateTimelineTaskInput): Promise<void> {
+  const response = await fetch(BackendApiUrl.projectManagerCreateTimelineTask, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      name: input.name,
+      startOffsetDays: input.startOffsetDays,
+      durationDays: input.durationDays,
+      colorTag: input.colorTag,
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to create timeline task (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function updateProjectManagerTimelineTask(input: ProjectManagerUpdateTimelineTaskInput): Promise<void> {
+  const status = input.status === "in-progress"
+    ? "InProgress"
+    : input.status === "completed"
+      ? "Completed"
+      : "Pending";
+
+  const response = await fetch(BackendApiUrl.projectManagerUpdateTimelineTask, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      pmUserId: input.pmUserId,
+      projectId: input.projectId,
+      timelineTaskId: input.timelineTaskId,
+      name: input.name,
+      startOffsetDays: input.startOffsetDays,
+      durationDays: input.durationDays,
+      colorTag: input.colorTag,
+      status,
+      sortOrder: input.sortOrder,
+    }),
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to update timeline task (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
+}
+
 export async function updateProjectManagerProjectStatus(
   projectId: string,
   status: 'Completed' | 'Cancelled'
@@ -673,6 +831,8 @@ export interface TaskAssignmentCreateInput {
 export interface TaskAssignmentUpdateInput {
   taskId: string;
   status: "pending" | "in-progress" | "completed";
+  taskName?: string;
+  description?: string;
   priority?: TaskPriority;
   workloadHours?: number;
   dueDate?: string;
@@ -760,7 +920,9 @@ export async function createTaskAssignment(input: TaskAssignmentCreateInput): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create task assignment (${response.status})`);
+    const fallbackMessage = `Failed to create task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
@@ -784,6 +946,8 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
     body: JSON.stringify({
       taskId: input.taskId,
       status,
+      taskName: input.taskName,
+      description: input.description,
       priority,
       workloadHours: input.workloadHours,
       dueDate: input.dueDate ? normalizeDateOnlyString(input.dueDate) : undefined,
@@ -791,10 +955,24 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update task assignment (${response.status})`);
+    const fallbackMessage = `Failed to update task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
   const normalized = normalizeTaskAssignments([payload]);
   return normalized[0] || { taskId: '', projectId: '', projectName: '', employeeId: '', employeeName: '', taskName: '', description: '', priority: 'low', workloadHours: 20, assignedDate: new Date().toISOString(), dueDate: new Date().toISOString(), status: 'pending', createdAt: new Date().toISOString() };
+}
+
+export async function deleteTaskAssignment(taskId: string): Promise<void> {
+  const response = await fetch(BackendApiUrl.taskAssignmentsDelete(taskId), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const fallbackMessage = `Failed to delete task assignment (${response.status})`;
+    const errorMessage = await readErrorMessage(response, fallbackMessage);
+    throw new Error(errorMessage);
+  }
 }

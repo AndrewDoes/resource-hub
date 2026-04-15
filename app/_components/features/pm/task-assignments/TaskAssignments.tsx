@@ -8,6 +8,8 @@ import {
   Clock,
   AlertCircle,
   Filter,
+  Pencil,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -15,6 +17,7 @@ import {
   fetchProjectManagerProjects,
   fetchProjectManagerProjectTeam,
   createTaskAssignment,
+  deleteTaskAssignment,
   updateTaskAssignment,
   WORKLOAD_CONFIG,
   type ProjectTaskAssignment,
@@ -84,6 +87,8 @@ export function TaskAssignments() {
   const [teamMembersLoading, setTeamMembersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "in-progress" | "completed">("all");
   const [filterPriority, setFilterPriority] = useState<"all" | TaskPriority>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -97,6 +102,15 @@ export function TaskAssignments() {
     priority: "medium" as TaskPriority,
     workloadHours: 30,
     dueDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0],
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    taskName: "",
+    description: "",
+    priority: "medium" as TaskPriority,
+    workloadHours: 30,
+    dueDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0],
+    status: "pending" as "pending" | "in-progress" | "completed",
   });
 
   // Load data
@@ -160,10 +174,19 @@ export function TaskAssignments() {
         const members = await fetchProjectManagerProjectTeam(pmUserId, formData.projectId);
         setTeamMembers(members);
 
-        // Reset selected member if it no longer exists in the selected project's team.
-        if (formData.employeeId && !members.some((member) => member.employeeId === formData.employeeId)) {
-          setFormData((prev) => ({ ...prev, employeeId: "" }));
-        }
+        // Keep selection valid and ensure a real employee ID is bound.
+        setFormData((prev) => {
+          if (members.length === 0) {
+            return { ...prev, employeeId: "" };
+          }
+
+          const hasCurrent = prev.employeeId && members.some((member) => member.employeeId === prev.employeeId);
+          if (hasCurrent) {
+            return prev;
+          }
+
+          return { ...prev, employeeId: members[0].employeeId };
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load team members");
         setTeamMembers([]);
@@ -177,6 +200,7 @@ export function TaskAssignments() {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     try {
       await createTaskAssignment({
         ...formData,
@@ -197,12 +221,14 @@ export function TaskAssignments() {
       });
       setTeamMembers([]);
       setShowCreateForm(false);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task");
     }
   };
 
   const handleUpdateTaskStatus = async (taskId: string, newStatus: "pending" | "in-progress" | "completed") => {
+    setError(null);
     try {
       await updateTaskAssignment({
         taskId,
@@ -211,8 +237,73 @@ export function TaskAssignments() {
 
       const latestTasks = await fetchAllTaskAssignments(pmUserId);
       setTasks(latestTasks);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task");
+    }
+  };
+
+  const handleStartEditTask = (task: ProjectTaskAssignment) => {
+    setEditingTaskId(task.taskId);
+    setEditFormData({
+      taskName: task.taskName,
+      description: task.description ?? "",
+      priority: task.priority,
+      workloadHours: task.workloadHours,
+      dueDate: task.dueDate.split("T")[0] ?? task.dueDate,
+      status: task.status,
+    });
+  };
+
+  const handleSaveEditTask = async () => {
+    if (!editingTaskId) {
+      return;
+    }
+
+    setError(null);
+    try {
+      setIsSavingEdit(true);
+
+      await updateTaskAssignment({
+        taskId: editingTaskId,
+        status: editFormData.status,
+        taskName: editFormData.taskName,
+        description: editFormData.description,
+        priority: editFormData.priority,
+        workloadHours: editFormData.workloadHours,
+        dueDate: editFormData.dueDate,
+      });
+
+      const latestTasks = await fetchAllTaskAssignments(pmUserId);
+      setTasks(latestTasks);
+      setEditingTaskId(null);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update task");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm("Remove this task assignment?");
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+    try {
+      await deleteTaskAssignment(taskId);
+
+      const latestTasks = await fetchAllTaskAssignments(pmUserId);
+      setTasks(latestTasks);
+
+      if (editingTaskId === taskId) {
+        setEditingTaskId(null);
+      }
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove task");
     }
   };
 
@@ -501,9 +592,9 @@ export function TaskAssignments() {
           {filteredTasks.map((task) => (
             <Card
               key={task.taskId}
-              className="p-4 hover:shadow-md transition-shadow"
+              className="h-full p-4 hover:shadow-md transition-shadow"
             >
-              <div className="space-y-3">
+              <div className="flex h-full flex-col gap-3">
                 {/* Header with status */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
@@ -523,9 +614,9 @@ export function TaskAssignments() {
                 </div>
 
                 {/* Description */}
-                {task.description && (
-                  <p className="text-sm text-gray-600">{task.description}</p>
-                )}
+                <p className="min-h-[20px] text-sm text-gray-600">
+                  {task.description && task.description.trim().length > 0 ? task.description : " "}
+                </p>
 
                 {/* Info grid */}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
@@ -557,7 +648,23 @@ export function TaskAssignments() {
                 </div>
 
                 {/* Status Update Buttons */}
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <div className="mt-auto flex gap-2 border-t border-gray-100 pt-2">
+                  <Button
+                    onClick={() => handleStartEditTask(task)}
+                    size="sm"
+                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs"
+                  >
+                    <Pencil className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    onClick={() => void handleDeleteTask(task.taskId)}
+                    size="sm"
+                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Remove
+                  </Button>
                   {task.status !== "in-progress" && (
                     <Button
                       onClick={() =>
@@ -592,6 +699,116 @@ export function TaskAssignments() {
                     </Button>
                   )}
                 </div>
+
+                {editingTaskId === task.taskId && (
+                  <div className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                    <p className="text-sm font-semibold text-indigo-900">Edit Task</p>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Task Name</label>
+                        <Input
+                          value={editFormData.taskName}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({ ...prev, taskName: event.target.value }))
+                          }
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Description</label>
+                        <textarea
+                          value={editFormData.description}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({ ...prev, description: event.target.value }))
+                          }
+                          rows={3}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Priority</label>
+                        <Select
+                          value={editFormData.priority}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({
+                              ...prev,
+                              priority: event.target.value as TaskPriority,
+                              workloadHours: WORKLOAD_CONFIG[event.target.value as TaskPriority]?.hours ?? prev.workloadHours,
+                            }))
+                          }
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Status</label>
+                        <Select
+                          value={editFormData.status}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({
+                              ...prev,
+                              status: event.target.value as "pending" | "in-progress" | "completed",
+                            }))
+                          }
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Workload Hours</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={80}
+                          value={editFormData.workloadHours}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({
+                              ...prev,
+                              workloadHours: Math.max(1, Math.min(80, Number(event.target.value) || 1)),
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Due Date</label>
+                        <Input
+                          type="date"
+                          value={editFormData.dueDate}
+                          onChange={(event) =>
+                            setEditFormData((prev) => ({ ...prev, dueDate: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        onClick={() => setEditingTaskId(null)}
+                        className="bg-gray-200 text-gray-800 hover:bg-gray-300"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => void handleSaveEditTask()}
+                        className="bg-indigo-600 text-white hover:bg-indigo-700"
+                        size="sm"
+                        disabled={isSavingEdit || !editFormData.taskName.trim()}
+                      >
+                        {isSavingEdit ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           ))}
