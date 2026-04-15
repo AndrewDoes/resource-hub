@@ -5,6 +5,7 @@ import { Save, CheckCircle, AlertCircle } from "lucide-react";
 
 // Sub-components
 import { ProfileSection } from "./components/ProfileSection";
+import { PasswordSection } from "./components/PasswordSection";
 import { NotificationSection } from "./components/NotificationSection";
 import { PreferencesSection } from "./components/PreferencesSection";
 import { AccessControlSection } from "./components/AccessControlSection";
@@ -250,6 +251,9 @@ export function Settings() {
         onUpdateProfile={(data) => setProfileData({ ...profileData, ...data })}
         isLoading={isLoading}
       />
+
+      {/* Password Settings */}
+      <PasswordSection />
 
       {/* Notification Settings */}
       <NotificationSection

@@ -55,4 +55,5 @@ export const BackendApiUrl = {
   user: `${baseUrl}/api/User`,
   userLogin: `${baseUrl}/api/User/login`,
   userProfile: `${baseUrl}/api/User/get-profile`,
+  userUpdatePassword: `${baseUrl}/api/User/update-password`,
 } as const;
