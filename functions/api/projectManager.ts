@@ -402,6 +402,35 @@ const normalizeProjects = (payload: unknown): ProjectManagerProjectSummary[] => 
   });
 };
 
+const extractTotalPages = (payload: unknown): number => {
+  const record = (payload ?? {}) as Record<string, unknown>;
+  const dataRecord = (record.data ?? record.Data ?? null) as Record<string, unknown> | null;
+
+  const candidates = [
+    record.totalPages,
+    record.TotalPages,
+    record.total_pages,
+    dataRecord?.totalPages,
+    dataRecord?.TotalPages,
+    dataRecord?.total_pages,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0) {
+      return Math.floor(candidate);
+    }
+
+    if (typeof candidate === "string") {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Math.floor(parsed);
+      }
+    }
+  }
+
+  return 1;
+};
+
 const normalizeOverview = (payload: unknown): ProjectManagerProjectOverview => {
   const source = (payload as ProjectManagerOverviewResponse | null) ?? {};
 
@@ -538,22 +567,33 @@ const normalizeTimelineTasks = (payload: unknown): ProjectManagerTimelineTask[] 
 };
 
 export async function fetchProjectManagerProjects(pmUserId: string): Promise<ProjectManagerProjectSummary[]> {
-  const url = withQuery(BackendApiUrl.projectManagerProjectsList, {
-    pmUserId,
-    pageNumber: "1",
-    pageSize: "10",
-  });
+  const pageSize = 100;
+  let pageNumber = 1;
+  let totalPages = 1;
+  const allProjects: ProjectManagerProjectSummary[] = [];
 
-  const response = await authorizedFetch(url, {
-    cache: "no-store",
-  });
+  while (pageNumber <= totalPages) {
+    const url = withQuery(BackendApiUrl.projectManagerProjectsList, {
+      pmUserId,
+      pageNumber: String(pageNumber),
+      pageSize: String(pageSize),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to load project manager projects (${response.status})`);
+    const response = await authorizedFetch(url, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load project manager projects (${response.status})`);
+    }
+
+    const payload: unknown = await response.json();
+    allProjects.push(...normalizeProjects(payload));
+    totalPages = extractTotalPages(payload);
+    pageNumber += 1;
   }
 
-  const payload: unknown = await response.json();
-  return normalizeProjects(payload);
+  return Array.from(new Map(allProjects.map((project) => [project.id, project])).values());
 }
 
 export async function fetchProjectManagerProjectOverview(pmUserId: string, projectId: string): Promise<ProjectManagerProjectOverview> {

@@ -71,25 +71,8 @@ const mapSummaryToProject = (
   };
 };
 
-const toDayStart = (value: string): Date => {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-};
-
 const isFinishedProject = (summary: ProjectManagerProjectSummary): boolean => {
-  if (summary.status === 'completed' || summary.status === 'cancelled') {
-    return true;
-  }
-
-  if (summary.progress >= 100) {
-    return true;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return toDayStart(summary.endDate).getTime() < today.getTime();
+  return summary.status === 'completed';
 };
 
 const buildRecommendationsFromPrediction = (
@@ -204,8 +187,10 @@ const parseConflictWarning = (warning: string): { requiredSkills?: string[]; add
 };
 
 export function DecisionPanel() {
+  const projectsPerPage = 5;
   const { addToast } = useFeedbackToast();
   const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [projectPage, setProjectPage] = useState(1);
   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
   const [prediction, setPrediction] = useState<GeneralManagerProjectPrediction | null>(null);
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
@@ -660,6 +645,17 @@ export function DecisionPanel() {
     );
   }, [prediction, selectedProject]);
 
+  const totalProjectPages = Math.max(1, Math.ceil(projects.length / projectsPerPage));
+
+  const pagedProjects = useMemo(() => {
+    const startIndex = (projectPage - 1) * projectsPerPage;
+    return projects.slice(startIndex, startIndex + projectsPerPage);
+  }, [projects, projectPage, projectsPerPage]);
+
+  useEffect(() => {
+    setProjectPage((prev) => Math.min(prev, totalProjectPages));
+  }, [totalProjectPages]);
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
@@ -685,15 +681,39 @@ export function DecisionPanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Project Selection Sidebar */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-6 lg:self-start">
           <ProjectSidebar
-            projects={projects}
+            projects={pagedProjects}
             selectedProjectId={selectedProject?.id}
             onSelect={(project) => {
               setSelectedProject(project);
               setPrediction(null);
             }}
           />
+
+          {projects.length > projectsPerPage && (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setProjectPage((prev) => Math.max(1, prev - 1))}
+                disabled={projectPage === 1}
+                className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <p className="text-sm text-gray-600">
+                Page {projectPage} of {totalProjectPages}
+              </p>
+              <button
+                type="button"
+                onClick={() => setProjectPage((prev) => Math.min(totalProjectPages, prev + 1))}
+                disabled={projectPage === totalProjectPages}
+                className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}

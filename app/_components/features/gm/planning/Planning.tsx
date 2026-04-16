@@ -133,11 +133,13 @@ const convertToProjectData = (project: GanttProject): ProjectData => ({
 });
 
 export function Planning() {
+  const projectsPerPage = 5;
   const searchParams = useSearchParams();
   const highlightProject = searchParams.get('highlight');
 
   const [hasMounted, setHasMounted] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [projects, setProjects] = useState<GanttProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<GanttProject | null>(null);
   const [timelineStartMonth, setTimelineStartMonth] = useState<string | null>(null);
@@ -163,7 +165,7 @@ export function Planning() {
 
       if (projectResult.status === 'fulfilled' && projectResult.value.length > 0) {
         const activeSummaries = projectResult.value.filter(
-          (project) => project.status !== 'completed' && project.status !== 'cancelled'
+          (project) => project.status !== 'completed'
         );
 
         if (activeSummaries.length === 0) {
@@ -284,6 +286,21 @@ export function Planning() {
     statusFilter === 'all'
       ? projects
       : projects.filter((p) => p.status === statusFilter);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / projectsPerPage));
+
+  const pagedProjects = useMemo(() => {
+    const startIndex = (currentPage - 1) * projectsPerPage;
+    return filteredProjects.slice(startIndex, startIndex + projectsPerPage);
+  }, [filteredProjects, currentPage, projectsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   const availableMonths = useMemo(() => {
     if (filteredProjects.length === 0) {
@@ -526,7 +543,7 @@ export function Planning() {
 
             {/* Gantt Bars */}
             <div className="space-y-4">
-              {filteredProjects.map((project) => {
+              {pagedProjects.map((project) => {
                 const isHighlighted = highlightProject === project.id;
 
                 return (
@@ -599,6 +616,30 @@ export function Planning() {
                 );
               })}
             </div>
+
+            {filteredProjects.length > projectsPerPage && (
+              <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <p className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
