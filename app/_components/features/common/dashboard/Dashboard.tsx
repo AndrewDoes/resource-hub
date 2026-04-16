@@ -12,28 +12,41 @@ import { PMDashboard } from "./components/PMDashboard";
 export function Dashboard() {
   const { currentUser } = useRole();
 
+  if (!currentUser) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-500 text-sm">Loading your workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Marketing Dashboard
-  if (currentUser.role === 'marketing') {
+  const currentRole = currentUser.role?.toLowerCase();
+
+  if (currentRole === 'marketing') {
     return <MarketingDashboard />;
   }
 
   // GM Dashboard
-  if (currentUser.role === 'gm') {
+  if (currentRole === 'gm') {
     return <GMDashboard />;
   }
 
   // PM Dashboard - Use new timeline dashboard
-  if (currentUser.role === 'pm') {
+  if (currentRole === 'pm') {
     return <PMDashboard />;
   }
 
   // HR Dashboard
-  if (currentUser.role === 'hr') {
+  if (currentRole === 'hr') {
     return <HRDashboard />;
   }
 
   // Employee Dashboard
-  if (currentUser.role === 'employee') {
+  if (currentRole === 'employee') {
     return <EmployeeDashboardView />;
   }
 

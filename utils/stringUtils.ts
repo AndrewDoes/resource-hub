@@ -9,3 +9,11 @@ export const getInitials = (name?: string | null): string => {
     .toUpperCase()
     .slice(0, 2);
 };
+
+export const normalizeStatus = (status?: string | null): string => {
+  if (!status) return "";
+  return status
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/\s+/g, '-')
+    .toLowerCase();
+};

@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   Folder,
   Gavel,
+  CheckSquare,
   FileX,
 } from "lucide-react";
 import { UserRole } from "@/app/types";
@@ -82,6 +83,7 @@ export const allMenuItems: MenuItem[] = [
     icon: Briefcase,
     roles: ["pm"],
   },
+  { path: '/pm/task-assignments', label: 'Task Assignments', icon: CheckSquare, roles: ['pm'] },
   {
     path: "/gm/planning",
     label: "Planning",

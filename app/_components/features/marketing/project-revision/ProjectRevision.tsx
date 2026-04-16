@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Paperclip, Plus, Save, Send, XCircle, X } from "lucide-react";
 import { useFeedbackToast } from "@/app/context/ToastContext";
 import { BackendApiUrl } from "@/functions/BackendApiUrl";
+import { authorizedFetch } from "@/functions/api/authorizedFetch";
 import { WorkflowVisualizer } from "@/app/_components/system/WorkflowSystem";
 import type { ProjectStatus } from "@/app/_components/system/WorkflowSystem";
 import { RejectedProjectsModal } from "../projects/components/RejectedProjectsModal";
@@ -61,14 +62,8 @@ export function ProjectRevision() {
     const fetchRejectedProjects = async () => {
       setIsProjectsLoading(true);
       try {
-        const response = await fetch(
-          `${BackendApiUrl.projectsList}?status=Rejected&pageNumber=${currentPage}&pageSize=5`,
-          {
-            headers: {
-              "X-Debug-Role": "marketing",
-              "X-Debug-User": "marketing-user",
-            },
-          },
+        const response = await authorizedFetch(
+          `${BackendApiUrl.projectsList}?status=Rejected&pageNumber=${currentPage}&pageSize=5`
         );
 
         if (!response.ok) {
@@ -173,12 +168,7 @@ export function ProjectRevision() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const response = await fetch(BackendApiUrl.lookupsSkillsList, {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        });
+        const response = await authorizedFetch(BackendApiUrl.lookupsSkillsList);
         if (response.ok) {
           const data = await response.json();
           const skills: SkillItem[] = data.skills;
@@ -284,15 +274,10 @@ export function ProjectRevision() {
         })),
       };
 
-      const response = await fetch(
+      const response = await authorizedFetch(
         BackendApiUrl.projectUpdate(selectedProjectId),
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
           body: JSON.stringify(payload),
         },
       );
@@ -326,14 +311,8 @@ export function ProjectRevision() {
     setSelectedProjectId(project.id);
 
     try {
-      const response = await fetch(
-        BackendApiUrl.projectRevision(project.id),
-        {
-          headers: {
-            "X-Debug-Role": "marketing",
-            "X-Debug-User": "marketing-user",
-          },
-        },
+      const response = await authorizedFetch(
+        BackendApiUrl.projectRevision(project.id)
       );
 
       if (!response.ok) {

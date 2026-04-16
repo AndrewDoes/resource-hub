@@ -1,80 +1,248 @@
 'use client';
 
-import { 
-  Clock, 
-  CheckCircle 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import {
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Target,
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
-import { employeeAssignments } from '@/app/_components/features/common/dashboard/data';
-import { StatusBadge } from '@/app/_components/system/components/StatusBadge';
-
+import {
+  fetchEmployeeDashboard,
+  acceptAssignment,
+  type EmployeeDashboardData,
+} from '@/functions/api/employeeDashboard';
+import { useRole } from '@/app/context/RoleContext';
+import { useFeedbackToast } from '@/app/context/ToastContext';
+import { UnifiedTaskList, GlobalMilestoneList, CompactProjectCard } from './DashboardWidgets';
+import { AssignmentCard } from './AssignmentCard';
 
 export function EmployeeDashboardView() {
+  const { currentUser } = useRole();
+  const { addToast } = useFeedbackToast();
+  const [data, setData] = useState<EmployeeDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDashboard = async () => {
+    if (!currentUser) return;
+    try {
+      setIsLoading(true);
+      const result = await fetchEmployeeDashboard(currentUser.id);
+      setData(result);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load employee dashboard:', err);
+      setError('Failed to load dashboard data. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.id && currentUser?.role === 'employee') {
+      loadDashboard();
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+  const handleAccept = async (assignmentId: string) => {
+    try {
+      const success = await acceptAssignment(assignmentId);
+      if (success) {
+        addToast({
+          type: 'success',
+          title: 'Assignment Accepted',
+          message: 'You have joined the project successfully.',
+        });
+        loadDashboard();
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Action Failed',
+        message: 'Could not accept the assignment.',
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 font-medium">Loading your cockpit...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="max-w-7xl mx-auto py-20 flex flex-col items-center justify-center space-y-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="text-gray-900 font-semibold">{error || 'Something went wrong'}</p>
+        <button
+          onClick={() => loadDashboard()}
+          className="px-4 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Aggregate global priorities
+  const globalTasks = data.assignments.flatMap(a =>
+    a.tasks.filter(t => t.status.toLowerCase() === 'inprogress').map(t => ({
+      ...t,
+      projectName: a.projectName
+    }))
+  ).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 10);
+
+  const globalMilestones = data.assignments.flatMap(a =>
+    a.milestones.filter(m => !m.isCompleted).map(m => ({
+      ...m,
+      projectName: a.projectName
+    }))
+  ).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 5);
+
+  const invitations = data.assignments.filter(a => {
+    const s = a.status.toLowerCase();
+    return s === 'pending' || s === 'gmapproved' || s === 'approved';
+  });
+
+  const activeEngagements = data.assignments.filter(a => {
+    const s = a.status.toLowerCase();
+    return s === 'accepted' || s === 'inprogress' || s === 'in-progress';
+  });
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Employee Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Your project assignments and tasks</p>
-      </div>
-
-      {/* Assignment Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-linear-to-br from-orange-500 to-yellow-500 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center gap-3 mb-3">
-            <Clock className="w-6 h-6" />
-            <h3 className="text-lg font-semibold">Pending Assignments</h3>
-          </div>
-          <p className="text-4xl font-semibold mb-1">
-            {employeeAssignments.filter(a => a.status === 'submitted').length}
-          </p>
-          <p className="text-orange-50 text-sm">Awaiting your response</p>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Active Projects</h3>
-          </div>
-          <p className="text-4xl font-semibold text-gray-900 mb-1">
-            {employeeAssignments.filter(a => a.status === 'in-progress').length}
-          </p>
-          <p className="text-sm text-gray-500">Currently working on</p>
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Welcome, {currentUser?.name}!</h1>
+          <p className="text-sm text-gray-500 mt-1 font-medium">Here's your real-time performance and priority highlight.</p>
         </div>
       </div>
 
-      {/* My Assignments */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">My Assignments</h2>
+      {/* Stats Quick Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-linear-to-br from-orange-500 to-yellow-500 rounded-2xl p-5 text-white shadow-lg border border-orange-400/20">
+          <p className="text-xs font-bold text-orange-100 uppercase tracking-widest mb-1">Invites</p>
+          <div className="flex items-end justify-between">
+            <h3 className="text-3xl font-bold">{data.pendingAssignmentsCount}</h3>
+            <Clock className="w-6 h-6 opacity-40 mb-1" />
+          </div>
         </div>
-        <div className="p-6 space-y-3">
-          {employeeAssignments.map((assignment) => (
-            <div key={assignment.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{assignment.project}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{assignment.role}</p>
-                </div>
-                <StatusBadge status={assignment.status} />
+
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm group hover:border-green-200 transition-all">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 group-hover:text-green-500 transition-colors">Projects</p>
+          <div className="flex items-end justify-between">
+            <h3 className="text-3xl font-bold text-gray-900">{data.activeProjectsCount}</h3>
+            <Target className="w-6 h-6 text-green-500 opacity-20 group-hover:opacity-100 transition-opacity mb-1" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Tasks</p>
+          <div className="flex items-end justify-between">
+            <h3 className="text-3xl font-bold text-gray-900">{globalTasks.length}</h3>
+            <CheckCircle className="w-6 h-6 text-blue-500 opacity-20 mb-1" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Upcoming</p>
+          <div className="flex items-end justify-between">
+            <h3 className="text-3xl font-bold text-gray-900">{globalMilestones.length}</h3>
+            <Calendar className="w-6 h-6 text-orange-500 opacity-20 mb-1" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Cockpit Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        {/* Unified Task Spotlight (Primary) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-xl">
+                <Clock className="w-4 h-4 text-orange-600" />
               </div>
-              {assignment.progress !== undefined && (
-                <div className="mb-2">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">Progress</span>
-                    <span className="font-medium text-gray-900">{assignment.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="h-2 bg-green-500 rounded-full"
-                      style={{ width: `${assignment.progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              <p className="text-sm text-gray-600">Allocation: {assignment.allocation}%</p>
+              <h2 className="text-xl font-bold text-gray-900 tracking-tight">Task Spotlight</h2>
             </div>
-          ))}
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 px-2 py-1 rounded-lg">Top {globalTasks.length} Priorities</span>
+          </div>
+
+          <UnifiedTaskList tasks={globalTasks} />
+
+          {globalTasks.length > 0 && (
+            <Link
+              href="/employee/my-projects"
+              className="flex items-center justify-center gap-2 py-3 w-full border-2 border-dashed border-gray-200 rounded-2xl text-sm font-bold text-gray-400 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50/30 transition-all group"
+            >
+              Dive into project details
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          )}
+        </div>
+
+        {/* Sidebar widgets */}
+        <div className="space-y-8">
+
+          {/* Upcoming Milestones */}
+          <section className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs">
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-500" />
+              Upcoming Goals
+            </h3>
+            <GlobalMilestoneList milestones={globalMilestones} />
+          </section>
+
+          {/* Active Projects Mini-List */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Active Projects</h3>
+              <Link href="/employee/my-projects" className="text-[10px] font-bold text-blue-600 uppercase hover:underline">See All</Link>
+            </div>
+            <div className="space-y-3">
+              {activeEngagements.map(a => <CompactProjectCard key={a.id} assignment={a} />)}
+              {activeEngagements.length === 0 && (
+                <p className="text-xs text-gray-400 italic px-1">No active projects currently.</p>
+              )}
+            </div>
+          </section>
+
         </div>
       </div>
+
+      {/* Invitations Section (Separate to keep primary dashboard clean) */}
+      {invitations.length > 0 && (
+        <div className="space-y-6 pt-10 border-t border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-xl">
+              <AlertCircle className="w-4 h-4 text-blue-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">New Invitations</h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {invitations.map(a => (
+              <AssignmentCard
+                key={a.id}
+                assignment={a}
+                onAccept={() => handleAccept(a.id)}
+                defaultExpanded
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { 
-  Lightbulb, AlertTriangle, Clock, HelpCircle, DollarSign, TrendingUp, Info, CheckCircle, X
+  Lightbulb, AlertTriangle, Clock, HelpCircle, DollarSign, Info, CheckCircle, X
 } from 'lucide-react';
 import { ProjectData, AIRecommendation } from '../types';
 
@@ -53,20 +53,49 @@ export function AIRecommendationSection({
       return;
     }
 
-    const normalizedConfidence = Math.max(0, Math.min(100, Math.round(draft.confidence)));
-
     setLocalRecommendations((prev) =>
       prev.map((recommendation) =>
         recommendation.id === editingId
-          ? {
-              ...draft,
-              confidence: normalizedConfidence,
-            }
+          ? draft
           : recommendation
       )
     );
 
     cancelEdit();
+  };
+
+  const handleDraftEmployeeChange = (employeeId: string) => {
+    setDraft((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      const options = prev.metadata?.candidateOptions ?? [];
+      const selected = options.find((option) => option.employeeId === employeeId);
+
+      if (!selected) {
+        return prev;
+      }
+
+      const roleName = prev.metadata?.roleName ?? '';
+      const capacityPercent = Math.max(0, Math.round(selected.availabilityPercent));
+      const autoDescription = roleName
+        ? `${selected.fullName} is selected for ${roleName} with ${capacityPercent}% current capacity.`
+        : `${selected.fullName} is selected with ${capacityPercent}% current capacity.`;
+      const autoReasoning = `Selected ${selected.fullName} from recommendation candidates (${capacityPercent}% current capacity).`;
+
+      return {
+        ...prev,
+        title: roleName ? `Assign ${selected.fullName} to ${roleName}` : prev.title,
+        description: autoDescription,
+        reasoning: autoReasoning,
+        metadata: {
+          ...prev.metadata,
+          employeeId: selected.employeeId,
+          employeeName: selected.fullName,
+        },
+      };
+    });
   };
 
   return (
@@ -161,33 +190,8 @@ export function AIRecommendationSection({
                       </span>
                     </div>
                   )}
-                  {recommendation.impact.workload && (
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <TrendingUp className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="font-medium text-gray-700">
-                        {recommendation.impact.workload}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Confidence Level */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${recommendation.confidence >= 85
-                          ? 'bg-green-500'
-                          : recommendation.confidence >= 70
-                            ? 'bg-yellow-500'
-                            : 'bg-red-500'
-                        }`}
-                      style={{ width: `${recommendation.confidence}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-700">
-                    {recommendation.confidence}% confidence
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -274,7 +278,24 @@ export function AIRecommendationSection({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-6">
+              {draft.type === 'add-resource' && (draft.metadata?.candidateOptions?.length ?? 0) > 0 && (
+                <label className="space-y-1 md:col-span-6">
+                  <span className="text-xs font-medium text-gray-600">Assigned Employee</span>
+                  <select
+                    value={draft.metadata?.employeeId ?? ''}
+                    onChange={(event) => handleDraftEmployeeChange(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    {(draft.metadata?.candidateOptions ?? []).map((option) => (
+                      <option key={option.employeeId} value={option.employeeId}>
+                        {option.fullName} ({Math.max(0, Math.round(option.availabilityPercent))}% capacity)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Title</span>
                 <input
@@ -284,7 +305,7 @@ export function AIRecommendationSection({
                 />
               </label>
 
-              <label className="space-y-1 md:col-span-2">
+              <label className="space-y-1 md:col-span-6">
                 <span className="text-xs font-medium text-gray-600">Description</span>
                 <textarea
                   value={draft.description}
@@ -296,7 +317,7 @@ export function AIRecommendationSection({
                 />
               </label>
 
-              <label className="space-y-1">
+              <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Impact: Time</span>
                 <input
                   value={draft.impact.time ?? ''}
@@ -309,7 +330,7 @@ export function AIRecommendationSection({
                 />
               </label>
 
-              <label className="space-y-1">
+              <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Impact: Cost</span>
                 <input
                   value={draft.impact.cost ?? ''}
@@ -322,7 +343,7 @@ export function AIRecommendationSection({
                 />
               </label>
 
-              <label className="space-y-1">
+              <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Impact: Risk</span>
                 <input
                   value={draft.impact.risk ?? ''}
@@ -335,34 +356,7 @@ export function AIRecommendationSection({
                 />
               </label>
 
-              <label className="space-y-1">
-                <span className="text-xs font-medium text-gray-600">Impact: Workload</span>
-                <input
-                  value={draft.impact.workload ?? ''}
-                  onChange={(event) =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, impact: { ...prev.impact, workload: event.target.value || undefined } } : prev
-                    )
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </label>
-
-              <label className="space-y-1 md:col-span-2">
-                <span className="text-xs font-medium text-gray-600">Confidence (%)</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={draft.confidence}
-                  onChange={(event) =>
-                    setDraft((prev) => (prev ? { ...prev, confidence: Number(event.target.value) } : prev))
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </label>
-
-              <label className="space-y-1 md:col-span-2">
+              <label className="space-y-1 md:col-span-6">
                 <span className="text-xs font-medium text-gray-600">Reasoning</span>
                 <textarea
                   value={draft.reasoning}

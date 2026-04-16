@@ -16,7 +16,9 @@ export function AssignmentValidation({
   onReject,
   isLoading = false,
 }: AssignmentValidationProps) {
-  const pendingAssignments = assignmentRequests.filter((a) => a.status === 'pending');
+  const pendingAssignments = assignmentRequests.filter(
+    (a) => a.status === 'pending' || a.status === 'gmapproved'
+  );
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -77,12 +79,6 @@ export function AssignmentValidation({
                 </div>
               </div>
 
-              {request.conflictWarning && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-2">
-                  <XCircle className="w-4 h-4" />
-                  {request.conflictWarning}
-                </div>
-              )}
 
               <div className="flex gap-2">
                 <button

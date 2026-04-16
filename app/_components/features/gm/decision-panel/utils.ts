@@ -59,7 +59,6 @@ export const generateRecommendations = (project: ProjectData): AIRecommendation[
         risk: 'Medium → Low',
         workload: `-${resourceGap * 15}%`,
       },
-      confidence: 87,
       reasoning:
         'Current team velocity analysis shows backend development is behind schedule. Adding senior developers will accelerate API development and database optimization tasks.',
     });
@@ -79,7 +78,6 @@ export const generateRecommendations = (project: ProjectData): AIRecommendation[
         risk: 'High → Medium',
         workload: `-${Math.ceil((project.resourceUtilization - 100) / 2)}%`,
       },
-      confidence: 92,
       reasoning: `With current resource allocation at ${project.resourceUtilization}% utilization, completing all deliverables on time has low probability. Extending by ${extensionDays} days increases success probability significantly.`,
     });
   }
@@ -97,7 +95,6 @@ export const generateRecommendations = (project: ProjectData): AIRecommendation[
         risk: 'Medium → Medium',
         workload: '-10%',
       },
-      confidence: 78,
       reasoning:
         'Lower priority projects have buffer time. Temporarily moving a specialist can help complete critical components faster.',
     });

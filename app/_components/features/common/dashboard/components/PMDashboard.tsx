@@ -19,14 +19,19 @@ import { convertToIntelligenceProjects } from '@/app/_components/features/common
 import { ResourcePlanningSystem, ResourceConflict, SystemSuggestion, SystemAlert, Employee } from '@/app/_components/system/SystemIntelligence';
 import {
   createProjectManagerChangeRequest,
+  fetchAllTaskAssignments,
+  fetchProjectManagerMilestones,
+  fetchProjectManagerProjectOverview,
   fetchProjectManagerProjectTeam,
   fetchProjectManagerProjects,
+  fetchProjectManagerTimelineTasks,
   persistSplitWorkloadToBackend,
   type ProjectManagerProjectSummary,
   type ProjectManagerProjectTeamMember,
 } from '@/functions/api/projectManager';
+import { useRole } from '@/app/context/RoleContext';
+import { calculateDerivedProgressPercent, clampPercent, isCompletedTimelineStatus } from '@/app/_components/features/common/progress/derivedProgress';
 
-const defaultPmUserId = process.env.NEXT_PUBLIC_PM_USER_ID ?? '11111111-1111-1111-1111-111111111111';
 
 const isActiveAssignmentStatus = (value: string): boolean => {
   const normalized = value.trim().toLowerCase();
@@ -51,12 +56,16 @@ const toEmployeeStatus = (value: string): Employee['status'] => {
   return 'on-leave';
 };
 
-const getProjectStatus = (project: ProjectManagerProjectSummary): TimelineProject['status'] => {
+const getProjectStatus = (project: ProjectManagerProjectSummary, progressOverride?: number): TimelineProject['status'] => {
   if (project.status === 'completed' || project.status === 'cancelled') {
     return 'completed';
   }
 
-  const progress = Number.isFinite(project.progress) ? project.progress : 0;
+  const progress = Number.isFinite(progressOverride)
+    ? Number(progressOverride)
+    : Number.isFinite(project.progress)
+      ? project.progress
+      : 0;
   const today = new Date();
   const startDate = new Date(project.startDate);
 
@@ -71,8 +80,8 @@ const getProjectStatus = (project: ProjectManagerProjectSummary): TimelineProjec
   return 'in-progress';
 };
 
-const getProjectPhase = (project: ProjectManagerProjectSummary): TimelineProject['phase'] => {
-  const status = getProjectStatus(project);
+const getProjectPhase = (project: ProjectManagerProjectSummary, progressOverride?: number): TimelineProject['phase'] => {
+  const status = getProjectStatus(project, progressOverride);
 
   if (status === 'assigned') {
     return 'planning';
@@ -175,6 +184,69 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
   try {
     const summaries = await fetchProjectManagerProjects(pmUserId);
     const sourceSummaries = summaries;
+    const allTasks = await fetchAllTaskAssignments(pmUserId).catch(() => []);
+
+    const derivedProgressEntries = await Promise.all(
+      sourceSummaries.map(async (project) => {
+        const projectTasks = allTasks.filter((task) => task.projectId === project.id);
+        const taskStats = projectTasks.length > 0
+          ? {
+              total: projectTasks.length,
+              completed: projectTasks.filter((task) => task.status === 'completed').length,
+            }
+          : null;
+
+        const [milestoneStats, timelineStats] = await Promise.all([
+          (async () => {
+            try {
+              const milestones = await fetchProjectManagerMilestones(pmUserId, project.id);
+              if (milestones.length === 0) {
+                return null;
+              }
+              return {
+                total: milestones.length,
+                completed: milestones.filter((item) => item.isCompleted).length,
+              };
+            } catch {
+              return null;
+            }
+          })(),
+          (async () => {
+            try {
+              const timelineTasks = await fetchProjectManagerTimelineTasks(pmUserId, project.id);
+              if (timelineTasks.length === 0) {
+                return null;
+              }
+              return {
+                total: timelineTasks.length,
+                completed: timelineTasks.filter((item) => isCompletedTimelineStatus(item.status)).length,
+              };
+            } catch {
+              return null;
+            }
+          })(),
+        ]);
+
+        try {
+          const overview = await fetchProjectManagerProjectOverview(pmUserId, project.id);
+          return [project.id, calculateDerivedProgressPercent({
+            tasks: taskStats,
+            milestones: milestoneStats,
+            timeline: timelineStats,
+            fallbackPercent: overview.progressPercent,
+          })] as const;
+        } catch {
+          return [project.id, calculateDerivedProgressPercent({
+            tasks: taskStats,
+            milestones: milestoneStats,
+            timeline: timelineStats,
+            fallbackPercent: project.progress,
+          })] as const;
+        }
+      })
+    );
+
+    const derivedProgressMap = new Map<string, number>(derivedProgressEntries);
 
     const teamResponses = await Promise.all(
       sourceSummaries.map(async (project) => {
@@ -199,10 +271,10 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
         description: project.description,
         startDate: project.startDate,
         endDate: project.endDate,
-        progress: Math.max(0, Math.min(100, Math.round(project.progress))),
-        status: getProjectStatus(project),
+        progress: derivedProgressMap.get(project.id) ?? clampPercent(project.progress),
+        status: getProjectStatus(project, derivedProgressMap.get(project.id)),
         teamMembers: team.map((member) => member.fullName),
-        phase: getProjectPhase(project),
+        phase: getProjectPhase(project, derivedProgressMap.get(project.id)),
       };
     });
 
@@ -273,6 +345,9 @@ const loadPmDashboardSnapshot = async (pmUserId: string) => {
 
 export function PMDashboard() {
   const { addToast } = useFeedbackToast();
+  const { currentUser } = useRole();
+  const pmUserId = currentUser?.id ?? '';
+
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [filters, setFilters] = useState<FilterOptions>({
     search: '',
@@ -294,7 +369,6 @@ export function PMDashboard() {
     projectId: '',
     roleName: '',
     requiredSkills: '',
-    allocationPercent: 50,
     startDate: '',
     endDate: '',
     additionalNeeds: '',
@@ -303,11 +377,15 @@ export function PMDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!pmUserId) {
+      return;
+    }
+
     let isMounted = true;
 
     const loadDashboard = async () => {
       try {
-        const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+        const snapshot = await loadPmDashboardSnapshot(pmUserId);
         const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
         const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
 
@@ -333,7 +411,7 @@ export function PMDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [pmUserId]);
 
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
@@ -425,11 +503,11 @@ export function PMDashboard() {
       try {
         await createProjectManagerChangeRequest({
           projectId: targetProject.id,
-          assignedByUserId: defaultPmUserId,
+          assignedByUserId: pmUserId,
           roleName: inferredRoleName,
           startDate: targetProject.startDate,
           endDate: targetProject.endDate,
-          allocationPercent: 100,
+          allocationPercent: 0,
           requiredSkills: affectedEmployee?.skills ?? [],
           additionalNeeds: `System conflict ${conflict.id}: ${conflict.details}`,
         });
@@ -534,7 +612,7 @@ export function PMDashboard() {
         roleName: affectedEmployee.skills[0] ?? 'Resource',
         startDate: allProjects.find((project) => project.id === targetProjectId)?.startDate ?? new Date().toISOString(),
         endDate: allProjects.find((project) => project.id === targetProjectId)?.endDate ?? new Date().toISOString(),
-        assignedByUserId: defaultPmUserId,
+        assignedByUserId: pmUserId,
       });
     } catch (persistError) {
       addToast({
@@ -704,11 +782,11 @@ export function PMDashboard() {
     try {
       await createProjectManagerChangeRequest({
         projectId: changeRequestForm.projectId,
-        assignedByUserId: defaultPmUserId,
+        assignedByUserId: pmUserId,
         roleName: changeRequestForm.roleName.trim(),
         startDate: changeRequestForm.startDate,
         endDate: changeRequestForm.endDate,
-        allocationPercent: changeRequestForm.allocationPercent,
+        allocationPercent: 0,
         requiredSkills,
         additionalNeeds: changeRequestForm.additionalNeeds.trim(),
       });
@@ -749,7 +827,7 @@ export function PMDashboard() {
     setIsLoading(true);
 
     try {
-      const snapshot = await loadPmDashboardSnapshot(defaultPmUserId);
+      const snapshot = await loadPmDashboardSnapshot(pmUserId);
       const conflictsWithSuggestions = buildDetectedConflicts(snapshot.projects, snapshot.employees);
       const projectsWithConflictFlags = attachConflictFlags(snapshot.projects, conflictsWithSuggestions);
 
@@ -913,29 +991,12 @@ export function PMDashboard() {
                 </select>
               </label>
 
-              <label className="space-y-1">
+              <label className="space-y-1 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600">Needed Role</span>
                 <input
                   value={changeRequestForm.roleName}
                   onChange={(event) => setChangeRequestForm((prev) => ({ ...prev, roleName: event.target.value }))}
                   placeholder="QA Engineer"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </label>
-
-              <label className="space-y-1">
-                <span className="text-xs font-medium text-gray-600">Allocation %</span>
-                <input
-                  type="number"
-                  min={10}
-                  max={100}
-                  value={changeRequestForm.allocationPercent}
-                  onChange={(event) =>
-                    setChangeRequestForm((prev) => ({
-                      ...prev,
-                      allocationPercent: Math.max(10, Math.min(100, Number(event.target.value) || 10)),
-                    }))
-                  }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </label>
