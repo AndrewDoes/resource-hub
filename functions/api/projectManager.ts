@@ -1,6 +1,7 @@
 import { BackendApiUrl } from "../BackendApiUrl";
 import { authorizedFetch } from "./authorizedFetch";
 
+// Standardized project status - used consistently throughout frontend
 export type ProjectManagerProjectStatus = "on-track" | "at-risk" | "delayed" | "completed" | "cancelled";
 
 export interface ProjectManagerProjectSummary {
@@ -200,15 +201,46 @@ interface ProjectManagerTimelineTasksResponse {
 }
 
 const fallbackStatus = (value: string | undefined): ProjectManagerProjectStatus => {
-  switch (value) {
+  const normalized = value?.toLowerCase().replace(/[_\s]/g, "-");
+
+  switch (normalized) {
     case "at-risk":
+    case "atrisk":
+    case "high-risk":
+      return "at-risk";
     case "delayed":
+      return "delayed";
     case "on-track":
+    case "in-progress":
+    case "inprogress":
+    case "assigned":
+      return "on-track";
     case "completed":
+    case "complete":
+      return "completed";
     case "cancelled":
-      return value;
+    case "canceled":
+      return "cancelled";
     default:
       return "on-track";
+  }
+};
+
+// Convert frontend status enum to backend format for mutation endpoints
+const toBackendStatus = (status: ProjectManagerProjectStatus): string => {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    case "on-track":
+      return "InProgress";
+    case "at-risk":
+      return "AtRisk";
+    case "delayed":
+      return "Delayed";
+    default:
+      return "InProgress";
   }
 };
 
@@ -512,7 +544,9 @@ export async function fetchProjectManagerProjects(pmUserId: string): Promise<Pro
     pageSize: "10",
   });
 
-  const response = await authorizedFetch(url);
+  const response = await authorizedFetch(url, {
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to load project manager projects (${response.status})`);
@@ -699,26 +733,35 @@ export async function updateProjectManagerTimelineTask(input: ProjectManagerUpda
 
 export async function updateProjectManagerProjectStatus(
   projectId: string,
-  status: 'InProgress' | 'Completed' | 'Cancelled' | 'Assigned'
+  status: ProjectManagerProjectStatus
 ): Promise<ProjectManagerUpdateProjectStatusResult> {
+  const backendStatus = toBackendStatus(status);
+
   const response = await authorizedFetch(BackendApiUrl.projectsUpdateStatus, {
     method: 'POST',
     body: JSON.stringify({
       projectId,
-      status,
+      status: backendStatus,
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to update project status (${response.status})`);
+  if (response.ok) {
+    const payload = (await response.json()) as Record<string, unknown>;
+    const responseStatus = fallbackStatus(
+      typeof (payload.status ?? payload.Status) === "string" 
+        ? String(payload.status ?? payload.Status).toLowerCase()
+        : undefined
+    );
+
+    return {
+      projectId: asString(payload.projectId ?? payload.ProjectId, projectId),
+      status: responseStatus,
+    };
   }
 
-  const payload = (await response.json()) as Record<string, unknown>;
-
-  return {
-    projectId: asString(payload.projectId ?? payload.ProjectId, projectId),
-    status: asString(payload.status ?? payload.Status, status),
-  };
+  const fallbackMessage = `Failed to update project status (${response.status})`;
+  const errorMessage = await readErrorMessage(response, fallbackMessage);
+  throw new Error(errorMessage);
 }
 
 export async function createProjectManagerChangeRequest(
@@ -966,7 +1009,7 @@ export async function updateTaskAssignment(input: TaskAssignmentUpdateInput): Pr
 }
 
 export async function deleteTaskAssignment(taskId: string): Promise<void> {
-  const response = await fetch(BackendApiUrl.taskAssignmentsDelete(taskId), {
+  const response = await authorizedFetch(BackendApiUrl.taskAssignmentsDelete(taskId), {
     method: 'DELETE',
   });
 

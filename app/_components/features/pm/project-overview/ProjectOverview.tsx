@@ -11,6 +11,7 @@ import {
   fetchProjectManagerTimelineTasks,
   projectManagerFallbackProjects,
   type ProjectManagerProjectSummary,
+  type ProjectManagerProjectStatus,
   updateProjectManagerProjectStatus,
 } from "@/functions/api/projectManager";
 import { useRole } from "@/app/context/RoleContext";
@@ -43,16 +44,16 @@ export function ProjectOverview() {
   const [error, setError] = useState<string | null>(null);
   const [isUsingFallbackData] = useState(false);
 
-  const handleUpdateStatus = async (projectId: string, status: 'InProgress' | 'Completed' | 'Cancelled') => {
+  const handleUpdateStatus = async (projectId: string, status: ProjectManagerProjectStatus) => {
     if (isUsingFallbackData) {
       setError('Cannot update status while using fallback data. Please ensure backend is reachable.');
       return;
     }
 
-    const confirmMessage = status === 'Completed'
+    const confirmMessage = status === 'completed'
       ? "Are you sure you want to mark this project as completed?"
-      : status === 'InProgress'
-        ? "Do you want to undo completion and move this project back to In Progress?"
+      : status === 'on-track'
+        ? "Do you want to undo completion and reopen this project?"
         : `Are you sure you want to change project status to ${status}?`;
 
     const confirmed = window.confirm(confirmMessage);
@@ -65,8 +66,28 @@ export function ProjectOverview() {
     try {
       await updateProjectManagerProjectStatus(projectId, status);
 
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId
+            ? {
+                ...project,
+                status: status,
+              }
+            : project
+        )
+      );
+
       const refreshed = await fetchProjectManagerProjects(pmUserId);
-      setProjects(refreshed);
+      setProjects((prev) =>
+        refreshed.map((project) =>
+          project.id === projectId
+            ? {
+                ...project,
+                status: status,
+              }
+            : project
+        )
+      );
       setError(null);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update project status');
@@ -328,7 +349,7 @@ export function ProjectOverview() {
               {!isUsingFallbackData && project.status !== 'cancelled' && (
                 <button
                   type="button"
-                  onClick={() => handleUpdateStatus(project.id, project.status === 'completed' ? 'InProgress' : 'Completed')}
+                  onClick={() => handleUpdateStatus(project.id, project.status === 'completed' ? 'on-track' : 'completed')}
                   disabled={updatingProjectIds.includes(project.id)}
                   className={`ml-4 shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${project.status === 'completed'
                     ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'

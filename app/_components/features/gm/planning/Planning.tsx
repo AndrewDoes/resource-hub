@@ -163,7 +163,7 @@ export function Planning() {
 
       if (projectResult.status === 'fulfilled' && projectResult.value.length > 0) {
         const activeSummaries = projectResult.value.filter(
-          (project) => !isFinishedProject(project)
+          (project) => project.status !== 'completed' && project.status !== 'cancelled'
         );
 
         if (activeSummaries.length === 0) {
