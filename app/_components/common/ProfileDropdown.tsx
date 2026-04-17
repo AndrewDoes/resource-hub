@@ -49,7 +49,7 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
            <p className="text-xs text-gray-500 px-3 mb-2 uppercase font-bold tracking-wider">Account</p>
            <button 
              onClick={() => {
-                router.push('/settings');
+                router.push(`/${currentUser.role}/settings`);
                 onClose();
              }}
              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-left"
