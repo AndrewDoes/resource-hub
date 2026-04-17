@@ -12,20 +12,20 @@ interface ProjectSidebarProps {
 
 export function ProjectSidebar({ projects, selectedProjectId, onSelect }: ProjectSidebarProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sticky top-6">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <h2 className="text-sm font-semibold text-gray-900 mb-4">Select Project</h2>
       <div className="space-y-3">
         {projects.map((project) => (
           <button
             key={project.id}
             onClick={() => onSelect(project)}
-            className={`w-full text-left p-4 rounded-lg border-2 transition-all ${selectedProjectId === project.id
+            className={`w-full min-h-[132px] text-left p-4 rounded-lg border-2 transition-all flex flex-col justify-between ${selectedProjectId === project.id
               ? 'border-blue-500 bg-blue-50'
               : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
           >
-            <div className="flex items-start justify-between mb-2">
-              <p className="font-semibold text-gray-900 text-sm">{project.name}</p>
+            <div className="flex items-start justify-between mb-3">
+              <p className="font-semibold text-gray-900 text-sm leading-5 min-h-10 pr-2 break-words">{project.name}</p>
               <ChevronRight
                 className={`w-4 h-4 shrink-0 transition-transform ${selectedProjectId === project.id
                   ? 'text-blue-600 translate-x-1'
