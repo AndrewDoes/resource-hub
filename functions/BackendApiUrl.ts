@@ -60,4 +60,6 @@ export const BackendApiUrl = {
   notifications: `${baseUrl}/api/Notification`,
   notificationsMarkRead: (id: string) => `${baseUrl}/api/Notification/${id}/read`,
   notificationsMarkAllRead: `${baseUrl}/api/Notification/mark-all-read`,
+  reportsMetrics: `${baseUrl}/api/reports/metrics`,
+  reportsExport: `${baseUrl}/api/reports/export`,
 } as const;
