@@ -23,7 +23,7 @@ export interface NotificationItemResponse {
 function mapNotification(item: NotificationItemResponse, role?: string): Notification {
   // Construct navigation target based on entity type and user role
   let navigationTarget = "/dashboard";
-  
+
   if (role) {
     const userRole = role.toLowerCase();
     if (item.sourceEntityType === "Project") {
@@ -43,6 +43,10 @@ function mapNotification(item: NotificationItemResponse, role?: string): Notific
         navigationTarget = "/employee/my-projects";
       } else if (userRole === "pm") {
         navigationTarget = "/pm/project-manager";
+      }
+    } else if (item.sourceEntityType === "GmDecision") {
+      if (userRole === "gm") {
+        navigationTarget = "/gm/planning";
       }
     }
   }
@@ -64,7 +68,7 @@ function mapNotification(item: NotificationItemResponse, role?: string): Notific
     timestamp: new Date(item.createdAt).toLocaleString(),
     read: item.isRead,
     navigationTarget: navigationTarget,
-    highlightProject: item.sourceEntityType === "Project" ? item.sourceEntityId || undefined : undefined
+    highlightProject: (item.sourceEntityType === "Project" || item.sourceEntityType === "GmDecision") ? item.sourceEntityId || undefined : undefined
   };
 }
 
