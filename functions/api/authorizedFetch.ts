@@ -15,8 +15,9 @@ export async function authorizedFetch(
       headers.set("Authorization", `Bearer ${token}`);
     }
   
-    // Ensure Content-Type is set for POST/PUT if body is present
-    if (options.body && !headers.has("Content-Type")) {
+    // Ensure Content-Type is set for POST/PUT if body is present, 
+    // except when the body is FormData (browser needs to set multipart/form-data with a boundary)
+    if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
   
