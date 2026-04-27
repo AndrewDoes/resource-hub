@@ -369,14 +369,7 @@ export async function executeContractAction(decisionId: string): Promise<boolean
   return response.ok;
 }
 
-export async function startHiring(decisionId: string): Promise<boolean> {
-  const response = await authorizedFetch(BackendApiUrl.startHiring, {
-    method: 'POST',
-    body: JSON.stringify({ decisionId }),
-  });
 
-  return response.ok;
-}
 
 export interface HRAssignmentRequestItem {
   id: string;

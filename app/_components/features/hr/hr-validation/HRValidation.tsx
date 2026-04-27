@@ -4,17 +4,17 @@ import { ShieldCheck } from 'lucide-react';
 import { useFeedbackToast } from '@/app/context/ToastContext';
 
 // Types & Data
-import { GMDecision, ContractAction, AssignmentRequest, HiringRequest, EmployeeStatus } from './types';
-import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockHiringRequests, mockEmployeeStatus } from './data';
+import { GMDecision, ContractAction, AssignmentRequest, EmployeeStatus } from './types';
+import { mockGMDecisions, mockContractActions, mockAssignmentRequests, mockEmployeeStatus } from './data';
 import { useEffect, useState } from 'react';
-import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, startHiring, requestClarification } from '@/functions/api/humanResource';
+import { fetchHREmployeeList, mapToUIEmployeeStatus, mapToUIContractAction, mapToUIDecision, fetchHRAssignmentRequests, mapToUIAssignmentRequest, updateAssignmentStatus, executeDecision, executeContractAction, requestClarification } from '@/functions/api/humanResource';
 import { fetchGeneralManagerContractDecisions, fetchGeneralManagerDecisions } from '@/functions/api/generalManager';
 
 // Sub-components
 import { DecisionInbox } from './components/DecisionInbox';
 import { ContractExecutionPanel } from './components/ContractExecutionPanel';
 import { AssignmentValidation } from './components/AssignmentValidation';
-import { HiringActionPanel } from './components/HiringActionPanel';
+
 import { EmployeeStatusControl } from './components/EmployeeStatusControl';
 import { WorkloadStatusIndicator } from './components/WorkloadStatusIndicator';
 import { WorkloadKPIs } from './components/WorkloadKPIs';
@@ -24,7 +24,7 @@ export function HRValidation() {
   const [gmDecisions, setGmDecisions] = useState<GMDecision[]>(mockGMDecisions);
   const [contractActions, setContractActions] = useState<ContractAction[]>(mockContractActions);
   const [assignmentRequests, setAssignmentRequests] = useState<AssignmentRequest[]>(mockAssignmentRequests);
-  const [hiringRequests, setHiringRequests] = useState<HiringRequest[]>(mockHiringRequests);
+
   const [employeeStatus, setEmployeeStatus] = useState<EmployeeStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,34 +65,7 @@ export function HRValidation() {
         const uiGeneralDecisions = apiGeneralDecisions.map(mapToUIDecision);
         setGmDecisions(uiGeneralDecisions);
 
-        // Map Hiring Requests from GM Decisions (type 'hire-resource')
-        const uiHiringRequests = uiGeneralDecisions
-          .filter(d => d.type === 'hire-resource' && d.status === 'pending')
-          .map(d => {
-            // Try to extract quantity and role from details string
-            // Example: "Hire 2 Backend Developers (Senior level) - Skills: Node.js, PostgreSQL, AWS"
-            const details = d.details || "";
-            const quantityMatch = details.match(/Hire (\d+)/i);
-            const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 1;
 
-            // Try to find role name (between quantity and skills/bracket)
-            const roleMatch = details.match(/Hire \d+ (.*?) (\(|-)/i) || details.match(/Hire \d+ (.*)/i);
-            const role = roleMatch ? roleMatch[1].trim() : "New Resource";
-
-            const skillsMatch = details.match(/Skills: (.*)/i);
-            const skills = skillsMatch ? skillsMatch[1].split(',').map((s: string) => s.trim()) : [];
-
-            return {
-              id: d.id,
-              role: role,
-              quantity: quantity,
-              skillRequirements: skills,
-              projectName: d.projectName,
-              gmDecisionId: d.id,
-              status: 'pending' as const
-            };
-          });
-        setHiringRequests(uiHiringRequests);
 
         // Map Assignment Requests
         const uiAssignments = apiAssignmentRequests.map(mapToUIAssignmentRequest);
@@ -130,9 +103,6 @@ export function HRValidation() {
     setContractActions((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status: newStatus as any } : c))
     );
-    setHiringRequests((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, status: newStatus === 'executed' ? 'in-progress' : newStatus as any } : h))
-    );
   };
 
   const handleExecuteDecision = async (id: string) => {
@@ -147,7 +117,9 @@ export function HRValidation() {
       if (type.includes('contract')) {
         success = await executeContractAction(id);
       } else if (type.includes('hire')) {
-        success = await startHiring(id);
+        // success = await startHiring(id);
+        // Hiring action is now handled elsewhere or disabled from this dashboard
+        success = await executeDecision(id);
       } else {
         // Default to project assignment / generic decision
         success = await executeDecision(id);
@@ -272,25 +244,7 @@ export function HRValidation() {
     }
   };
 
-  const handleStartHiring = async (id: string) => {
-    try {
-      const success = await startHiring(id);
-      if (success) {
-        setHiringRequests(prev => prev.filter(h => h.id !== id));
-        addToast({
-          type: 'success',
-          title: 'Hiring Process Started',
-          message: 'Recruitment process tracking record created.',
-        });
-      }
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: 'Init Failed',
-        message: 'Could not start the hiring process.',
-      });
-    }
-  };
+
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -338,7 +292,7 @@ export function HRValidation() {
           )}
 
         </div>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {isLoading ? (
             <div className="h-64 bg-gray-50 rounded-xl border border-dashed border-gray-300 flex items-center justify-center">
               <p className="text-gray-400 text-sm">Loading contract actions...</p>
@@ -349,10 +303,6 @@ export function HRValidation() {
               onExecute={handleExecuteContract}
             />
           )}
-          <HiringActionPanel
-            hiringRequests={hiringRequests}
-            onStartHiring={handleStartHiring}
-          />
         </div>
         <div className="grid grid-cols-1 gap-6">
           {isLoading ? (
