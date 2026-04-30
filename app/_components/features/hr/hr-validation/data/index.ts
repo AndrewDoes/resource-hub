@@ -1,7 +1,6 @@
 import {
   GMDecision,
   ContractAction,
-  HiringRequest,
   EmployeeStatus,
   AssignmentRequest,
   Employee
@@ -53,17 +52,7 @@ export const mockContractActions: ContractAction[] = [
   },
 ];
 
-export const mockHiringRequests: HiringRequest[] = [
-  {
-    id: 'hire-1',
-    role: 'Backend Developer',
-    quantity: 2,
-    skillRequirements: ['Node.js', 'PostgreSQL', 'AWS', 'Docker'],
-    projectName: 'Mobile App Development',
-    gmDecisionId: 'gm-dec-2',
-    status: 'pending',
-  },
-];
+
 
 export const mockEmployeeStatus: EmployeeStatus[] = [
   {

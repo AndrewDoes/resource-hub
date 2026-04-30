@@ -20,15 +20,7 @@ export interface ContractAction {
   status: 'pending' | 'executed';
 }
 
-export interface HiringRequest {
-  id: string;
-  role: string;
-  quantity: number;
-  skillRequirements: string[];
-  projectName: string;
-  gmDecisionId: string;
-  status: 'pending' | 'in-progress' | 'completed';
-}
+
 
 export interface EmployeeStatus {
   id: string;
